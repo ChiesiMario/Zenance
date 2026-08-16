@@ -1,0 +1,54 @@
+{
+  "translation": {
+    "nav": {
+      "overview": "總覽",
+      "add": "新增",
+      "settings": "設定"
+    },
+    "dashboard": {
+      "overview": "總覽",
+      "netBalance": "淨結餘",
+      "income": "收入",
+      "expense": "支出",
+      "activity": "近期紀錄",
+      "noActivity": "尚無紀錄。"
+    },
+    "add": {
+      "expense": "支出",
+      "income": "收入",
+      "category": "分類",
+      "addCategory": "新增",
+      "addExpenseCategory": "新增支出分類",
+      "addIncomeCategory": "新增收入分類",
+      "categoryName": "分類名稱",
+      "cancel": "取消",
+      "date": "日期",
+      "note": "備註",
+      "optional": "選填",
+      "saving": "儲存中...",
+      "saveTransaction": "儲存紀錄",
+      "errors": {
+        "amountRequired": "必填",
+        "amountPositive": "金額必須大於 0",
+        "categoryRequired": "必填",
+        "dateRequired": "必填"
+      }
+    },
+    "settings": {
+      "settings": "設定",
+      "dropboxSync": "Dropbox 同步",
+      "backupAndSync": "安全地備份並同步您的資料。",
+      "status": "狀態",
+      "connected": "已連結",
+      "disconnected": "未連結",
+      "lastSync": "最後同步",
+      "never": "從未",
+      "connectDropbox": "連結 Dropbox",
+      "syncing": "同步中...",
+      "syncNow": "立即同步",
+      "disconnect": "解除連結",
+      "language": "語言",
+      "selectLanguage": "選擇語言"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "translation": {
+    "nav": {
+      "overview": "Overview",
+      "add": "Add",
+      "settings": "Settings"
+    },
+    "dashboard": {
+      "overview": "Overview",
+      "netBalance": "Net Balance",
+      "income": "Income",
+      "expense": "Expense",
+      "activity": "Activity",
+      "noActivity": "No recent activity."
+    },
+    "add": {
+      "expense": "Expense",
+      "income": "Income",
+      "category": "Category",
+      "addCategory": "Add",
+      "addExpenseCategory": "Add Expense Category",
+      "addIncomeCategory": "Add Income Category",
+      "categoryName": "Category Name",
+      "cancel": "Cancel",
+      "date": "Date",
+      "note": "Note",
+      "optional": "Optional",
+      "saving": "Saving...",
+      "saveTransaction": "Save Transaction",
+      "errors": {
+        "amountRequired": "Required",
+        "amountPositive": "Amount must be > 0",
+        "categoryRequired": "Required",
+        "dateRequired": "Required"
+      }
+    },
+    "settings": {
+      "settings": "Settings",
+      "dropboxSync": "Dropbox Sync",
+      "backupAndSync": "Backup and sync your data securely.",
+      "status": "Status",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "lastSync": "Last Sync",
+      "never": "Never",
+      "connectDropbox": "Connect Dropbox",
+      "syncing": "Syncing...",
+      "syncNow": "Sync Now",
+      "disconnect": "Disconnect",
+      "language": "Language",
+      "selectLanguage": "Select Language"
+    }
+  }
+}

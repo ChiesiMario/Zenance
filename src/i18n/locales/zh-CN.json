@@ -1,0 +1,54 @@
+{
+  "translation": {
+    "nav": {
+      "overview": "概览",
+      "add": "记账",
+      "settings": "设置"
+    },
+    "dashboard": {
+      "overview": "概览",
+      "netBalance": "净结余",
+      "income": "收入",
+      "expense": "支出",
+      "activity": "近期记录",
+      "noActivity": "暂无记录。"
+    },
+    "add": {
+      "expense": "支出",
+      "income": "收入",
+      "category": "分类",
+      "addCategory": "添加",
+      "addExpenseCategory": "添加支出分类",
+      "addIncomeCategory": "添加收入分类",
+      "categoryName": "分类名称",
+      "cancel": "取消",
+      "date": "日期",
+      "note": "备注",
+      "optional": "选填",
+      "saving": "保存中...",
+      "saveTransaction": "保存记录",
+      "errors": {
+        "amountRequired": "必填",
+        "amountPositive": "金额必须大于 0",
+        "categoryRequired": "必填",
+        "dateRequired": "必填"
+      }
+    },
+    "settings": {
+      "settings": "设置",
+      "dropboxSync": "Dropbox 同步",
+      "backupAndSync": "安全地备份并同步您的数据。",
+      "status": "状态",
+      "connected": "已连接",
+      "disconnected": "未连接",
+      "lastSync": "最后同步",
+      "never": "从未",
+      "connectDropbox": "连接 Dropbox",
+      "syncing": "同步中...",
+      "syncNow": "立即同步",
+      "disconnect": "解除连接",
+      "language": "语言",
+      "selectLanguage": "选择语言"
+    }
+  }
+}

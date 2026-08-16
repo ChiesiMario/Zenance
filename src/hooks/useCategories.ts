@@ -1,56 +1,28 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Category } from '../services/db/db';
-import { v4 as uuidv4 } from 'uuid';
-import { useEffect } from 'react';
-
-const DEFAULT_CATEGORIES = [
-  { name: '飲食', type: 'expense' as const },
-  { name: '交通', type: 'expense' as const },
-  { name: '娛樂', type: 'expense' as const },
-  { name: '購物', type: 'expense' as const },
-  { name: '居住', type: 'expense' as const },
-  { name: '薪水', type: 'income' as const },
-  { name: '投資', type: 'income' as const },
-  { name: '其他', type: 'income' as const },
-];
+import { db, type Category } from '@/services/db/db';
+import { useAppStore } from '@/store/useAppStore';
 
 export function useCategories() {
-  const categories = useLiveQuery(() => 
-    db.categories
-      .filter(c => !c.deleted)
-      .toArray()
+  const { activeLedgerId } = useAppStore();
+
+  const categories = useLiveQuery(
+    () => {
+      if (!activeLedgerId) return Promise.resolve([] as Category[]);
+      return db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).toArray();
+    },
+    [activeLedgerId]
   );
 
-  // Initialize default categories if database is empty
-  useEffect(() => {
-    const initDefaultCategories = async () => {
-      const count = await db.categories.count();
-      if (count === 0) {
-        const now = new Date().toISOString();
-        const defaultData = DEFAULT_CATEGORIES.map(cat => ({
-          id: uuidv4(),
-          name: cat.name,
-          type: cat.type,
-          isDefault: true,
-          createdAt: now,
-          updatedAt: now,
-          deleted: false
-        }));
-        await db.categories.bulkAdd(defaultData);
-      }
-    };
-    initDefaultCategories();
-  }, []);
-
-  const addCategory = async (name: string, type: 'income' | 'expense') => {
-    const now = new Date().toISOString();
+  const addCategory = async (name: string, type: 'income' | 'expense', isDefault = false): Promise<Category> => {
+    if (!activeLedgerId) throw new Error('No active ledger');
     const newCategory: Category = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
+      ledgerId: activeLedgerId,
       name,
       type,
-      isDefault: false,
-      createdAt: now,
-      updatedAt: now,
+      isDefault,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       deleted: false,
     };
     await db.categories.add(newCategory);
@@ -58,16 +30,57 @@ export function useCategories() {
   };
 
   const deleteCategory = async (id: string) => {
-    const now = new Date().toISOString();
     await db.categories.update(id, {
       deleted: true,
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     });
+  };
+
+  const initDefaultCategories = async () => {
+    if (!activeLedgerId) return;
+    const defaultExpenseCategories = [
+      'Food & Dining', 'Transportation', 'Housing', 'Utilities', 
+      'Shopping', 'Entertainment', 'Healthcare', 'Personal Care', 'Education'
+    ];
+    
+    const defaultIncomeCategories = [
+      'Salary', 'Investments', 'Freelance', 'Gifts', 'Other Income'
+    ];
+
+    const currentCount = await db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).count();
+    
+    if (currentCount === 0) {
+      const categoriesToAdd = [
+        ...defaultExpenseCategories.map(name => ({
+          id: crypto.randomUUID(),
+          ledgerId: activeLedgerId,
+          name,
+          type: 'expense' as const,
+          isDefault: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          deleted: false,
+        })),
+        ...defaultIncomeCategories.map(name => ({
+          id: crypto.randomUUID(),
+          ledgerId: activeLedgerId,
+          name,
+          type: 'income' as const,
+          isDefault: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          deleted: false,
+        }))
+      ];
+      
+      await db.categories.bulkAdd(categoriesToAdd);
+    }
   };
 
   return {
     categories,
     addCategory,
     deleteCategory,
+    initDefaultCategories,
   };
 }

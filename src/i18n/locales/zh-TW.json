@@ -2,20 +2,37 @@
   "translation": {
     "nav": {
       "overview": "總覽",
+      "accounts": "帳戶",
+      "contacts": "對象",
+      "budgets": "預算",
       "add": "新增",
       "settings": "設定"
     },
     "dashboard": {
       "overview": "總覽",
+      "recentTransactions": "近期紀錄",
+      "switchLedger": "切換帳本",
+      "manageLedgers": "管理帳本",
+      "createLedger": "建立新帳本",
+      "newLedgerName": "新帳本名稱",
       "netBalance": "淨結餘",
       "income": "收入",
       "expense": "支出",
-      "activity": "近期紀錄",
-      "noActivity": "尚無紀錄。"
+      "activity": "活動",
+      "noActivity": "暫無近期紀錄。",
+      "detail": "交易明細",
+      "original": "原始金額",
+      "rate": "匯率",
+      "delete": "刪除",
+      "close": "關閉"
     },
     "add": {
       "expense": "支出",
       "income": "收入",
+      "transfer": "轉帳",
+      "account": "帳戶",
+      "fromAccount": "轉出帳戶",
+      "toAccount": "轉入帳戶",
       "category": "分類",
       "addCategory": "新增",
       "addExpenseCategory": "新增支出分類",
@@ -31,8 +48,57 @@
         "amountRequired": "必填",
         "amountPositive": "金額必須大於 0",
         "categoryRequired": "必填",
-        "dateRequired": "必填"
+        "accountRequired": "必填",
+        "dateRequired": "必填",
+        "sameAccount": "轉出與轉入帳戶不能相同"
       }
+    },
+    "accounts": {
+      "accounts": "帳戶",
+      "addAccount": "新增帳戶",
+      "accountName": "帳戶名稱",
+      "cancel": "取消",
+      "add": "新增",
+      "default": "預設",
+      "balance": "餘額",
+      "netWorth": "總淨值",
+      "assets": "資產",
+      "liabilities": "負債"
+    },
+    "budgets": {
+      "budgets": "預算",
+      "addBudget": "新增預算",
+      "budgetName": "預算名稱",
+      "targetAmount": "目標金額",
+      "startDate": "開始日期",
+      "endDate": "結束日期",
+      "cancel": "取消",
+      "add": "新增",
+      "spent": "已花費",
+      "remaining": "剩餘"
+    },
+    "ledgers": {
+      "personal": "個人帳本",
+      "create": "建立帳本",
+      "cancel": "取消",
+      "add": "新增",
+      "baseCurrency": "預設貨幣",
+      "deleteLedger": "刪除帳本",
+      "deleteWarning": "確定要刪除此帳本嗎？這將會隱藏帳本內的所有紀錄且無法復原。",
+      "typeToConfirm": "請輸入帳本名稱以確認刪除：",
+      "ledgerName": "帳本名稱",
+      "delete": "刪除"
+    },
+    "contacts": {
+      "contacts": "對象",
+      "addContact": "新增對象",
+      "contactName": "對象名稱",
+      "cancel": "取消",
+      "add": "新增",
+      "owesYou": "應收",
+      "youOwe": "應付",
+      "settled": "已結清",
+      "noContacts": "目前沒有任何對象"
     },
     "settings": {
       "settings": "設定",
@@ -48,7 +114,11 @@
       "syncNow": "立即同步",
       "disconnect": "解除連結",
       "language": "語言",
-      "selectLanguage": "選擇語言"
+      "selectLanguage": "選擇語言",
+      "theme": "外觀主題",
+      "themeLight": "淺色",
+      "themeDark": "暗色",
+      "themeSystem": "跟隨系統"
     }
   }
 }

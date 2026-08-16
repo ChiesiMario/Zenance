@@ -2,20 +2,37 @@
   "translation": {
     "nav": {
       "overview": "概览",
+      "accounts": "账户",
+      "contacts": "对象",
+      "budgets": "预算",
       "add": "记账",
       "settings": "设置"
     },
     "dashboard": {
       "overview": "概览",
+      "recentTransactions": "近期记录",
+      "switchLedger": "切换账本",
+      "manageLedgers": "管理账本",
+      "createLedger": "创建新账本",
+      "newLedgerName": "新账本名称",
       "netBalance": "净结余",
       "income": "收入",
       "expense": "支出",
       "activity": "近期记录",
-      "noActivity": "暂无记录。"
+      "noActivity": "暂无记录。",
+      "detail": "交易明细",
+      "original": "原始金额",
+      "rate": "汇率",
+      "delete": "删除",
+      "close": "关闭"
     },
     "add": {
       "expense": "支出",
       "income": "收入",
+      "transfer": "转账",
+      "account": "账户",
+      "fromAccount": "转出账户",
+      "toAccount": "转入账户",
       "category": "分类",
       "addCategory": "添加",
       "addExpenseCategory": "添加支出分类",
@@ -31,8 +48,57 @@
         "amountRequired": "必填",
         "amountPositive": "金额必须大于 0",
         "categoryRequired": "必填",
-        "dateRequired": "必填"
+        "accountRequired": "必填",
+        "dateRequired": "必填",
+        "sameAccount": "转出与转入账户不能相同"
       }
+    },
+    "accounts": {
+      "accounts": "账户",
+      "addAccount": "添加账户",
+      "accountName": "账户名称",
+      "cancel": "取消",
+      "add": "添加",
+      "default": "默认",
+      "balance": "余额",
+      "netWorth": "净资产",
+      "assets": "资产",
+      "liabilities": "负债"
+    },
+    "budgets": {
+      "budgets": "预算",
+      "addBudget": "添加预算",
+      "budgetName": "预算名称",
+      "targetAmount": "目标金额",
+      "startDate": "开始日期",
+      "endDate": "结束日期",
+      "cancel": "取消",
+      "add": "添加",
+      "spent": "已花费",
+      "remaining": "剩余"
+    },
+    "ledgers": {
+      "personal": "个人账本",
+      "create": "创建账本",
+      "cancel": "取消",
+      "add": "新增",
+      "baseCurrency": "基础货币",
+      "deleteLedger": "删除账本",
+      "deleteWarning": "确定要删除此账本吗？这将会隐藏账本内的所有记录且无法复原。",
+      "typeToConfirm": "请输入账本名称以确认删除：",
+      "ledgerName": "账本名称",
+      "delete": "删除"
+    },
+    "contacts": {
+      "contacts": "对象",
+      "addContact": "添加对象",
+      "contactName": "对象名称",
+      "cancel": "取消",
+      "add": "添加",
+      "owesYou": "应收",
+      "youOwe": "应付",
+      "settled": "已结清",
+      "noContacts": "目前没有任何对象"
     },
     "settings": {
       "settings": "设置",
@@ -48,7 +114,11 @@
       "syncNow": "立即同步",
       "disconnect": "解除连接",
       "language": "语言",
-      "selectLanguage": "选择语言"
+      "selectLanguage": "选择语言",
+      "theme": "外观主题",
+      "themeLight": "浅色",
+      "themeDark": "暗色",
+      "themeSystem": "跟随系统"
     }
   }
 }

@@ -1,14 +1,19 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Home, Plus } from 'lucide-react';
+import { Home, Plus, Wallet, PieChart, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 
 export function AppLayout() {
   const location = useLocation();
   const { t } = useTranslation();
+  useExchangeRates(); // Trigger background sync
 
   const navItems = [
     { path: '/', label: t('nav.overview'), icon: Home },
+    { path: '/budgets', label: t('nav.budgets'), icon: PieChart },
+    { path: '/accounts', label: t('nav.accounts'), icon: Wallet },
+    { path: '/contacts', label: t('nav.contacts'), icon: Users },
     { path: '/add', label: t('nav.add'), icon: Plus },
   ];
 

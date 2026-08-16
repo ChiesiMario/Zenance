@@ -2,20 +2,37 @@
   "translation": {
     "nav": {
       "overview": "Overview",
+      "accounts": "Accounts",
+      "contacts": "Contacts",
+      "budgets": "Budgets",
       "add": "Add",
       "settings": "Settings"
     },
     "dashboard": {
       "overview": "Overview",
+      "recentTransactions": "Recent Transactions",
+      "switchLedger": "Switch Ledger",
+      "manageLedgers": "Manage Ledgers",
+      "createLedger": "Create Ledger",
+      "newLedgerName": "New Ledger Name",
       "netBalance": "Net Balance",
       "income": "Income",
       "expense": "Expense",
       "activity": "Activity",
-      "noActivity": "No recent activity."
+      "noActivity": "No recent activity.",
+      "detail": "Transaction Detail",
+      "original": "Original",
+      "rate": "Exchange Rate",
+      "delete": "Delete",
+      "close": "Close"
     },
     "add": {
       "expense": "Expense",
       "income": "Income",
+      "transfer": "Transfer",
+      "account": "Account",
+      "fromAccount": "From Account",
+      "toAccount": "To Account",
       "category": "Category",
       "addCategory": "Add",
       "addExpenseCategory": "Add Expense Category",
@@ -31,8 +48,57 @@
         "amountRequired": "Required",
         "amountPositive": "Amount must be > 0",
         "categoryRequired": "Required",
-        "dateRequired": "Required"
+        "accountRequired": "Required",
+        "dateRequired": "Required",
+        "sameAccount": "Cannot transfer to same account"
       }
+    },
+    "accounts": {
+      "accounts": "Accounts",
+      "addAccount": "Add Account",
+      "accountName": "Account Name",
+      "cancel": "Cancel",
+      "add": "Add",
+      "default": "Default",
+      "balance": "Balance",
+      "netWorth": "Net Worth",
+      "assets": "Assets",
+      "liabilities": "Liabilities"
+    },
+    "budgets": {
+      "budgets": "Budgets",
+      "addBudget": "Add Budget",
+      "budgetName": "Budget Name",
+      "targetAmount": "Target Amount",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "cancel": "Cancel",
+      "add": "Add",
+      "spent": "Spent",
+      "remaining": "Remaining"
+    },
+    "ledgers": {
+      "personal": "Personal",
+      "create": "Create Ledger",
+      "cancel": "Cancel",
+      "add": "Add",
+      "baseCurrency": "Base Currency",
+      "deleteLedger": "Delete Ledger",
+      "deleteWarning": "Are you sure you want to delete this ledger? All data inside will be hidden.",
+      "typeToConfirm": "Type the ledger name to confirm:",
+      "ledgerName": "Ledger Name",
+      "delete": "Delete"
+    },
+    "contacts": {
+      "contacts": "Contacts",
+      "addContact": "Add Contact",
+      "contactName": "Contact Name",
+      "cancel": "Cancel",
+      "add": "Add",
+      "owesYou": "Owes you",
+      "youOwe": "You owe",
+      "settled": "Settled",
+      "noContacts": "No contacts found."
     },
     "settings": {
       "settings": "Settings",
@@ -48,7 +114,11 @@
       "syncNow": "Sync Now",
       "disconnect": "Disconnect",
       "language": "Language",
-      "selectLanguage": "Select Language"
+      "selectLanguage": "Select Language",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeSystem": "System"
     }
   }
 }

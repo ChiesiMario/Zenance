@@ -1,37 +1,59 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Transaction } from '../services/db/db';
-import { v4 as uuidv4 } from 'uuid';
+import { db, type Transaction } from '@/services/db/db';
+import { useAppStore } from '@/store/useAppStore';
 
 export function useTransactions() {
-  const transactions = useLiveQuery(() => 
-    db.transactions
-      .filter(t => !t.deleted)
-      .reverse()
-      .sortBy('date')
+  const { activeLedgerId } = useAppStore();
+
+  const transactions = useLiveQuery(
+    () => {
+      if (!activeLedgerId) return Promise.resolve([] as Transaction[]);
+      return db.transactions
+        .filter(t => !t.deleted && t.ledgerId === activeLedgerId)
+        .reverse()
+        .sortBy('date');
+    },
+    [activeLedgerId]
   );
 
-  const addTransaction = async (data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt' | 'deleted'>) => {
-    const now = new Date().toISOString();
-    await db.transactions.add({
+  const addTransaction = async (
+    data: Omit<Transaction, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'>
+  ) => {
+    if (!activeLedgerId) return;
+    const id = crypto.randomUUID();
+    const newTransaction: Transaction = {
       ...data,
-      id: uuidv4(),
-      createdAt: now,
-      updatedAt: now,
+      id,
+      displayId: id.split('-')[0].toUpperCase(),
+      ledgerId: activeLedgerId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       deleted: false,
+    };
+    await db.transactions.add(newTransaction);
+  };
+
+  const updateTransaction = async (
+    id: string,
+    data: Partial<Omit<Transaction, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'>>
+  ) => {
+    await db.transactions.update(id, {
+      ...data,
+      updatedAt: new Date().toISOString(),
     });
   };
 
   const deleteTransaction = async (id: string) => {
-    const now = new Date().toISOString();
     await db.transactions.update(id, {
       deleted: true,
-      updatedAt: now,
+      updatedAt: new Date().toISOString(),
     });
   };
 
   return {
     transactions,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
   };
 }

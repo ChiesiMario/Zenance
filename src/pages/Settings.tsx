@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/button';
-import { Cloud, CloudOff, RefreshCw, Globe } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, Globe, Moon } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useTheme } from '@/components/ThemeProvider';
 
 export default function Settings() {
   const { isSyncing, lastSyncTime } = useAppStore();
   const { t, i18n } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const isAuthenticated = false; // Placeholder
 
   return (
@@ -63,21 +65,40 @@ export default function Settings() {
 
       {/* Preferences Container */}
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 pl-2">
-            <Globe className="h-5 w-5 text-muted-foreground" />
-            <span className="text-sm font-medium">{t('settings.language')}</span>
+        <div className="divide-y divide-border">
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3 pl-2">
+              <Globe className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm font-medium">{t('settings.language')}</span>
+            </div>
+            <Select value={i18n.resolvedLanguage || i18n.language || 'en'} onValueChange={(v) => i18n.changeLanguage(v || 'en')}>
+              <SelectTrigger className="w-[140px] border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-2">
+                <SelectValue placeholder={t('settings.selectLanguage')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="zh-TW">繁體中文</SelectItem>
+                <SelectItem value="zh-CN">简体中文</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={i18n.resolvedLanguage || i18n.language || 'en'} onValueChange={(v) => i18n.changeLanguage(v || 'en')}>
-            <SelectTrigger className="w-[140px] border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-2">
-              <SelectValue placeholder={t('settings.selectLanguage')} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="zh-TW">繁體中文</SelectItem>
-              <SelectItem value="zh-CN">简体中文</SelectItem>
-            </SelectContent>
-          </Select>
+          
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3 pl-2">
+              <Moon className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm font-medium">{t('settings.theme')}</span>
+            </div>
+            <Select value={theme} onValueChange={(v) => setTheme(v as any)}>
+              <SelectTrigger className="w-[140px] border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-2">
+                <SelectValue placeholder="Theme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">{t('settings.themeLight')}</SelectItem>
+                <SelectItem value="dark">{t('settings.themeDark')}</SelectItem>
+                <SelectItem value="system">{t('settings.themeSystem')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
       

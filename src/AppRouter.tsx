@@ -2,6 +2,9 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import AddTransaction from './pages/AddTransaction';
+import Accounts from './pages/Accounts';
+import Contacts from './pages/Contacts';
+import Budgets from './pages/Budgets';
 import Settings from './pages/Settings';
 
 const router = createBrowserRouter([
@@ -16,6 +19,18 @@ const router = createBrowserRouter([
       {
         path: 'add',
         element: <AddTransaction />,
+      },
+      {
+        path: 'accounts',
+        element: <Accounts />,
+      },
+      {
+        path: 'contacts',
+        element: <Contacts />,
+      },
+      {
+        path: 'budgets',
+        element: <Budgets />,
       },
       {
         path: 'settings',

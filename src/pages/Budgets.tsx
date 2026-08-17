@@ -57,10 +57,9 @@ export default function Budgets() {
             </DialogHeader>
             <div className="py-4 space-y-4">
               <Input 
-                placeholder={t('budgets.budgetName')} 
+                placeholder={t('budgets.namePlaceholder')} 
                 value={newBudgetName}
                 onChange={(e) => setNewBudgetName(e.target.value)}
-                autoFocus
               />
               <Input 
                 type="number"

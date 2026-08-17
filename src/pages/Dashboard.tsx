@@ -5,7 +5,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, Trash2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Settings, ChevronDown, Trash2, ChevronLeft, ChevronRight, Plus, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +36,7 @@ export default function Dashboard() {
   const { categories } = useCategories();
   const { accounts } = useAccounts();
   const { activeBudget, budgetProgress } = useBudgets();
-  const { ledgers, addLedger, deleteLedger } = useLedgers();
+  const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
   const { activeLedgerId, setActiveLedgerId } = useAppStore();
   const { t, i18n } = useTranslation();
 
@@ -44,6 +44,9 @@ export default function Dashboard() {
   const [isCreateLedgerOpen, setIsCreateLedgerOpen] = useState(false);
   const [newLedgerName, setNewLedgerName] = useState('');
   const [newLedgerCurrency, setNewLedgerCurrency] = useState('CNY');
+  
+  const [editingLedgerId, setEditingLedgerId] = useState<string | null>(null);
+  const [editingLedgerName, setEditingLedgerName] = useState('');
   
   const [ledgerToDelete, setLedgerToDelete] = useState<Ledger | null>(null);
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
@@ -70,6 +73,13 @@ export default function Dashboard() {
     setActiveLedgerId(newLedger.id);
     setNewLedgerName('');
     setIsCreateLedgerOpen(false);
+  };
+
+  const handleUpdateLedgerName = async (id: string) => {
+    if (editingLedgerName.trim()) {
+      await updateLedger(id, { name: editingLedgerName.trim() });
+    }
+    setEditingLedgerId(null);
   };
 
   const handleDeleteLedger = async () => {
@@ -182,7 +192,7 @@ export default function Dashboard() {
         </DropdownMenu>
 
         <Dialog open={isManageLedgersOpen} onOpenChange={setIsManageLedgersOpen}>
-          <DialogContent className="sm:max-w-[450px]">
+          <DialogContent className="sm:max-w-[350px]">
             <DialogHeader>
               <DialogTitle>{t('dashboard.manageLedgers')}</DialogTitle>
             </DialogHeader>
@@ -193,15 +203,38 @@ export default function Dashboard() {
                   {ledgers?.map(ledger => (
                     <div key={ledger.id} className="flex min-h-12 md:min-h-10 items-center justify-between px-4 md:px-3 py-2 text-sm hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{ledger.name}</span>
+                        {editingLedgerId === ledger.id ? (
+                          <Input
+                            value={editingLedgerName}
+                            onChange={(e) => setEditingLedgerName(e.target.value)}
+                            onBlur={() => handleUpdateLedgerName(ledger.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateLedgerName(ledger.id)}
+                            className="h-7 w-32 px-2 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="font-medium">{ledger.name}</span>
+                        )}
                         <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm">{ledger.baseCurrency || 'CNY'}</span>
                         {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm">Active</span>}
                       </div>
-                      {ledgers.length > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setEditingLedgerId(ledger.id);
+                            setEditingLedgerName(ledger.name);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive" 
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:hover:text-muted-foreground" 
+                          disabled={(ledgers?.length || 0) <= 1}
                           onClick={() => {
                             setLedgerToDelete(ledger);
                             setDeleteConfirmationName('');
@@ -209,7 +242,7 @@ export default function Dashboard() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -235,22 +268,25 @@ export default function Dashboard() {
         </Dialog>
 
         <Dialog open={isCreateLedgerOpen} onOpenChange={setIsCreateLedgerOpen}>
-          <DialogContent className="sm:max-w-[400px] border-none shadow-2xl bg-background/95 backdrop-blur-xl">
-            <div className="py-12 flex flex-col items-center justify-center space-y-12">
-              <input
-                type="text"
-                value={newLedgerName}
-                onChange={(e) => setNewLedgerName(e.target.value)}
-                placeholder={t('dashboard.newLedgerName')}
-                className="w-full bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted focus:ring-0"
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && handleAddLedger()}
-              />
-              
-              <div className="flex flex-col items-center gap-6 w-full px-6">
+          <DialogContent className="sm:max-w-[300px] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="text-center">{t('dashboard.createLedger')}</DialogTitle>
+            </DialogHeader>
+            <div className="py-4 space-y-6">
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">{t('ledgers.ledgerName')}</label>
+                <Input 
+                  placeholder={t('dashboard.newLedgerName')} 
+                  value={newLedgerName}
+                  onChange={(e) => setNewLedgerName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddLedger()}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium">{t('ledgers.baseCurrency')}</label>
                 <Select value={newLedgerCurrency} onValueChange={(val) => { if (val) setNewLedgerCurrency(val); }}>
-                  <SelectTrigger className="w-auto border-none shadow-none focus:ring-0 bg-transparent text-center font-mono text-lg text-muted-foreground hover:text-foreground transition-colors p-0 h-auto [&>svg]:hidden">
-                    <SelectValue placeholder="Cur" />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Currency" />
                   </SelectTrigger>
                   <SelectContent>
                     {COMMON_CURRENCIES.map(c => (
@@ -258,16 +294,19 @@ export default function Dashboard() {
                     ))}
                   </SelectContent>
                 </Select>
-                
-                <Button 
-                  onClick={handleAddLedger} 
-                  disabled={!newLedgerName.trim()}
-                  className="w-full rounded-full h-12 md:h-10 text-md font-medium"
-                >
-                  {t('ledgers.add')}
-                </Button>
               </div>
             </div>
+            <DialogFooter>
+              <DialogClose render={<Button variant="outline" type="button" />}>
+                {t('ledgers.cancel')}
+              </DialogClose>
+              <Button 
+                onClick={handleAddLedger} 
+                disabled={!newLedgerName.trim()}
+              >
+                {t('ledgers.add')}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -286,7 +325,6 @@ export default function Dashboard() {
                 placeholder={t('ledgers.ledgerName')} 
                 value={deleteConfirmationName}
                 onChange={(e) => setDeleteConfirmationName(e.target.value)}
-                autoFocus
               />
             </div>
             <DialogFooter>
@@ -313,12 +351,12 @@ export default function Dashboard() {
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         
         {/* Month Selector */}
-        <div className="flex items-center justify-between p-4 border-b border-border bg-muted/10">
-          <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/10">
+          <Button variant="ghost" onClick={handlePrevMonth} className="!size-8 !p-0 text-muted-foreground hover:text-foreground rounded-md">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="font-medium text-sm capitalize">{formatMonth(currentMonth)}</span>
-          <Button variant="ghost" size="icon" onClick={handleNextMonth} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" onClick={handleNextMonth} className="!size-8 !p-0 text-muted-foreground hover:text-foreground rounded-md">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

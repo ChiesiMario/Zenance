@@ -30,9 +30,17 @@ export function useLedgers() {
     });
   };
 
+  const updateLedger = async (id: string, updates: Partial<Ledger>) => {
+    await db.ledgers.update(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   return {
     ledgers,
     addLedger,
+    updateLedger,
     deleteLedger,
   };
 }

@@ -81,10 +81,10 @@ export default function Accounts() {
             </DialogHeader>
             <div className="py-4">
               <Input 
-                placeholder={t('accounts.accountName')} 
+                placeholder={t('accounts.namePlaceholder')} 
                 value={newAccountName}
                 onChange={(e) => setNewAccountName(e.target.value)}
-                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleAddAccount()}
               />
             </div>
             <DialogFooter>

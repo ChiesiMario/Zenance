@@ -66,10 +66,10 @@ export default function Contacts() {
             </DialogHeader>
             <div className="py-4">
               <Input 
-                placeholder={t('contacts.contactName')} 
+                placeholder={t('contacts.namePlaceholder')} 
                 value={newContactName}
                 onChange={(e) => setNewContactName(e.target.value)}
-                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleAddContact()}
               />
             </div>
             <DialogFooter>

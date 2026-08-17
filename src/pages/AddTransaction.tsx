@@ -264,10 +264,10 @@ export default function AddTransaction() {
                       </DialogHeader>
                       <div className="py-4">
                         <Input 
-                          placeholder={t('add.categoryName')} 
+                          placeholder={t('add.newCategoryPlaceholder')}
                           value={newCatName}
                           onChange={(e) => setNewCatName(e.target.value)}
-                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
                         />
                       </div>
                       <DialogFooter>

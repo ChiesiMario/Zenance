@@ -89,7 +89,6 @@ export default function Setup() {
             onChange={(e) => setName(e.target.value)}
             placeholder={t('setup.namePlaceholder')}
             className="w-full bg-transparent text-center text-6xl font-bold tracking-tight outline-none placeholder:text-muted focus:ring-0"
-            autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleNext()}
           />
 

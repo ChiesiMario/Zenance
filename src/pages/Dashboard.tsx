@@ -184,7 +184,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="border border-border rounded-md divide-y divide-border">
                   {ledgers?.map(ledger => (
-                    <div key={ledger.id} className="flex items-center justify-between p-3 text-sm hover:bg-muted/30 transition-colors">
+                    <div key={ledger.id} className="flex min-h-12 md:min-h-10 items-center justify-between px-4 md:px-3 py-2 text-sm hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{ledger.name}</span>
                         <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm">{ledger.baseCurrency || 'CNY'}</span>
@@ -393,43 +393,43 @@ export default function Dashboard() {
               <div className="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border text-sm">
                 
                 {selectedTransaction.originalCurrency && selectedTransaction.originalCurrency !== activeLedger?.baseCurrency && (
-                  <div className="p-3 flex justify-between items-center bg-muted/10">
+                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
                     <span className="text-muted-foreground">{t('dashboard.original')}</span>
                     <span className="font-mono">{selectedTransaction.originalAmount?.toLocaleString()} {selectedTransaction.originalCurrency}</span>
                   </div>
                 )}
                 {selectedTransaction.originalCurrency && selectedTransaction.originalCurrency !== activeLedger?.baseCurrency && (
-                  <div className="p-3 flex justify-between items-center bg-muted/10">
+                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
                     <span className="text-muted-foreground">{t('dashboard.rate')}</span>
                     <span className="font-mono">{selectedTransaction.exchangeRate?.toFixed(4)}</span>
                   </div>
                 )}
 
-                <div className="p-3 flex justify-between items-center">
+                <div className="flex min-h-12 justify-between items-center px-4 py-2">
                   <span className="text-muted-foreground">{t('add.date')}</span>
                   <span className="font-medium">{selectedTransaction.date}</span>
                 </div>
                 
                 {selectedTransaction.type === 'transfer' ? (
                   <>
-                    <div className="p-3 flex justify-between items-center">
+                    <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
                       <span className="text-muted-foreground">{t('add.fromAccount')}</span>
                       <span className="font-medium">{getAccountName(selectedTransaction.accountId)}</span>
                     </div>
-                    <div className="p-3 flex justify-between items-center">
+                    <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
                       <span className="text-muted-foreground">{t('add.toAccount')}</span>
                       <span className="font-medium">{selectedTransaction.toAccountId ? getAccountName(selectedTransaction.toAccountId) : '-'}</span>
                     </div>
                   </>
                 ) : (
-                  <div className="p-3 flex justify-between items-center">
+                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
                     <span className="text-muted-foreground">{t('add.account')}</span>
                     <span className="font-medium">{getAccountName(selectedTransaction.accountId)}</span>
                   </div>
                 )}
                 
                 {selectedTransaction.note && (
-                  <div className="p-3 flex justify-between items-center">
+                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
                     <span className="text-muted-foreground">{t('add.note')}</span>
                     <span className="font-medium">{selectedTransaction.note}</span>
                   </div>

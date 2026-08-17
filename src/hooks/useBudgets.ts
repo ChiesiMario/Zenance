@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Budget } from '@/services/db/db';
+import { v4 as uuidv4 } from 'uuid';
 import { useTransactions } from './useTransactions';
 import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
@@ -38,7 +39,7 @@ export function useBudgets() {
   const addBudget = async (data: Omit<Budget, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'>): Promise<Budget> => {
     if (!activeLedgerId) throw new Error('No active ledger');
     const newBudget: Budget = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       ledgerId: activeLedgerId,
       ...data,
       createdAt: new Date().toISOString(),

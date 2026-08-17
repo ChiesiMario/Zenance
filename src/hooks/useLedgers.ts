@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Ledger } from '@/services/db/db';
+import { v4 as uuidv4 } from 'uuid';
 
 export function useLedgers() {
   const ledgers = useLiveQuery(
@@ -10,7 +11,7 @@ export function useLedgers() {
     const isFirstLedger = await db.ledgers.filter(l => !l.deleted).count() === 0;
     
     const newLedger: Ledger = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       name,
       baseCurrency,
       isDefault: isFirstLedger,

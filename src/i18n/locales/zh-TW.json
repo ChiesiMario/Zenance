@@ -100,6 +100,18 @@
       "settled": "已結清",
       "noContacts": "目前沒有任何對象"
     },
+    "setup": {
+      "welcomeTagline": "以優雅的方式掌握您的個人財務。",
+      "getStarted": "開始使用",
+      "title": "建立帳本",
+      "namePlaceholder": "帳本名稱",
+      "currency": "預設貨幣",
+      "next": "下一步",
+      "syncTitle": "與 Dropbox 同步",
+      "syncDesc": "安全地備份並在所有裝置上同步您的資料。",
+      "connect": "連結 Dropbox",
+      "skip": "稍後再說"
+    },
     "settings": {
       "settings": "設定",
       "dropboxSync": "Dropbox 同步",

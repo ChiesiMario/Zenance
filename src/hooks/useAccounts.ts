@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Account } from '@/services/db/db';
+import { v4 as uuidv4 } from 'uuid';
 import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -27,7 +28,7 @@ export function useAccounts() {
     const isFirstAccount = await db.accounts.filter(a => !a.deleted && (!a.type || a.type === 'wallet') && a.ledgerId === activeLedgerId).count() === 0;
     
     const newAccount: Account = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       ledgerId: activeLedgerId,
       name,
       type,

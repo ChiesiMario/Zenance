@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface Ledger {
   id: string;
@@ -91,7 +92,7 @@ export class ZenanceDatabase extends Dexie {
       accounts: 'id, isDefault, updatedAt, deleted',
     }).upgrade(async tx => {
       // Create a default Cash account during migration
-      const cashAccountId = crypto.randomUUID();
+      const cashAccountId = uuidv4();
       await tx.table('accounts').add({
         id: cashAccountId,
         name: 'Cash',
@@ -133,7 +134,7 @@ export class ZenanceDatabase extends Dexie {
       accounts: 'id, ledgerId, type, isDefault, updatedAt, deleted',
       budgets: 'id, ledgerId, startDate, endDate, updatedAt, deleted',
     }).upgrade(async tx => {
-      const defaultLedgerId = crypto.randomUUID();
+      const defaultLedgerId = uuidv4();
       const now = new Date().toISOString();
       
       // Create default ledger

@@ -100,6 +100,18 @@
       "settled": "已结清",
       "noContacts": "目前没有任何对象"
     },
+    "setup": {
+      "welcomeTagline": "以优雅的方式掌握您的个人财务。",
+      "getStarted": "开始使用",
+      "title": "创建账本",
+      "namePlaceholder": "账本名称",
+      "currency": "默认货币",
+      "next": "下一步",
+      "syncTitle": "与 Dropbox 同步",
+      "syncDesc": "安全地备份并在所有设备上同步您的数据。",
+      "connect": "连接 Dropbox",
+      "skip": "稍后再说"
+    },
     "settings": {
       "settings": "设置",
       "dropboxSync": "Dropbox 同步",

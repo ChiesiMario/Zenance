@@ -100,6 +100,18 @@
       "settled": "Settled",
       "noContacts": "No contacts found."
     },
+    "setup": {
+      "welcomeTagline": "Master your personal finances with elegance.",
+      "getStarted": "Get Started",
+      "title": "Create Ledger",
+      "namePlaceholder": "Ledger Name",
+      "currency": "Base Currency",
+      "next": "Next",
+      "syncTitle": "Sync with Dropbox",
+      "syncDesc": "Keep your data safe and synced across devices.",
+      "connect": "Connect Dropbox",
+      "skip": "Skip for now"
+    },
     "settings": {
       "settings": "Settings",
       "dropboxSync": "Dropbox Sync",

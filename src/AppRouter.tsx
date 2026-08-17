@@ -6,11 +6,21 @@ import Accounts from './pages/Accounts';
 import Contacts from './pages/Contacts';
 import Budgets from './pages/Budgets';
 import Settings from './pages/Settings';
+import Setup from './pages/Setup';
+import { SetupGuard } from './components/layout/SetupGuard';
 
 const router = createBrowserRouter([
   {
+    path: '/setup',
+    element: <Setup />,
+  },
+  {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <SetupGuard>
+        <AppLayout />
+      </SetupGuard>
+    ),
     children: [
       {
         index: true,

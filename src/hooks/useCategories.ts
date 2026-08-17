@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Category } from '@/services/db/db';
+import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '@/store/useAppStore';
 
 export function useCategories() {
@@ -16,7 +17,7 @@ export function useCategories() {
   const addCategory = async (name: string, type: 'income' | 'expense', isDefault = false): Promise<Category> => {
     if (!activeLedgerId) throw new Error('No active ledger');
     const newCategory: Category = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       ledgerId: activeLedgerId,
       name,
       type,
@@ -52,7 +53,7 @@ export function useCategories() {
     if (currentCount === 0) {
       const categoriesToAdd = [
         ...defaultExpenseCategories.map(name => ({
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           ledgerId: activeLedgerId,
           name,
           type: 'expense' as const,
@@ -62,7 +63,7 @@ export function useCategories() {
           deleted: false,
         })),
         ...defaultIncomeCategories.map(name => ({
-          id: crypto.randomUUID(),
+          id: uuidv4(),
           ledgerId: activeLedgerId,
           name,
           type: 'income' as const,

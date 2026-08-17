@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Transaction } from '@/services/db/db';
+import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '@/store/useAppStore';
 
 export function useTransactions() {
@@ -20,7 +21,7 @@ export function useTransactions() {
     data: Omit<Transaction, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'>
   ) => {
     if (!activeLedgerId) return;
-    const id = crypto.randomUUID();
+    const id = uuidv4();
     const newTransaction: Transaction = {
       ...data,
       id,

@@ -5,7 +5,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Settings, ChevronDown, Trash2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +41,7 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation();
 
   const [isManageLedgersOpen, setIsManageLedgersOpen] = useState(false);
+  const [isCreateLedgerOpen, setIsCreateLedgerOpen] = useState(false);
   const [newLedgerName, setNewLedgerName] = useState('');
   const [newLedgerCurrency, setNewLedgerCurrency] = useState('CNY');
   
@@ -65,8 +66,10 @@ export default function Dashboard() {
 
   const handleAddLedger = async () => {
     if (!newLedgerName.trim()) return;
-    await addLedger(newLedgerName.trim(), newLedgerCurrency);
+    const newLedger = await addLedger(newLedgerName.trim(), newLedgerCurrency);
+    setActiveLedgerId(newLedger.id);
     setNewLedgerName('');
+    setIsCreateLedgerOpen(false);
   };
 
   const handleDeleteLedger = async () => {
@@ -167,6 +170,10 @@ export default function Dashboard() {
               ))}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setIsCreateLedgerOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('dashboard.createLedger')}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsManageLedgersOpen(true)}>
               <Settings className="mr-2 h-4 w-4" />
               {t('dashboard.manageLedgers')}
@@ -208,37 +215,59 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <h4 className="text-sm font-medium">{t('dashboard.createLedger')}</h4>
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder={t('dashboard.newLedgerName')} 
-                    value={newLedgerName}
-                    onChange={(e) => setNewLedgerName(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Select value={newLedgerCurrency} onValueChange={(val) => { if (val) setNewLedgerCurrency(val); }}>
-                    <SelectTrigger className="w-[90px]">
-                      <SelectValue placeholder="Cur" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMMON_CURRENCIES.map(c => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleAddLedger} disabled={!newLedgerName.trim()}>
-                    {t('ledgers.add')}
-                  </Button>
-                </div>
-              </div>
-
             </div>
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" type="button" />}>
-                {t('dashboard.close')}
+            <DialogFooter className="flex-row justify-between items-center sm:justify-between">
+              <Button 
+                variant="outline" 
+                type="button" 
+                onClick={() => {
+                  setIsCreateLedgerOpen(true);
+                }}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                {t('ledgers.add')}
+              </Button>
+              <DialogClose render={<Button variant="default" type="button" />}>
+                {t('common.confirm')}
               </DialogClose>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isCreateLedgerOpen} onOpenChange={setIsCreateLedgerOpen}>
+          <DialogContent className="sm:max-w-[400px] border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+            <div className="py-12 flex flex-col items-center justify-center space-y-12">
+              <input
+                type="text"
+                value={newLedgerName}
+                onChange={(e) => setNewLedgerName(e.target.value)}
+                placeholder={t('dashboard.newLedgerName')}
+                className="w-full bg-transparent text-center text-5xl font-bold tracking-tight outline-none placeholder:text-muted focus:ring-0"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleAddLedger()}
+              />
+              
+              <div className="flex flex-col items-center gap-6 w-full px-6">
+                <Select value={newLedgerCurrency} onValueChange={(val) => { if (val) setNewLedgerCurrency(val); }}>
+                  <SelectTrigger className="w-auto border-none shadow-none focus:ring-0 bg-transparent text-center font-mono text-lg text-muted-foreground hover:text-foreground transition-colors p-0 h-auto [&>svg]:hidden">
+                    <SelectValue placeholder="Cur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_CURRENCIES.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Button 
+                  onClick={handleAddLedger} 
+                  disabled={!newLedgerName.trim()}
+                  className="w-full rounded-full h-12 md:h-10 text-md font-medium"
+                >
+                  {t('ledgers.add')}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 

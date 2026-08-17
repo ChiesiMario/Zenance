@@ -1,5 +1,8 @@
 {
   "translation": {
+    "common": {
+      "confirm": "確認"
+    },
     "nav": {
       "overview": "總覽",
       "accounts": "帳戶",

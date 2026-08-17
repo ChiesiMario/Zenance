@@ -1,5 +1,8 @@
 {
   "translation": {
+    "common": {
+      "confirm": "Confirm"
+    },
     "nav": {
       "overview": "Overview",
       "accounts": "Accounts",

@@ -1,5 +1,8 @@
 {
   "translation": {
+    "common": {
+      "confirm": "确认"
+    },
     "nav": {
       "overview": "概览",
       "accounts": "账户",

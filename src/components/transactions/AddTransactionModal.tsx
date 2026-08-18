@@ -8,7 +8,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, ArrowRight } from 'lucide-react';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
@@ -55,6 +55,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
     accountId: (type === 'transfer' || type === 'loan') ? z.string().optional() : z.string().min(1, t('add.errors.accountRequired')),
     fromAccountId: (type === 'transfer' || type === 'loan') ? z.string().min(1, t('add.errors.accountRequired')) : z.string().optional(),
     toAccountId: (type === 'transfer' || type === 'loan') ? z.string().min(1, t('add.errors.accountRequired')) : z.string().optional(),
+    transferInAmount: z.number().nonnegative(t('add.errors.amountPositive')).optional(),
     date: z.string().min(1, t('add.errors.dateRequired')),
     note: z.string().optional(),
   }).refine((data) => {
@@ -84,6 +85,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
       accountId: '',
       fromAccountId: '',
       toAccountId: '',
+      transferInAmount: undefined,
       date: new Date().toISOString().split('T')[0],
       note: '',
     },
@@ -184,8 +186,9 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
       category: (type === 'transfer' || type === 'loan') ? (type === 'loan' ? 'loan' : 'transfer') : data.categoryId!,
       accountId: (type === 'transfer' || type === 'loan') ? data.fromAccountId! : data.accountId!,
       toAccountId: (type === 'transfer' || type === 'loan') ? data.toAccountId : undefined,
-      date: data.date,
+      transferInAmount: (type === 'transfer' || type === 'loan') && data.transferInAmount !== undefined ? data.transferInAmount : undefined,
       note: data.note,
+      date: data.date,
     });
     onClose();
   };
@@ -323,46 +326,85 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
 
           {type === 'transfer' && (
             <>
-              {/* Transfer From Account */}
               <div className="p-4 border-b border-border">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">{t('add.fromAccount')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {accounts?.map(acc => (
-                    <button
-                      key={acc.id}
-                      type="button"
-                      className={cn(
-                        "px-3 py-1.5 text-sm rounded-md border transition-colors",
-                        selectedFromAccountId === acc.id ? "bg-primary text-primary-foreground border-primary" : "bg-transparent border-border hover:bg-muted"
-                      )}
-                      onClick={() => setValue('fromAccountId', acc.id)}
-                    >
-                      {acc.name}
-                    </button>
-                  ))}
+                {/* Labels */}
+                <div className="flex items-center mb-3">
+                  <div className="flex-1 min-w-0 text-[10px] uppercase tracking-widest text-muted-foreground text-center">{t('add.fromAccount')}</div>
+                  <div className="w-10 shrink-0"></div>
+                  <div className="flex-1 min-w-0 text-[10px] uppercase tracking-widest text-muted-foreground text-center">{t('add.toAccount')}</div>
                 </div>
-                {errors.fromAccountId && <p className="text-sm font-medium text-destructive mt-3">{errors.fromAccountId.message}</p>}
+
+                {/* Controls */}
+                <div className="flex items-center">
+                  <div className="flex-1 min-w-0 relative">
+                    <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
+                      <SelectTrigger className="w-full text-xs h-9 bg-transparent border-border">
+                        <SelectValue placeholder={t('add.fromAccount')}>
+                          {accounts?.find(a => a.id === selectedFromAccountId)?.name}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts?.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
+                            {acc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="w-10 shrink-0 flex items-center justify-center">
+                    <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
+                  </div>
+
+                  <div className="flex-1 min-w-0 relative">
+                    <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
+                      <SelectTrigger className="w-full text-xs h-9 bg-transparent border-border">
+                        <SelectValue placeholder={t('add.toAccount')}>
+                          {accounts?.find(a => a.id === selectedToAccountId)?.name}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts?.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
+                            {acc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Errors */}
+                {(errors.fromAccountId || errors.toAccountId) && (
+                  <div className="flex items-start mt-3">
+                    <div className="flex-1 min-w-0">
+                      {errors.fromAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.fromAccountId.message}</p>}
+                    </div>
+                    <div className="w-10 shrink-0"></div>
+                    <div className="flex-1 min-w-0">
+                      {errors.toAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.toAccountId.message}</p>}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Transfer To Account */}
+              {/* Transfer In Amount (Optional) */}
               <div className="p-4 border-b border-border">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">{t('add.toAccount')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {accounts?.map(acc => (
-                    <button
-                      key={acc.id}
-                      type="button"
-                      className={cn(
-                        "px-3 py-1.5 text-sm rounded-md border transition-colors",
-                        selectedToAccountId === acc.id ? "bg-primary text-primary-foreground border-primary" : "bg-transparent border-border hover:bg-muted"
-                      )}
-                      onClick={() => setValue('toAccountId', acc.id)}
-                    >
-                      {acc.name}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{t('add.transferInAmount', 'Transfer-in Amount (Optional)')}</p>
                 </div>
-                {errors.toAccountId && <p className="text-sm font-medium text-destructive mt-3">{errors.toAccountId.message}</p>}
+                <Input 
+                  type="number" 
+                  step="any"
+                  placeholder={t('add.sameAsTransferOut', 'Same as transfer out')}
+                  {...register('transferInAmount', { 
+                    setValueAs: v => v === "" ? undefined : parseFloat(v) 
+                  })}
+                  className="w-full font-mono text-right"
+                />
+                {errors.transferInAmount && <p className="text-xs font-medium text-destructive mt-2">{errors.transferInAmount.message}</p>}
               </div>
             </>
           )}

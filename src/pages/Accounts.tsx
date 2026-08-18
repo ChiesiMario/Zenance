@@ -46,7 +46,7 @@ export default function Accounts() {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
       } else if (tx.type === 'transfer') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
-        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += tx.amount;
+        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount);
       }
     });
 

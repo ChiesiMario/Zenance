@@ -23,6 +23,7 @@ export interface Transaction {
   category: string;
   accountId: string; // The account for income/expense, or the "from" account for transfer
   toAccountId?: string; // The "to" account for transfer
+  transferInAmount?: number; // The actual amount received in the "to" account (for cross-currency or fees)
   note?: string;
   date: string; // ISO date string (YYYY-MM-DD)
   createdAt: string; // ISO datetime

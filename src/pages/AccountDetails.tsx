@@ -81,8 +81,9 @@ export default function AccountDetails() {
           expense += tx.amount;
         }
         if (tx.toAccountId === id) {
-          bal += tx.amount;
-          income += tx.amount;
+          const inAmount = tx.transferInAmount ?? tx.amount;
+          bal += inAmount;
+          income += inAmount;
         }
       }
     });
@@ -182,8 +183,8 @@ export default function AccountDetails() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-base font-mono font-medium ${t.type === 'income' ? 'text-primary' : (t.type === 'transfer' || t.type === 'loan') ? 'text-blue-500' : 'text-muted-foreground'}`}>
-                  {t.type === 'expense' ? '-' : (t.type === 'transfer' || t.type === 'loan') ? '' : '+'}{currencySymbol}{t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className={`text-base font-mono font-medium ${t.type === 'income' || (t.type === 'transfer' && t.toAccountId === id) || (t.type === 'loan' && t.toAccountId === id) ? 'text-primary' : (t.type === 'transfer' || t.type === 'loan') ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                  {t.type === 'expense' ? '-' : (t.type === 'transfer' && t.accountId === id) || (t.type === 'loan' && t.accountId === id) ? '-' : (t.type === 'transfer' && t.toAccountId === id) || (t.type === 'loan' && t.toAccountId === id) ? '+' : '+'}{currencySymbol}{(t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id ? (t.transferInAmount ?? t.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </button>

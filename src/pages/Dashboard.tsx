@@ -2,10 +2,10 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
-import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, Trash2, ChevronLeft, ChevronRight, Plus, Pencil } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
+import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { Link } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,9 +32,8 @@ import {
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 
 export default function Dashboard() {
-  const { transactions, deleteTransaction } = useTransactions();
+  const { transactions } = useTransactions();
   const { categories } = useCategories();
-  const { accounts } = useAccounts();
   const { activeBudget, budgetProgress } = useBudgets();
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
   const { activeLedgerId, setActiveLedgerId } = useAppStore();
@@ -139,30 +138,18 @@ export default function Dashboard() {
     if (id === 'transfer') return t('add.transfer');
     return categories?.find(c => c.id === id)?.name || id;
   };
-
-  const getAccountName = (id: string) => {
-    return accounts?.find(a => a.id === id)?.name || id;
-  };
-
-  const selectedTransaction = useMemo(() => 
-    transactions?.find(t => t.id === selectedTransactionId),
-  [transactions, selectedTransactionId]);
-
-  const handleDeleteTransaction = async () => {
-    if (!selectedTransactionId) return;
-    await deleteTransaction(selectedTransactionId);
-    setSelectedTransactionId(null);
-  };
-
+  
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none">
-            {activeLedger?.name || t('dashboard.overview')}
-            <ChevronDown className="ml-1 h-4 w-4 opacity-50" />
+          <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[250px]">
+            <span className="truncate">
+              {activeLedger?.name || t('dashboard.overview')}
+            </span>
+            <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
+          <DropdownMenuContent align="start" className="w-(--anchor-width) min-w-[200px] max-w-[calc(100vw-2rem)]">
             <DropdownMenuGroup>
               <DropdownMenuLabel className="bg-foreground text-background text-sm text-center !px-3 !py-2.5 rounded-t-[7px] -mx-2 -mt-2 mb-1 font-semibold">{t('dashboard.switchLedger')}</DropdownMenuLabel>
               {ledgers?.map(ledger => (
@@ -171,11 +158,11 @@ export default function Dashboard() {
                   onClick={() => setActiveLedgerId(ledger.id)}
                   className="justify-between"
                 >
-                  <div className="flex items-center gap-2">
-                    {ledger.name}
-                    <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm">{ledger.baseCurrency || 'CNY'}</span>
+                  <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 mr-2">
+                    <span className="truncate block">{ledger.name}</span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm shrink-0">{ledger.baseCurrency || 'CNY'}</span>
                   </div>
-                  {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm">Active</span>}
+                  {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm shrink-0">Active</span>}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuGroup>
@@ -201,24 +188,24 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="border border-border rounded-md divide-y divide-border">
                   {ledgers?.map(ledger => (
-                    <div key={ledger.id} className="flex min-h-12 md:min-h-10 items-center justify-between px-4 md:px-3 py-2 text-sm hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-2">
+                    <div key={ledger.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 min-h-12 md:min-h-10 items-center px-4 md:px-3 py-2 text-sm hover:bg-muted/30 transition-colors w-full">
+                      <div className="flex items-center gap-2 overflow-hidden">
                         {editingLedgerId === ledger.id ? (
                           <Input
                             value={editingLedgerName}
                             onChange={(e) => setEditingLedgerName(e.target.value)}
                             onBlur={() => handleUpdateLedgerName(ledger.id)}
                             onKeyDown={(e) => e.key === 'Enter' && handleUpdateLedgerName(ledger.id)}
-                            className="h-7 w-32 px-2 text-sm"
+                            className="h-7 w-32 px-2 text-sm shrink-0"
                             autoFocus
                           />
                         ) : (
-                          <span className="font-medium">{ledger.name}</span>
+                          <span className="font-medium truncate block">{ledger.name}</span>
                         )}
-                        <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm">{ledger.baseCurrency || 'CNY'}</span>
-                        {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm">Active</span>}
+                        <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm shrink-0">{ledger.baseCurrency || 'CNY'}</span>
+                        {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm shrink-0">Active</span>}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -342,7 +329,7 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        <Link to="/settings" className="p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors">
+        <Link to="/settings" className="p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors shrink-0">
           <Settings className="size-5" strokeWidth={1.5} />
         </Link>
       </div>
@@ -417,21 +404,22 @@ export default function Dashboard() {
             </div>
           )}
           
-          {filteredTransactions.slice(0, 15).map((t) => (
+          {filteredTransactions.slice(0, 15).map((tx) => (
             <button 
-              key={t.id} 
-              onClick={() => setSelectedTransactionId(t.id)}
+              key={tx.id} 
+              onClick={() => setSelectedTransactionId(tx.id)}
               className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
             >
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(t.category)}</span>
+                <span className="text-sm font-medium leading-none">{getCategoryName(tx.category)}</span>
                 <p className="text-sm text-muted-foreground truncate">
-                  {t.date} {t.note && `· ${t.note}`}
+                  {tx.type === 'transfer' ? t('add.transfer') : tx.type === 'loan' ? t('add.loan') : categories?.find(c => c.id === tx.category)?.name || tx.category}
+                  {tx.note && ` · ${tx.note}`}
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-base font-mono font-medium ${t.type === 'income' ? 'text-primary' : t.type === 'transfer' ? 'text-blue-500' : 'text-muted-foreground'}`}>
-                  {t.type === 'expense' ? '-' : t.type === 'transfer' ? '' : '+'}{currencySymbol}{t.amount.toLocaleString()}
+              <div className="flex flex-col items-end gap-1">
+                <span className={`text-base font-mono font-medium ${tx.type === 'income' ? 'text-primary' : (tx.type === 'transfer' || tx.type === 'loan') ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                  {tx.type === 'expense' ? '-' : (tx.type === 'transfer' || tx.type === 'loan') ? '' : '+'}{currencySymbol}{tx.amount.toLocaleString()}
                 </span>
               </div>
             </button>
@@ -439,82 +427,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Dialog open={!!selectedTransactionId} onOpenChange={(open) => !open && setSelectedTransactionId(null)}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{t('dashboard.detail')}</DialogTitle>
-          </DialogHeader>
-          
-          {selectedTransaction && (
-            <div className="py-2">
-              <div className="text-center mb-6">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <p className="text-sm text-muted-foreground uppercase tracking-widest">{getCategoryName(selectedTransaction.category)}</p>
-                  <span className="text-[10px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">#{selectedTransaction.displayId || selectedTransaction.id.split('-')[0].toUpperCase()}</span>
-                </div>
-                <p className={`text-5xl font-mono tracking-tighter font-medium ${selectedTransaction.type === 'income' ? 'text-primary' : selectedTransaction.type === 'transfer' ? 'text-blue-500' : 'text-foreground'}`}>
-                  {selectedTransaction.type === 'expense' ? '-' : selectedTransaction.type === 'transfer' ? '' : '+'}{currencySymbol}{selectedTransaction.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                </p>
-              </div>
-
-              <div className="border border-border rounded-lg bg-card overflow-hidden divide-y divide-border text-sm">
-                
-                {selectedTransaction.originalCurrency && selectedTransaction.originalCurrency !== activeLedger?.baseCurrency && (
-                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
-                    <span className="text-muted-foreground">{t('dashboard.original')}</span>
-                    <span className="font-mono">{selectedTransaction.originalAmount?.toLocaleString()} {selectedTransaction.originalCurrency}</span>
-                  </div>
-                )}
-                {selectedTransaction.originalCurrency && selectedTransaction.originalCurrency !== activeLedger?.baseCurrency && (
-                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
-                    <span className="text-muted-foreground">{t('dashboard.rate')}</span>
-                    <span className="font-mono">{selectedTransaction.exchangeRate?.toFixed(4)}</span>
-                  </div>
-                )}
-
-                <div className="flex min-h-12 justify-between items-center px-4 py-2">
-                  <span className="text-muted-foreground">{t('add.date')}</span>
-                  <span className="font-medium">{selectedTransaction.date}</span>
-                </div>
-                
-                {selectedTransaction.type === 'transfer' ? (
-                  <>
-                    <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                      <span className="text-muted-foreground">{t('add.fromAccount')}</span>
-                      <span className="font-medium">{getAccountName(selectedTransaction.accountId)}</span>
-                    </div>
-                    <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                      <span className="text-muted-foreground">{t('add.toAccount')}</span>
-                      <span className="font-medium">{selectedTransaction.toAccountId ? getAccountName(selectedTransaction.toAccountId) : '-'}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                    <span className="text-muted-foreground">{t('add.account')}</span>
-                    <span className="font-medium">{getAccountName(selectedTransaction.accountId)}</span>
-                  </div>
-                )}
-                
-                {selectedTransaction.note && (
-                  <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                    <span className="text-muted-foreground">{t('add.note')}</span>
-                    <span className="font-medium">{selectedTransaction.note}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="sm:justify-between items-center mt-2 border-t pt-4 border-border">
-             <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDeleteTransaction}>
-               {t('dashboard.delete')}
-             </Button>
-             <DialogClose render={<Button variant="outline" />}>
-               {t('dashboard.close')}
-             </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TransactionDetailsDialog 
+        transactionId={selectedTransactionId} 
+        onClose={() => setSelectedTransactionId(null)} 
+      />
     </div>
   );
 }

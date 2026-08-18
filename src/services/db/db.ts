@@ -19,7 +19,7 @@ export interface Transaction {
   originalAmount: number; // Original currency amount
   originalCurrency: string; // The currency code for this transaction
   exchangeRate: number; // Rate used to convert to base currency
-  type: 'income' | 'expense' | 'transfer';
+  type: 'income' | 'expense' | 'transfer' | 'loan';
   category: string;
   accountId: string; // The account for income/expense, or the "from" account for transfer
   toAccountId?: string; // The "to" account for transfer
@@ -52,7 +52,11 @@ export interface Account {
   ledgerId: string;
   name: string;
   type?: 'wallet' | 'contact';
+  group?: string; // e.g., 'cash', 'debit', 'credit', 'investment', 'credit_pay', 'other'
   isDefault: boolean;
+  initialBalance?: number;
+  currency?: string;
+  archived?: boolean;
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
@@ -195,6 +199,63 @@ export class ZenanceDatabase extends Dexie {
       await tx.table('transactions').toCollection().modify(t => {
         if (!t.displayId) {
           t.displayId = t.id.split('-')[0].toUpperCase();
+        }
+      });
+    });
+
+    this.version(9).stores({
+      ledgers: 'id, isDefault, updatedAt, deleted',
+      transactions: 'id, displayId, ledgerId, date, type, accountId, toAccountId, updatedAt, deleted',
+      categories: 'id, ledgerId, type, isDefault, updatedAt, deleted',
+      accounts: 'id, ledgerId, type, isDefault, updatedAt, deleted',
+      budgets: 'id, ledgerId, startDate, endDate, updatedAt, deleted',
+      exchange_rates: 'currency, updatedAt',
+    }).upgrade(async tx => {
+      // Set initialBalance to 0 for existing accounts
+      await tx.table('accounts').toCollection().modify(a => {
+        if (a.initialBalance === undefined) {
+          a.initialBalance = 0;
+        }
+      });
+    });
+
+    this.version(10).stores({
+      ledgers: 'id, isDefault, updatedAt, deleted',
+      transactions: 'id, displayId, ledgerId, date, type, accountId, toAccountId, updatedAt, deleted',
+      categories: 'id, ledgerId, type, isDefault, updatedAt, deleted',
+      accounts: 'id, ledgerId, type, isDefault, updatedAt, deleted',
+      budgets: 'id, ledgerId, startDate, endDate, updatedAt, deleted',
+      exchange_rates: 'currency, updatedAt',
+    }).upgrade(async () => {
+      // Currency will be undefined for existing accounts, which falls back to ledger base currency
+    });
+
+    this.version(11).stores({
+      ledgers: 'id, isDefault, updatedAt, deleted',
+      transactions: 'id, displayId, ledgerId, date, type, accountId, toAccountId, updatedAt, deleted',
+      categories: 'id, ledgerId, type, isDefault, updatedAt, deleted',
+      accounts: 'id, ledgerId, type, group, isDefault, updatedAt, deleted',
+      budgets: 'id, ledgerId, startDate, endDate, updatedAt, deleted',
+      exchange_rates: 'currency, updatedAt',
+    }).upgrade(async tx => {
+      await tx.table('accounts').toCollection().modify(a => {
+        if (!a.group) {
+          a.group = a.type === 'contact' ? 'other' : 'cash';
+        }
+      });
+    });
+
+    this.version(12).stores({
+      ledgers: 'id, isDefault, updatedAt, deleted',
+      transactions: 'id, displayId, ledgerId, date, type, accountId, toAccountId, updatedAt, deleted',
+      categories: 'id, ledgerId, type, isDefault, updatedAt, deleted',
+      accounts: 'id, ledgerId, type, group, isDefault, archived, updatedAt, deleted',
+      budgets: 'id, ledgerId, startDate, endDate, updatedAt, deleted',
+      exchange_rates: 'currency, updatedAt',
+    }).upgrade(async tx => {
+      await tx.table('accounts').toCollection().modify(a => {
+        if (a.archived === undefined) {
+          a.archived = false;
         }
       });
     });

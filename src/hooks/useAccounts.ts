@@ -10,7 +10,7 @@ export function useAccounts() {
   const accounts = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Account[]);
-      return db.accounts.filter(a => !a.deleted && a.ledgerId === activeLedgerId).toArray();
+      return db.accounts.filter(a => !a.deleted && !a.archived && a.ledgerId === activeLedgerId).toArray();
     },
     [activeLedgerId]
   );
@@ -23,7 +23,7 @@ export function useAccounts() {
     };
   }, [accounts]);
 
-  const addAccount = async (name: string, type: 'wallet' | 'contact' = 'wallet'): Promise<Account | null> => {
+  const addAccount = async (name: string, type: 'wallet' | 'contact' = 'wallet', initialBalance: number = 0, currency?: string, group: string = 'cash'): Promise<Account | null> => {
     if (!activeLedgerId) return null;
     const isFirstAccount = await db.accounts.filter(a => !a.deleted && (!a.type || a.type === 'wallet') && a.ledgerId === activeLedgerId).count() === 0;
     
@@ -32,7 +32,10 @@ export function useAccounts() {
       ledgerId: activeLedgerId,
       name,
       type,
+      group,
       isDefault: type === 'wallet' ? isFirstAccount : false,
+      initialBalance,
+      currency,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       deleted: false,
@@ -41,11 +44,36 @@ export function useAccounts() {
     return newAccount;
   };
 
-  const deleteAccount = async (id: string) => {
+  const updateAccount = async (id: string, updates: Partial<Account>) => {
+    await db.accounts.update(id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const archiveAccount = async (id: string) => {
+    await db.accounts.update(id, {
+      archived: true,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const deleteAccount = async (id: string): Promise<{ success: boolean; reason?: string }> => {
+    // Check if account has any transactions
+    const txCount = await db.transactions
+      .filter(t => !t.deleted && (t.accountId === id || t.toAccountId === id))
+      .count();
+
+    if (txCount > 0) {
+      return { success: false, reason: 'has_transactions' };
+    }
+
     await db.accounts.update(id, {
       deleted: true,
       updatedAt: new Date().toISOString(),
     });
+    
+    return { success: true };
   };
 
   return {
@@ -53,6 +81,8 @@ export function useAccounts() {
     wallets,
     contacts,
     addAccount,
+    updateAccount,
+    archiveAccount,
     deleteAccount,
   };
 }

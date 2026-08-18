@@ -95,3 +95,34 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes marquee-pause {
+  0%, 20% {
+    transform: translateX(0);
+  }
+  80%, 100% {
+    transform: translateX(min(0px, calc(100cqw - 100%)));
+  }
+}
+
+@utility animate-marquee-pause {
+  container-type: inline-size;
+  overflow: hidden;
+  display: flex;
+  width: 100%;
+  justify-content: safe center;
+  
+  & > span {
+    white-space: nowrap;
+    animation: marquee-pause 5s linear infinite;
+    display: inline-block;
+  }
+}

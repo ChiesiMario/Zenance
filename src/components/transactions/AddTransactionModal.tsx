@@ -48,6 +48,9 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
   const [isCatDialogOpen, setIsCatDialogOpen] = useState(false);
   const [customExchangeRate, setCustomExchangeRate] = useState<number | null>(null);
   const [displayAmount, setDisplayAmount] = useState('');
+  const [displayInAmount, setDisplayInAmount] = useState('');
+  const [focusedAmount, setFocusedAmount] = useState<'out' | 'in'>('out');
+  const [isLinked, setIsLinked] = useState(true);
 
   const formSchema = z.object({
     amount: z.number({ message: t('add.errors.amountRequired') }).positive(t('add.errors.amountPositive')),
@@ -56,6 +59,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
     fromAccountId: (type === 'transfer' || type === 'loan') ? z.string().min(1, t('add.errors.accountRequired')) : z.string().optional(),
     toAccountId: (type === 'transfer' || type === 'loan') ? z.string().min(1, t('add.errors.accountRequired')) : z.string().optional(),
     transferInAmount: z.number().nonnegative(t('add.errors.amountPositive')).optional(),
+    feeCategoryId: z.string().optional(),
     date: z.string().min(1, t('add.errors.dateRequired')),
     note: z.string().optional(),
   }).refine((data) => {
@@ -76,6 +80,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
     setValue,
     watch,
     reset,
+    setError,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -86,6 +91,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
       fromAccountId: '',
       toAccountId: '',
       transferInAmount: undefined,
+      feeCategoryId: undefined,
       date: new Date().toISOString().split('T')[0],
       note: '',
     },
@@ -96,8 +102,12 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
       setType(initialType);
       reset();
       setDisplayAmount('');
+      setDisplayInAmount('');
+      setFocusedAmount('out');
+      setIsLinked(true);
+      setValue('feeCategoryId', undefined);
     }
-  }, [isOpen, initialType, reset]);
+  }, [isOpen, initialType, reset, setValue]);
 
   const selectedCategoryId = watch('categoryId');
   const selectedAccountId = watch('accountId');
@@ -111,6 +121,10 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
   const selectedCurrency = (type === 'transfer' || type === 'loan') 
     ? (selectedFromAccount?.currency || baseCurrency) 
     : (selectedAccount?.currency || baseCurrency);
+  
+  const selectedToCurrency = (type === 'transfer' || type === 'loan')
+    ? (accounts?.find(a => a.id === selectedToAccountId)?.currency || baseCurrency)
+    : baseCurrency;
   
   useEffect(() => {
     setCustomExchangeRate(null);
@@ -145,6 +159,12 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
     return filteredCategories.reduce((sum, cat) => sum + (categoryMonthlyTotals[cat.id] || 0), 0);
   }, [filteredCategories, categoryMonthlyTotals]);
 
+  const parsedAmount = parseFloat(displayAmount) || 0;
+  const parsedInAmount = parseFloat(displayInAmount);
+  const diffAmount = (type === 'transfer' && selectedCurrency === selectedToCurrency && !isNaN(parsedInAmount) && parsedInAmount > 0) 
+    ? parsedAmount - parsedInAmount 
+    : 0;
+
 
 
   useEffect(() => {
@@ -174,7 +194,53 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
   }, [type, loanType, accounts, contacts, setValue]);
 
   const onSubmit = async (data: FormValues) => {
+    const isSameCurrency = selectedCurrency === selectedToCurrency;
+    const transferIn = data.transferInAmount;
+    const diff = (type === 'transfer' && isSameCurrency && transferIn !== undefined) ? data.amount - transferIn : 0;
+    
+    if (diff !== 0 && !data.feeCategoryId) {
+      setError('feeCategoryId', { type: 'manual', message: t('add.errors.categoryRequired', 'Category is required') });
+      return;
+    }
+
     const exchangeRate = customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency);
+
+    if (type === 'transfer' && isSameCurrency && diff !== 0) {
+      // Split transaction
+      const transferActualAmount = diff > 0 ? transferIn! : data.amount;
+      
+      // Transaction 1: Transfer
+      await addTransaction({
+        originalAmount: transferActualAmount,
+        originalCurrency: selectedCurrency,
+        exchangeRate: exchangeRate,
+        amount: transferActualAmount * exchangeRate,
+        type: 'transfer',
+        category: 'transfer',
+        accountId: data.fromAccountId!,
+        toAccountId: data.toAccountId,
+        note: data.note,
+        date: data.date,
+      });
+
+      // Transaction 2: Fee/Interest
+      const feeAmount = Math.abs(diff);
+      await addTransaction({
+        originalAmount: feeAmount,
+        originalCurrency: selectedCurrency,
+        exchangeRate: exchangeRate,
+        amount: feeAmount * exchangeRate,
+        type: diff > 0 ? 'expense' : 'income',
+        category: data.feeCategoryId!,
+        accountId: diff > 0 ? data.fromAccountId! : data.toAccountId!,
+        note: data.note ? `${data.note} (${diff > 0 ? 'Fee' : 'Interest'})` : t(diff > 0 ? 'add.transferFee' : 'add.transferInterest', diff > 0 ? 'Transfer Fee' : 'Transfer Interest'),
+        date: data.date,
+      });
+      
+      onClose();
+      return;
+    }
+
     const calculatedBaseAmount = data.amount * exchangeRate;
 
     await addTransaction({
@@ -205,6 +271,18 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
     const val = parseFloat(displayAmount);
     if (isNaN(val) || val <= 0) return;
     setValue('amount', val);
+    
+    if (type === 'transfer') {
+      const inVal = parseFloat(displayInAmount);
+      if (!isNaN(inVal) && inVal > 0) {
+        setValue('transferInAmount', inVal);
+      } else if (selectedCurrency === selectedToCurrency) {
+        setValue('transferInAmount', val);
+      } else {
+        setValue('transferInAmount', undefined);
+      }
+    }
+    
     handleSubmit(onSubmit)();
   };
 
@@ -327,58 +405,129 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
           {type === 'transfer' && (
             <>
               <div className="p-4 border-b border-border">
-                {/* Labels */}
-                <div className="flex items-center mb-3">
-                  <div className="flex-1 min-w-0 text-[10px] uppercase tracking-widest text-muted-foreground text-center">{t('add.fromAccount')}</div>
-                  <div className="w-10 shrink-0"></div>
-                  <div className="flex-1 min-w-0 text-[10px] uppercase tracking-widest text-muted-foreground text-center">{t('add.toAccount')}</div>
+                <div className="flex gap-4">
+                  
+                  {/* Transfer Out Card */}
+                  <div 
+                    className={cn(
+                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
+                      focusedAmount === 'out' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
+                    )}
+                    onClick={() => setFocusedAmount('out')}
+                  >
+                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground")}>
+                      {t('add.fromAccount')}
+                    </div>
+                    
+                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
+                      <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
+                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'out' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
+                          <SelectValue placeholder={t('add.fromAccount')}>
+                            {accounts?.find(a => a.id === selectedFromAccountId)?.name}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts?.map(acc => (
+                            <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
+                              {acc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="mt-auto w-full relative flex items-baseline justify-start">
+                      <span className={cn(
+                        "font-medium transition-all shrink-0", 
+                        focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground",
+                        (displayAmount || '0').length > 4 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-sm mr-1"
+                      )}>
+                        {selectedCurrency}
+                      </span>
+                      <span className="font-mono font-bold tracking-tighter truncate pr-1 transition-all text-3xl sm:text-4xl w-full text-right">
+                        {displayAmount || '0'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Transfer In Card */}
+                  <div 
+                    className={cn(
+                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
+                      focusedAmount === 'in' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
+                    )}
+                    onClick={() => {
+                      setFocusedAmount('in');
+                      setIsLinked(false);
+                    }}
+                  >
+                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground")}>
+                      {t('add.toAccount')}
+                    </div>
+                    
+                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
+                      <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
+                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'in' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
+                          <SelectValue placeholder={t('add.toAccount')}>
+                            {accounts?.find(a => a.id === selectedToAccountId)?.name}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts?.map(acc => (
+                            <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
+                              {acc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="mt-auto w-full relative flex items-baseline justify-start">
+                      <span className={cn(
+                        "font-medium transition-all shrink-0", 
+                        focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground",
+                        (displayInAmount || '0').length > 4 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-sm mr-1"
+                      )}>
+                        {selectedToCurrency}
+                      </span>
+                      <span className="font-mono font-bold tracking-tighter truncate pr-1 transition-all text-3xl sm:text-4xl w-full text-right">
+                        {displayInAmount || '0'}
+                      </span>
+                    </div>
+                  </div>
+
                 </div>
 
-                {/* Controls */}
-                <div className="flex items-center">
-                  <div className="flex-1 min-w-0 relative">
-                    <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
+                {/* Difference Handling for same currency transfer */}
+                {diffAmount !== 0 && (
+                  <div className="mt-4 p-3 bg-muted/30 rounded-xl border border-border animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {diffAmount > 0 ? t('add.transferFee', 'Transfer Fee') : t('add.transferInterest', 'Transfer Interest')}
+                      </span>
+                      <span className="text-sm font-mono font-bold text-foreground">
+                        {Math.abs(diffAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCurrency}
+                      </span>
+                    </div>
+                    <Select value={watch('feeCategoryId') || undefined} onValueChange={(val) => setValue('feeCategoryId', val)}>
                       <SelectTrigger className="w-full text-xs h-9 bg-transparent border-border">
-                        <SelectValue placeholder={t('add.fromAccount')}>
-                          {accounts?.find(a => a.id === selectedFromAccountId)?.name}
-                        </SelectValue>
+                        <SelectValue placeholder={diffAmount > 0 ? t('add.selectExpenseCategory', 'Select Expense Category') : t('add.selectIncomeCategory', 'Select Income Category')} />
                       </SelectTrigger>
                       <SelectContent>
-                        {accounts?.map(acc => (
-                          <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
-                            {acc.name}
+                        {categories?.filter(c => c.type === (diffAmount > 0 ? 'expense' : 'income')).map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {errors.feeCategoryId && <p className="text-xs font-medium text-destructive mt-1">{errors.feeCategoryId.message}</p>}
                   </div>
-
-                  {/* Arrow */}
-                  <div className="w-10 shrink-0 flex items-center justify-center">
-                    <ArrowRight className="w-4 h-4 text-muted-foreground/50" />
-                  </div>
-
-                  <div className="flex-1 min-w-0 relative">
-                    <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
-                      <SelectTrigger className="w-full text-xs h-9 bg-transparent border-border">
-                        <SelectValue placeholder={t('add.toAccount')}>
-                          {accounts?.find(a => a.id === selectedToAccountId)?.name}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts?.map(acc => (
-                          <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
-                            {acc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                )}
 
                 {/* Errors */}
                 {(errors.fromAccountId || errors.toAccountId) && (
-                  <div className="flex items-start mt-3">
+                  <div className="flex items-start mt-4">
                     <div className="flex-1 min-w-0">
                       {errors.fromAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.fromAccountId.message}</p>}
                     </div>
@@ -388,23 +537,6 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Transfer In Amount (Optional) */}
-              <div className="p-4 border-b border-border">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{t('add.transferInAmount', 'Transfer-in Amount (Optional)')}</p>
-                </div>
-                <Input 
-                  type="number" 
-                  step="any"
-                  placeholder={t('add.sameAsTransferOut', 'Same as transfer out')}
-                  {...register('transferInAmount', { 
-                    setValueAs: v => v === "" ? undefined : parseFloat(v) 
-                  })}
-                  className="w-full font-mono text-right"
-                />
-                {errors.transferInAmount && <p className="text-xs font-medium text-destructive mt-2">{errors.transferInAmount.message}</p>}
               </div>
             </>
           )}
@@ -448,43 +580,50 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
         <div className="w-full bg-zinc-950 p-3 pb-safe sm:rounded-b-2xl sm:border-none shadow-2xl">
           <div className="w-full mx-auto max-w-[350px] flex flex-col gap-3">
             
-            {/* Account & Note Row */}
-            {/* Note Row */}
+            {/* Note Row or Transfer Hint */}
             <div className="w-full px-1 mt-2">
-              <Input 
-                id="note" 
-                placeholder={t('add.note')} 
-                className="w-full h-8 px-3 border-white/10 bg-white/5 text-white shadow-none focus-visible:ring-0 text-xs font-medium rounded-lg placeholder:text-zinc-500"
-                {...register('note')}
-              />
+              {type === 'transfer' ? (
+                <div className="w-full h-8 px-3 flex items-center justify-center text-[10px] uppercase tracking-widest text-zinc-500 font-medium">
+                  {focusedAmount === 'out' ? t('add.transferOutAmount', 'Transfer Out') : t('add.transferInAmount', 'Transfer In')}
+                </div>
+              ) : (
+                <Input 
+                  id="note" 
+                  placeholder={t('add.note')} 
+                  className="w-full h-8 px-3 border-white/10 bg-white/5 text-white shadow-none focus-visible:ring-0 text-xs font-medium rounded-lg placeholder:text-zinc-500"
+                  {...register('note')}
+                />
+              )}
             </div>
 
             {/* Account, Currency & Amount Row */}
-            <div className="w-full flex justify-between items-center px-1 mt-1 gap-2">
-              {(type === 'expense' || type === 'income') && (
-                <div className="flex-[0.35] min-w-[80px]">
-                  <Select value={selectedAccountId ?? undefined} onValueChange={(val) => setValue('accountId', val ?? undefined)}>
-                    <SelectTrigger className="w-full h-auto px-2 py-1 border-none bg-transparent hover:bg-white/10 text-zinc-400 hover:text-white shadow-none text-xl font-medium focus:ring-0 rounded cursor-pointer transition-colors">
-                      <SelectValue placeholder={t('add.account')}>
-                        {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts?.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+            {type !== 'transfer' && (
+              <div className="w-full flex justify-between items-center px-1 mt-1 gap-2">
+                {(type === 'expense' || type === 'income') && (
+                  <div className="flex-[0.35] min-w-[80px]">
+                    <Select value={selectedAccountId ?? undefined} onValueChange={(val) => setValue('accountId', val ?? undefined)}>
+                      <SelectTrigger className="w-full h-auto px-2 py-1 border-none bg-transparent hover:bg-white/10 text-zinc-400 hover:text-white shadow-none text-xl font-medium focus:ring-0 rounded cursor-pointer transition-colors">
+                        <SelectValue placeholder={t('add.account')}>
+                          {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : undefined}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts?.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-              <div className="flex items-end gap-1 flex-1 overflow-hidden justify-end">
-                <span className="text-xl font-medium text-zinc-400 pb-1">{selectedCurrency}</span>
-                <div className="overflow-hidden whitespace-nowrap text-4xl sm:text-5xl font-mono font-bold tracking-tighter text-right text-white pr-1">
-                  {displayAmount || '0'}
+                <div className="flex items-end gap-1 flex-1 overflow-hidden justify-end">
+                  <span className="text-xl font-medium text-zinc-400 pb-1">{selectedCurrency}</span>
+                  <div className="overflow-hidden whitespace-nowrap text-4xl sm:text-5xl font-mono font-bold tracking-tighter text-right text-white pr-1">
+                    {displayAmount || '0'}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             {errors.accountId && type !== 'transfer' && <p className="text-xs font-medium text-destructive px-2 mt-[-8px]">{errors.accountId.message}</p>}
             
             {errors.amount && <p className="text-sm font-medium text-destructive text-right px-2">{errors.amount.message}</p>}
@@ -511,8 +650,22 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
             )}
 
             <NumericKeypad 
-              value={displayAmount} 
-              onChange={setDisplayAmount} 
+              value={type === 'transfer' && focusedAmount === 'in' ? displayInAmount : displayAmount} 
+              onChange={(val) => {
+                if (type === 'transfer') {
+                  if (focusedAmount === 'in') {
+                    setDisplayInAmount(val);
+                    setIsLinked(false);
+                  } else {
+                    setDisplayAmount(val);
+                    if (isLinked && selectedCurrency === selectedToCurrency) {
+                      setDisplayInAmount(val);
+                    }
+                  }
+                } else {
+                  setDisplayAmount(val);
+                }
+              }} 
               onSubmit={handleKeypadSubmit} 
               date={selectedDate}
               onDateChange={(val) => setValue('date', val)}

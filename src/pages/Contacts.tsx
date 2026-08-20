@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { getCurrencySymbol } from '@/lib/utils';
+import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
 
 export default function Contacts() {
   const { t } = useTranslation();
@@ -17,6 +18,7 @@ export default function Contacts() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newContactName, setNewContactName] = useState('');
+  const [newContactGroup, setNewContactGroup] = useState('personal');
 
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
@@ -45,10 +47,16 @@ export default function Contacts() {
     return balances;
   }, [contacts, transactions]);
 
+  const personalContacts = contacts?.filter(c => c.group === 'personal' || c.group === 'other' || !c.group) || [];
+  const orgContacts = contacts?.filter(c => c.group === 'organization') || [];
+
+
+
   const handleAddContact = async () => {
     if (!newContactName.trim()) return;
-    await addAccount(newContactName.trim(), 'contact');
+    await addAccount(newContactName.trim(), 'contact', 0, undefined, newContactGroup);
     setNewContactName('');
+    setNewContactGroup('personal');
     setIsDialogOpen(false);
   };
 
@@ -64,13 +72,31 @@ export default function Contacts() {
             <DialogHeader>
               <DialogTitle>{t('contacts.addContact')}</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
+            <div className="py-4 space-y-4">
               <Input 
                 placeholder={t('contacts.namePlaceholder')} 
                 value={newContactName}
                 onChange={(e) => setNewContactName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddContact()}
               />
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant={newContactGroup === 'personal' ? 'default' : 'outline'} 
+                  className="flex-1" 
+                  onClick={() => setNewContactGroup('personal')}
+                >
+                  {t('contacts.groupPersonal')}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant={newContactGroup === 'organization' ? 'default' : 'outline'} 
+                  className="flex-1" 
+                  onClick={() => setNewContactGroup('organization')}
+                >
+                  {t('contacts.groupOrganization')}
+                </Button>
+              </div>
             </div>
             <DialogFooter>
               <DialogClose render={<Button variant="outline" />}>
@@ -84,33 +110,28 @@ export default function Contacts() {
         </Dialog>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="divide-y divide-border">
-          {(!contacts || contacts.length === 0) && (
+      <div className="space-y-6">
+        {(!contacts || contacts.length === 0) && (
+          <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
             <div className="p-8 text-center text-sm text-muted-foreground">
               {t('contacts.noContacts')}
             </div>
-          )}
-          
-          {contacts?.map(contact => {
-            const balance = contactBalances[contact.id] || 0;
-            return (
-              <div key={contact.id} className="flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium leading-none">{contact.name}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-medium leading-none mb-1 block text-muted-foreground">
-                    {balance === 0 ? t('contacts.settled') : balance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
-                  </span>
-                  <span className={cn("text-xl font-mono tracking-tight font-medium", balance === 0 ? "text-muted-foreground" : balance > 0 ? "text-primary" : "text-destructive")}>
-                    {currencySymbol}{Math.abs(balance).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          </div>
+        )}
+        
+        <ContactGroupCard 
+          title={t('contacts.groupPersonal')}
+          contacts={personalContacts}
+          contactBalances={contactBalances}
+          currencySymbol={currencySymbol}
+        />
+
+        <ContactGroupCard 
+          title={t('contacts.groupOrganization')}
+          contacts={orgContacts}
+          contactBalances={contactBalances}
+          currencySymbol={currencySymbol}
+        />
       </div>
     </div>
   );

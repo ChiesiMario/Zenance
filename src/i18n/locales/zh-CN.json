@@ -128,6 +128,8 @@
       "owesYou": "应收",
       "youOwe": "应付",
       "settled": "已结清",
+      "groupPersonal": "个人",
+      "groupOrganization": "机构",
       "noContacts": "目前没有任何对象"
     },
     "setup": {

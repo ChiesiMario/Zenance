@@ -128,6 +128,8 @@
       "owesYou": "Owes you",
       "youOwe": "You owe",
       "settled": "Settled",
+      "groupPersonal": "Personal",
+      "groupOrganization": "Organization",
       "noContacts": "No contacts found."
     },
     "setup": {

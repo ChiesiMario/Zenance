@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Plus, X, ArrowRight } from 'lucide-react';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -154,6 +154,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
   }, [transactions]);
   
   const compactFormatter = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 });
+  const amountCompactFormatter = new Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 });
 
   const typeTotal = useMemo(() => {
     return filteredCategories.reduce((sum, cat) => sum + (categoryMonthlyTotals[cat.id] || 0), 0);
@@ -313,9 +314,18 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
         </div>
 
         {/* Main scrollable area */}
-        <div className="flex-1 w-full max-w-xl mx-auto px-5 pt-2 pb-4 overflow-y-auto no-scrollbar space-y-6 animate-in fade-in duration-500">
+        <div className="flex-1 w-full max-w-xl mx-auto px-5 pt-2 pb-4 overflow-y-auto no-scrollbar flex flex-col animate-in fade-in duration-500">
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 flex flex-col items-center">
+          {type === 'loan' && (
+             <div className="w-full pt-2 pb-4 flex justify-center shrink-0">
+               <div className="inline-flex items-center p-1 bg-muted/50 rounded-full border border-border">
+                 <button type="button" onClick={() => setLoanType('borrow')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors", loanType === 'borrow' ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}>{t('add.borrow')}</button>
+                 <button type="button" onClick={() => setLoanType('lend')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors", loanType === 'lend' ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}>{t('add.lend')}</button>
+               </div>
+             </div>
+          )}
+
+      <form onSubmit={handleSubmit(onSubmit)} className="my-auto w-full space-y-8 flex flex-col items-center">
         
 
 
@@ -404,8 +414,13 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
 
           {type === 'transfer' && (
             <>
-              <div className="p-4 border-b border-border">
-                <div className="flex gap-4">
+              <div className="py-4 px-2">
+                <div className="flex gap-6 relative items-center justify-center">
+                  
+                  {/* Middle Arrow */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-border z-10 pointer-events-none">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
                   
                   {/* Transfer Out Card */}
                   <div 
@@ -437,16 +452,23 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
                     </div>
 
                     <div className="mt-auto w-full relative flex items-baseline justify-start">
+                      {parseFloat(displayAmount) >= 1000 && (
+                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
+                          ({amountCompactFormatter.format(parseFloat(displayAmount)).toLowerCase()})
+                        </span>
+                      )}
                       <span className={cn(
                         "font-medium transition-all shrink-0", 
                         focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground",
-                        (displayAmount || '0').length > 4 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-sm mr-1"
+                        (displayAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
                       )}>
                         {selectedCurrency}
                       </span>
-                      <span className="font-mono font-bold tracking-tighter truncate pr-1 transition-all text-3xl sm:text-4xl w-full text-right">
-                        {displayAmount || '0'}
-                      </span>
+                      <div className="animate-marquee-right w-full flex-1">
+                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
+                          {formatDisplayAmount(displayAmount)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -483,16 +505,23 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
                     </div>
 
                     <div className="mt-auto w-full relative flex items-baseline justify-start">
+                      {parseFloat(displayInAmount) >= 1000 && (
+                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
+                          ({amountCompactFormatter.format(parseFloat(displayInAmount)).toLowerCase()})
+                        </span>
+                      )}
                       <span className={cn(
                         "font-medium transition-all shrink-0", 
                         focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground",
-                        (displayInAmount || '0').length > 4 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-sm mr-1"
+                        (displayInAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
                       )}>
                         {selectedToCurrency}
                       </span>
-                      <span className="font-mono font-bold tracking-tighter truncate pr-1 transition-all text-3xl sm:text-4xl w-full text-right">
-                        {displayInAmount || '0'}
-                      </span>
+                      <div className="animate-marquee-right w-full flex-1">
+                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
+                          {formatDisplayAmount(displayInAmount)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -543,30 +572,132 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
 
           {type === 'loan' && (
              <>
-               <div className="p-4 border-b border-border flex justify-center">
-                 <div className="inline-flex items-center p-1 bg-muted/50 rounded-full border border-border">
-                   <button type="button" onClick={() => setLoanType('borrow')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors", loanType === 'borrow' ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}>{t('add.borrow')}</button>
-                   <button type="button" onClick={() => setLoanType('lend')} className={cn("px-4 py-1.5 rounded-full text-sm font-medium transition-colors", loanType === 'lend' ? "bg-background text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground")}>{t('add.lend')}</button>
-                 </div>
-               </div>
-               {/* Contact Account */}
-               <div className="p-4 border-b border-border">
-                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">{t('add.contact')}</p>
-                 <div className="flex flex-wrap gap-2">
-                   {contacts?.map(acc => (
-                     <button key={acc.id} type="button" className={cn("px-3 py-1.5 text-sm rounded-md border transition-colors", (loanType === 'borrow' ? selectedFromAccountId : selectedToAccountId) === acc.id ? "bg-primary text-primary-foreground border-primary" : "bg-transparent border-border hover:bg-muted")} onClick={() => { setValue(loanType === 'borrow' ? 'fromAccountId' : 'toAccountId', acc.id) }}>{acc.name}</button>
-                   ))}
-                 </div>
-               </div>
-               {/* Wallet Account */}
-               <div className="p-4 border-b border-border">
-                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">{t('add.account')}</p>
-                 <div className="flex flex-wrap gap-2">
-                   {accounts?.map(acc => (
-                     <button key={acc.id} type="button" className={cn("px-3 py-1.5 text-sm rounded-md border transition-colors", (loanType === 'borrow' ? selectedToAccountId : selectedFromAccountId) === acc.id ? "bg-primary text-primary-foreground border-primary" : "bg-transparent border-border hover:bg-muted")} onClick={() => { setValue(loanType === 'borrow' ? 'toAccountId' : 'fromAccountId', acc.id) }}>{acc.name}</button>
-                   ))}
-                 </div>
-               </div>
+              <div className="py-4 px-2">
+                <div className="flex gap-6 relative items-center justify-center">
+                  
+                  {/* Middle Arrow */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-border z-10 pointer-events-none">
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                  
+                  {/* Loan Out Card (From) */}
+                  <div 
+                    className={cn(
+                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
+                      focusedAmount === 'out' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
+                    )}
+                    onClick={() => setFocusedAmount('out')}
+                  >
+                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground")}>
+                      {loanType === 'borrow' ? t('add.contact') : t('add.account')}
+                    </div>
+                    
+                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
+                      <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
+                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'out' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
+                          <SelectValue placeholder={loanType === 'borrow' ? t('add.contact') : t('add.account')}>
+                            {[...(contacts || []), ...(accounts || [])].find(a => a.id === selectedFromAccountId)?.name}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(loanType === 'borrow' ? contacts : accounts)?.map(acc => (
+                            <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
+                              {acc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="mt-auto w-full relative flex items-baseline justify-start">
+                      {parseFloat(displayAmount) >= 1000 && (
+                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
+                          ({amountCompactFormatter.format(parseFloat(displayAmount)).toLowerCase()})
+                        </span>
+                      )}
+                      <span className={cn(
+                        "font-medium transition-all shrink-0", 
+                        focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground",
+                        (displayAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
+                      )}>
+                        {selectedCurrency}
+                      </span>
+                      <div className="animate-marquee-right w-full flex-1">
+                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
+                          {formatDisplayAmount(displayAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Loan In Card (To) */}
+                  <div 
+                    className={cn(
+                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
+                      focusedAmount === 'in' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
+                    )}
+                    onClick={() => {
+                      setFocusedAmount('in');
+                      setIsLinked(false);
+                    }}
+                  >
+                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground")}>
+                      {loanType === 'borrow' ? t('add.account') : t('add.contact')}
+                    </div>
+                    
+                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
+                      <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
+                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'in' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
+                          <SelectValue placeholder={loanType === 'borrow' ? t('add.account') : t('add.contact')}>
+                            {[...(contacts || []), ...(accounts || [])].find(a => a.id === selectedToAccountId)?.name}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(loanType === 'borrow' ? accounts : contacts)?.map(acc => (
+                            <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
+                              {acc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="mt-auto w-full relative flex items-baseline justify-start">
+                      {parseFloat(displayInAmount) >= 1000 && (
+                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
+                          ({amountCompactFormatter.format(parseFloat(displayInAmount)).toLowerCase()})
+                        </span>
+                      )}
+                      <span className={cn(
+                        "font-medium transition-all shrink-0", 
+                        focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground",
+                        (displayInAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
+                      )}>
+                        {selectedToCurrency}
+                      </span>
+                      <div className="animate-marquee-right w-full flex-1">
+                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
+                          {formatDisplayAmount(displayInAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Errors */}
+                {(errors.fromAccountId || errors.toAccountId) && (
+                  <div className="flex items-start mt-4">
+                    <div className="flex-1 min-w-0">
+                      {errors.fromAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.fromAccountId.message}</p>}
+                    </div>
+                    <div className="w-10 shrink-0"></div>
+                    <div className="flex-1 min-w-0">
+                      {errors.toAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.toAccountId.message}</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
              </>
           )}
 
@@ -581,10 +712,12 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
           <div className="w-full mx-auto max-w-[350px] flex flex-col gap-3">
             
             {/* Note Row or Transfer Hint */}
-            <div className="w-full px-1 mt-2">
-              {type === 'transfer' ? (
-                <div className="w-full h-8 px-3 flex items-center justify-center text-[10px] uppercase tracking-widest text-zinc-500 font-medium">
-                  {focusedAmount === 'out' ? t('add.transferOutAmount', 'Transfer Out') : t('add.transferInAmount', 'Transfer In')}
+            <div className="w-full px-1">
+              {(type === 'transfer' || type === 'loan') ? (
+                <div className="w-full px-3 py-1 flex items-center justify-center text-base uppercase text-zinc-500 font-medium">
+                  {type === 'transfer' 
+                    ? (focusedAmount === 'out' ? t('add.transferOutAmount') : t('add.transferInAmount'))
+                    : (focusedAmount === 'out' ? t('add.loanOutAmount') : t('add.loanInAmount'))}
                 </div>
               ) : (
                 <Input 
@@ -597,7 +730,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
             </div>
 
             {/* Account, Currency & Amount Row */}
-            {type !== 'transfer' && (
+            {(type !== 'transfer' && type !== 'loan') && (
               <div className="w-full flex justify-between items-center px-1 mt-1 gap-2">
                 {(type === 'expense' || type === 'income') && (
                   <div className="flex-[0.35] min-w-[80px]">
@@ -619,12 +752,12 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
                 <div className="flex items-end gap-1 flex-1 overflow-hidden justify-end">
                   <span className="text-xl font-medium text-zinc-400 pb-1">{selectedCurrency}</span>
                   <div className="overflow-hidden whitespace-nowrap text-4xl sm:text-5xl font-mono font-bold tracking-tighter text-right text-white pr-1">
-                    {displayAmount || '0'}
+                    {formatDisplayAmount(displayAmount)}
                   </div>
                 </div>
               </div>
             )}
-            {errors.accountId && type !== 'transfer' && <p className="text-xs font-medium text-destructive px-2 mt-[-8px]">{errors.accountId.message}</p>}
+            {errors.accountId && (type !== 'transfer' && type !== 'loan') && <p className="text-xs font-medium text-destructive px-2 mt-[-8px]">{errors.accountId.message}</p>}
             
             {errors.amount && <p className="text-sm font-medium text-destructive text-right px-2">{errors.amount.message}</p>}
 
@@ -650,9 +783,9 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
             )}
 
             <NumericKeypad 
-              value={type === 'transfer' && focusedAmount === 'in' ? displayInAmount : displayAmount} 
+              value={(type === 'transfer' || type === 'loan') && focusedAmount === 'in' ? displayInAmount : displayAmount} 
               onChange={(val) => {
-                if (type === 'transfer') {
+                if (type === 'transfer' || type === 'loan') {
                   if (focusedAmount === 'in') {
                     setDisplayInAmount(val);
                     setIsLinked(false);

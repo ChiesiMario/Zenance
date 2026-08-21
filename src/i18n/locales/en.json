@@ -130,7 +130,8 @@
       "settled": "Settled",
       "groupPersonal": "Personal",
       "groupOrganization": "Organization",
-      "noContacts": "No contacts found."
+      "noContacts": "No contacts found.",
+      "all": "All Contacts"
     },
     "setup": {
       "welcomeTagline": "Master your personal finances with elegance.",

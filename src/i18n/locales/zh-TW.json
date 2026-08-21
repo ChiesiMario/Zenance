@@ -130,7 +130,8 @@
       "settled": "已結清",
       "groupPersonal": "個人",
       "groupOrganization": "機構",
-      "noContacts": "目前沒有任何對象"
+      "noContacts": "目前沒有任何對象",
+      "all": "所有對象"
     },
     "setup": {
       "welcomeTagline": "以優雅的方式掌握您的個人財務。",

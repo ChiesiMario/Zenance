@@ -19,6 +19,7 @@ export default function Contacts() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [newContactGroup, setNewContactGroup] = useState('personal');
+  const [filterGroup, setFilterGroup] = useState<'all' | 'personal' | 'organization'>('all');
 
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
@@ -47,8 +48,26 @@ export default function Contacts() {
     return balances;
   }, [contacts, transactions]);
 
-  const personalContacts = contacts?.filter(c => c.group === 'personal' || c.group === 'other' || !c.group) || [];
-  const orgContacts = contacts?.filter(c => c.group === 'organization') || [];
+  const filteredAndSortedContacts = useMemo(() => {
+    let filtered = contacts || [];
+    if (filterGroup === 'personal') {
+      filtered = filtered.filter(c => c.group === 'personal' || c.group === 'other' || !c.group);
+    } else if (filterGroup === 'organization') {
+      filtered = filtered.filter(c => c.group === 'organization');
+    }
+
+    return filtered.sort((a, b) => {
+      const aBalance = contactBalances[a.id] || 0;
+      const bBalance = contactBalances[b.id] || 0;
+      const aHasBalance = Math.abs(aBalance) > 0;
+      const bHasBalance = Math.abs(bBalance) > 0;
+
+      if (aHasBalance && !bHasBalance) return -1;
+      if (!aHasBalance && bHasBalance) return 1;
+      
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [contacts, filterGroup, contactBalances]);
 
 
 
@@ -111,26 +130,39 @@ export default function Contacts() {
       </div>
 
       <div className="space-y-6">
-        {(!contacts || contacts.length === 0) && (
-          <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              {t('contacts.noContacts')}
+        <ContactGroupCard 
+          title={
+            <div className="flex gap-2">
+              <Button 
+                variant={filterGroup === 'all' ? 'default' : 'outline'} 
+                onClick={() => setFilterGroup('all')}
+                size="sm"
+                className="rounded-full"
+              >
+                {t('contacts.all')}
+              </Button>
+              <Button 
+                variant={filterGroup === 'personal' ? 'default' : 'outline'} 
+                onClick={() => setFilterGroup('personal')}
+                size="sm"
+                className="rounded-full"
+              >
+                {t('contacts.groupPersonal')}
+              </Button>
+              <Button 
+                variant={filterGroup === 'organization' ? 'default' : 'outline'} 
+                onClick={() => setFilterGroup('organization')}
+                size="sm"
+                className="rounded-full"
+              >
+                {t('contacts.groupOrganization')}
+              </Button>
             </div>
-          </div>
-        )}
-        
-        <ContactGroupCard 
-          title={t('contacts.groupPersonal')}
-          contacts={personalContacts}
+          }
+          contacts={filteredAndSortedContacts}
           contactBalances={contactBalances}
           currencySymbol={currencySymbol}
-        />
-
-        <ContactGroupCard 
-          title={t('contacts.groupOrganization')}
-          contacts={orgContacts}
-          contactBalances={contactBalances}
-          currencySymbol={currencySymbol}
+          hideGroupTag={filterGroup !== 'all'}
         />
       </div>
     </div>

@@ -538,7 +538,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense' }
                         {Math.abs(diffAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCurrency}
                       </span>
                     </div>
-                    <Select value={watch('feeCategoryId') || undefined} onValueChange={(val) => setValue('feeCategoryId', val)}>
+                    <Select value={watch('feeCategoryId') || undefined} onValueChange={(val) => setValue('feeCategoryId', val ?? undefined)}>
                       <SelectTrigger className="w-full text-xs h-9 bg-transparent border-border">
                         <SelectValue placeholder={diffAmount > 0 ? t('add.selectExpenseCategory', 'Select Expense Category') : t('add.selectIncomeCategory', 'Select Income Category')} />
                       </SelectTrigger>

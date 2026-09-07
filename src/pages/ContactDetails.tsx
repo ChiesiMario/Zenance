@@ -12,90 +12,75 @@ import { ChevronLeft, Pencil, Trash2, ArchiveRestore } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 
-export default function AccountDetails() {
+export default function ContactDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  const { accounts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
+  const { contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
   const { transactions } = useTransactions();
   const { categories } = useCategories();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   
-  const account = accounts?.find(a => a.id === id);
+  const contact = contacts?.find(a => a.id === id);
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editGroup, setEditGroup] = useState('cash');
-  const [editCurrency, setEditCurrency] = useState('');
+  const [editGroup, setEditGroup] = useState('personal');
   const [deleteError, setDeleteError] = useState('');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   
   useEffect(() => {
-    if (account) {
-      setEditName(account.name);
-      setEditGroup(account.group || 'cash');
-      setEditCurrency(account.currency || '');
+    if (contact) {
+      setEditName(contact.name);
+      setEditGroup(contact.group || 'personal');
       setDeleteError('');
     }
-  }, [account, isEditDialogOpen]);
+  }, [contact, isEditDialogOpen]);
 
-  if (!account && accounts && accounts.length > 0) {
+  if (!contact && contacts && contacts.length > 0) {
     return (
       <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <p>{t('accounts.accountNotFound', 'Account not found.')}</p>
-        <Button variant="outline" onClick={() => navigate('/accounts')}>Go back</Button>
+        <p>{t('contacts.contactNotFound', 'Contact not found.')}</p>
+        <Button variant="outline" onClick={() => navigate('/contacts')}>{t('dashboard.close', 'Go back')}</Button>
       </div>
     );
   }
 
-  const accountTransactions = useMemo(() => {
+  const contactTransactions = useMemo(() => {
     return transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
   }, [transactions, id]);
 
-  const hasTransactions = accountTransactions.length > 0;
-
-  const { balance, totalIncome, totalExpense } = useMemo(() => {
-    let bal = account?.initialBalance || 0;
-    let income = 0;
-    let expense = 0;
+  const { balance, totalLent, totalBorrowed } = useMemo(() => {
+    let bal = 0;
+    let lent = 0;
+    let borrowed = 0;
     
-    accountTransactions.forEach(tx => {
-      if (tx.type === 'income' && tx.accountId === id) {
-        bal += tx.amount;
-        income += tx.amount;
-      }
-      if (tx.type === 'expense' && tx.accountId === id) {
-        bal -= tx.amount;
-        expense += tx.amount;
-      }
+    contactTransactions.forEach(tx => {
       if (tx.type === 'transfer' || tx.type === 'loan') {
-        if (tx.accountId === id) {
+        if (tx.accountId === id) { // transfer FROM contact
           bal -= tx.amount;
-          expense += tx.amount;
+          borrowed += tx.amount;
         }
-        if (tx.toAccountId === id) {
-          const inAmount = tx.transferInAmount ?? tx.amount;
-          bal += inAmount;
-          income += inAmount;
+        if (tx.toAccountId === id) { // transfer TO contact
+          bal += tx.amount;
+          lent += tx.amount;
         }
       }
     });
-    return { balance: bal, totalIncome: income, totalExpense: expense };
-  }, [accountTransactions, account?.initialBalance, id]);
+    return { balance: bal, totalLent: lent, totalBorrowed: borrowed };
+  }, [contactTransactions, id]);
 
   const handleUpdate = async () => {
     if (!editName.trim() || !id) return;
     await updateAccount(id, {
       name: editName.trim(),
-      group: editGroup,
-      currency: editCurrency
+      group: editGroup
     });
     setIsEditDialogOpen(false);
   };
@@ -104,16 +89,16 @@ export default function AccountDetails() {
     if (!id) return;
     const res = await deleteAccount(id);
     if (!res.success) {
-      setDeleteError(res.reason === 'has_transactions' ? t('accounts.cannotDeleteHasTransactions', 'Cannot delete account with existing transactions. You can archive it instead.') : t('common.error'));
+      setDeleteError(res.reason === 'has_transactions' ? t('accounts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.') : t('common.error'));
     } else {
-      navigate('/accounts');
+      navigate('/contacts');
     }
   };
   
   const handleArchive = async () => {
     if (!id) return;
     await archiveAccount(id);
-    navigate('/accounts');
+    navigate('/contacts');
   };
 
   const getCategoryName = (categoryId: string) => {
@@ -121,45 +106,38 @@ export default function AccountDetails() {
     return categories?.find(c => c.id === categoryId)?.name || categoryId;
   };
 
-  const GROUP_I18N_KEYS: Record<string, string> = {
-    cash: 'groupCash',
-    debit: 'groupDebit',
-    credit: 'groupCredit',
-    credit_pay: 'groupCreditPay',
-    investment: 'groupInvestment',
-    other: 'groupOther'
-  };
-
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-6 pb-8">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/accounts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/contacts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-xl font-semibold tracking-tight truncate px-2">{account?.name}</h2>
+        <h2 className="text-xl font-semibold tracking-tight truncate px-2">{contact?.name}</h2>
         <Button variant="ghost" size="icon" onClick={() => setIsEditDialogOpen(true)} className="h-8 w-8 -mr-2 text-muted-foreground hover:text-foreground">
           <Pencil className="h-4 w-4" />
         </Button>
       </div>
 
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground p-8 flex flex-col items-center justify-center">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('accounts.balance')}</p>
-        <div className={cn("text-6xl font-mono tracking-tighter font-medium text-center break-all px-4", balance < 0 ? 'text-destructive' : 'text-foreground')}>
-          <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+           {balance === 0 ? t('contacts.settled') : balance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
+        </p>
+        <div className={cn("text-6xl font-mono tracking-tighter font-medium text-center break-all px-4", balance === 0 ? 'text-muted-foreground' : balance > 0 ? 'text-primary' : 'text-destructive')}>
+          <AmountDisplay amount={Math.abs(balance)} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div className="border border-border rounded-lg bg-card p-4 flex flex-col">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
           <p className="font-medium text-lg font-mono text-primary">
-            <AmountDisplay amount={totalIncome} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            <AmountDisplay amount={totalLent} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
           </p>
         </div>
         <div className="border border-border rounded-lg bg-card p-4 flex flex-col">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
           <p className="font-medium text-lg font-mono text-destructive">
-            <AmountDisplay amount={totalExpense} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            <AmountDisplay amount={totalBorrowed} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
           </p>
         </div>
       </div>
@@ -169,12 +147,12 @@ export default function AccountDetails() {
           <h3 className="text-sm font-medium">{t('dashboard.recentTransactions')}</h3>
         </div>
         <div className="divide-y divide-border">
-          {accountTransactions.length === 0 && (
+          {contactTransactions.length === 0 && (
             <div className="p-8 text-center text-sm text-muted-foreground">
               {t('dashboard.noActivity')}
             </div>
           )}
-          {accountTransactions.map(t => (
+          {contactTransactions.map(t => (
             <button 
               key={t.id} 
               onClick={() => setSelectedTransactionId(t.id)}
@@ -188,12 +166,12 @@ export default function AccountDetails() {
               </div>
               <div className="flex items-center gap-3">
                 <AmountDisplay 
-                  amount={(t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id ? (t.transferInAmount ?? t.amount) : t.amount} 
+                  amount={t.amount} 
                   originalCurrency={t.originalCurrency} 
                   baseCurrency={activeLedger?.baseCurrency} 
                   type={t.type as any} 
                   className={cn("text-base", 
-                    (t.type === 'income' || (t.type === 'transfer' && t.toAccountId === id) || (t.type === 'loan' && t.toAccountId === id)) ? 'text-primary' : 
+                    ((t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id) ? 'text-primary' : 
                     ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id) ? 'text-foreground' : 
                     t.type === 'expense' ? 'text-muted-foreground' : undefined
                   )}
@@ -208,11 +186,11 @@ export default function AccountDetails() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[350px] overflow-hidden">
           <DialogHeader>
-            <DialogTitle className="text-center">{t('accounts.editAccount', 'Edit Account')}</DialogTitle>
+            <DialogTitle className="text-center">{t('contacts.editContact', 'Edit Contact')}</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-6">
             <div className="space-y-1">
-              <label className="block text-sm font-medium">{t('accounts.accountName')}</label>
+              <label className="block text-sm font-medium">{t('contacts.contactName')}</label>
               <Input 
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
@@ -220,39 +198,17 @@ export default function AccountDetails() {
               />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">{t('accounts.accountGroup')}</label>
-                <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
-                  <SelectTrigger>
-                    <SelectValue>
-                      {t(`accounts.${GROUP_I18N_KEYS[editGroup]}` as any)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">{t('accounts.groupCash')}</SelectItem>
-                    <SelectItem value="debit">{t('accounts.groupDebit')}</SelectItem>
-                    <SelectItem value="credit">{t('accounts.groupCredit')}</SelectItem>
-                    <SelectItem value="credit_pay">{t('accounts.groupCreditPay')}</SelectItem>
-                    <SelectItem value="investment">{t('accounts.groupInvestment')}</SelectItem>
-                    <SelectItem value="other">{t('accounts.groupOther')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">{t('setup.currency', 'Currency')}</label>
-                <Select disabled={hasTransactions} value={editCurrency || activeLedger?.baseCurrency || 'CNY'} onValueChange={(val) => { if (val) setEditCurrency(val); }}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMMON_CURRENCIES.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">{t('accounts.accountGroup')}</label>
+              <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="personal">{t('contacts.groupPersonal')}</SelectItem>
+                  <SelectItem value="organization">{t('contacts.groupOrganization')}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {deleteError && (
@@ -264,21 +220,13 @@ export default function AccountDetails() {
             <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
               <Button variant="outline" className="w-full justify-center text-muted-foreground hover:text-foreground" onClick={handleArchive}>
                 <ArchiveRestore className="mr-2 h-4 w-4" />
-                {t('accounts.archiveAccount', 'Archive Account')}
+                {t('contacts.archiveContact', 'Archive Contact')}
               </Button>
-              <Button disabled={hasTransactions} variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
+              <Button variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />
-                {t('accounts.deleteAccount', 'Delete Account')}
+                {t('contacts.deleteContact', 'Delete Contact')}
               </Button>
             </div>
-            
-            {hasTransactions && (
-              <div className="text-center !mt-3">
-                <p className="text-[11px] text-muted-foreground leading-tight">
-                  {t('accounts.cannotEditCurrencyHasTransactions', 'Currency and Account Deletion are disabled when there are existing transactions.')}
-                </p>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" type="button" />}>

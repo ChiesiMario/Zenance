@@ -131,7 +131,13 @@
       "groupPersonal": "Personal",
       "groupOrganization": "Organization",
       "noContacts": "No contacts found.",
-      "all": "All Contacts"
+      "all": "All Contacts",
+      "totalLent": "Total Lent",
+      "totalBorrowed": "Total Borrowed",
+      "contactNotFound": "Contact not found.",
+      "editContact": "Edit Contact",
+      "archiveContact": "Archive Contact",
+      "deleteContact": "Delete Contact"
     },
     "setup": {
       "welcomeTagline": "Master your personal finances with elegance.",

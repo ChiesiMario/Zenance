@@ -9,8 +9,9 @@ import { TransactionDetailsDialog } from '@/components/transactions/TransactionD
 import { Link } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { type Ledger } from '@/services/db/db';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,7 +56,6 @@ export default function Dashboard() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
-  const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
 
   // Initialize active ledger if null
   useEffect(() => {
@@ -352,7 +352,7 @@ export default function Dashboard() {
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('dashboard.netBalance')}</p>
           <p className="text-4xl font-mono tracking-tighter font-medium text-foreground">
-            {currencySymbol}{balance.toLocaleString()}
+            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
           </p>
         </div>
 
@@ -360,11 +360,15 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium">{currencySymbol}{income.toLocaleString()}</p>
+            <p className="text-2xl font-mono tracking-tight font-medium">
+              <AmountDisplay amount={income} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium">{currencySymbol}{expense.toLocaleString()}</p>
+            <p className="text-2xl font-mono tracking-tight font-medium">
+              <AmountDisplay amount={expense} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
           </div>
         </div>
 
@@ -374,10 +378,15 @@ export default function Dashboard() {
             <div className="flex justify-between items-baseline mb-2">
               <h2 className="text-xs uppercase tracking-widest text-muted-foreground">{activeBudget.name}</h2>
               <div className="text-right">
-                <span className="text-lg font-mono font-medium text-foreground">
-                  {currencySymbol}{(budgetProgress[activeBudget.id] || 0).toLocaleString()}
+                <AmountDisplay 
+                  amount={budgetProgress[activeBudget.id] || 0} 
+                  baseCurrency={activeLedger?.baseCurrency} 
+                  type="neutral" 
+                  className="text-lg text-foreground"
+                />
+                <span className="text-sm text-muted-foreground ml-1">
+                  / <AmountDisplay amount={activeBudget.amount} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
                 </span>
-                <span className="text-sm text-muted-foreground">/ {currencySymbol}{activeBudget.amount.toLocaleString()}</span>
               </div>
             </div>
             {/* Progress Bar */}
@@ -418,9 +427,13 @@ export default function Dashboard() {
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span className={`text-base font-mono font-medium ${tx.type === 'income' ? 'text-primary' : (tx.type === 'transfer' || tx.type === 'loan') ? 'text-blue-500' : 'text-muted-foreground'}`}>
-                  {tx.type === 'expense' ? '-' : (tx.type === 'transfer' || tx.type === 'loan') ? '' : '+'}{currencySymbol}{tx.amount.toLocaleString()}
-                </span>
+                <AmountDisplay 
+                  amount={tx.amount} 
+                  originalCurrency={tx.originalCurrency} 
+                  baseCurrency={activeLedger?.baseCurrency} 
+                  type={tx.type as any} 
+                  className={cn("text-base", tx.type === 'expense' && "text-muted-foreground")}
+                />
               </div>
             </button>
           ))}

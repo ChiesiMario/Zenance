@@ -39,7 +39,7 @@ export default function Contacts() {
     transactions.forEach(tx => {
       // If money flows TO the contact account, the contact balance INCREASES
       // (This means they hold our money, i.e., Owes you)
-      if (tx.type === 'transfer') {
+      if (tx.type === 'transfer' || tx.type === 'loan') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount; // transfer FROM contact
         if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += tx.amount; // transfer TO contact
       }

@@ -8,6 +8,7 @@ import Budgets from './pages/Budgets';
 import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 import AccountDetails from './pages/AccountDetails';
+import ContactDetails from './pages/ContactDetails';
 import { SetupGuard } from './components/layout/SetupGuard';
 
 const router = createBrowserRouter([
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: 'contacts',
         element: <Contacts />,
+      },
+      {
+        path: 'contacts/:id',
+        element: <ContactDetails />,
       },
       {
         path: 'budgets',

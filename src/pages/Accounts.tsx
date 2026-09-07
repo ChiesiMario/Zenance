@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Plus } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
 
 export default function Accounts() {
   const { t } = useTranslation();
@@ -27,7 +28,6 @@ export default function Accounts() {
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
-  const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'USD');
   const selectedCurrency = newAccountCurrency || activeLedger?.baseCurrency || 'CNY';
 
   const accountBalances = useMemo(() => {
@@ -185,22 +185,25 @@ export default function Accounts() {
         </Dialog>
       </div>
 
-      {/* Asset Statistics Card */}
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         <div className="p-6 border-b border-border flex flex-col items-start justify-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('accounts.netWorth')}</p>
           <div className="text-5xl font-mono tracking-tighter font-medium text-foreground">
-            {currencySymbol}{netWorth.toLocaleString()}
+            <AmountDisplay amount={netWorth} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
           </div>
         </div>
         <div className="grid grid-cols-2">
           <div className="p-5 border-r border-border flex flex-col">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.assets')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium text-primary">{currencySymbol}{totalAssets.toLocaleString()}</p>
+            <p className="text-2xl font-mono tracking-tight font-medium text-primary">
+              <AmountDisplay amount={totalAssets} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
           </div>
           <div className="p-5 flex flex-col">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.liabilities')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium text-destructive">{currencySymbol}{totalLiabilities.toLocaleString()}</p>
+            <p className="text-2xl font-mono tracking-tight font-medium text-destructive">
+              <AmountDisplay amount={totalLiabilities} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
           </div>
         </div>
       </div>
@@ -222,8 +225,8 @@ export default function Accounts() {
             <div key={groupId} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="flex items-center justify-between p-4 border-b border-border bg-muted/20">
                 <h3 className="text-sm font-medium">{t(`accounts.${GROUP_I18N_KEYS[groupId]}` as any)}</h3>
-                <span className={cn("text-sm font-mono", groupTotal < 0 ? 'text-destructive' : 'text-muted-foreground')}>
-                  {currencySymbol}{groupTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="text-sm font-mono text-muted-foreground">
+                  <AmountDisplay amount={groupTotal} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
                 </span>
               </div>
               <div className="divide-y divide-border">
@@ -243,9 +246,12 @@ export default function Accounts() {
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={cn("text-base font-mono font-medium", (accountBalances[account.id] || 0) < 0 ? 'text-destructive' : 'text-foreground')}>
-                        {currencySymbol}{(accountBalances[account.id] || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
+                      <AmountDisplay 
+                        amount={accountBalances[account.id] || 0} 
+                        baseCurrency={account.currency || activeLedger?.baseCurrency} 
+                        type="neutral" 
+                        className={cn("text-base", (accountBalances[account.id] || 0) < 0 ? 'text-destructive' : 'text-foreground')}
+                      />
                     </div>
                   </Link>
                 ))}

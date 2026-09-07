@@ -6,8 +6,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
-import { getCurrencySymbol } from '@/lib/utils';
 import { useMemo } from 'react';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
 
 interface Props {
   transactionId: string | null;
@@ -28,7 +28,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   }, [transactionId, transactions]);
 
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
-  const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
 
   const getAccountName = (accountId: string) => {
     return accounts?.find(a => a.id === accountId)?.name || accountId;
@@ -61,7 +60,13 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               <span className="text-[10px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">#{selectedTransaction.displayId || selectedTransaction.id.split('-')[0].toUpperCase()}</span>
             </div>
             <p className={`text-5xl font-mono tracking-tighter font-medium ${selectedTransaction.type === 'income' ? 'text-primary' : (selectedTransaction.type === 'transfer' || selectedTransaction.type === 'loan') ? 'text-blue-500' : 'text-foreground'}`}>
-              {selectedTransaction.type === 'expense' ? '-' : (selectedTransaction.type === 'transfer' || selectedTransaction.type === 'loan') ? '' : '+'}{currencySymbol}{selectedTransaction.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <AmountDisplay 
+                amount={selectedTransaction.amount} 
+                originalCurrency={selectedTransaction.originalCurrency} 
+                baseCurrency={activeLedger?.baseCurrency} 
+                type={selectedTransaction.type as any} 
+                className={selectedTransaction.type === 'expense' ? 'text-foreground' : undefined}
+              />
             </p>
           </div>
 

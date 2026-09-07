@@ -131,7 +131,13 @@
       "groupPersonal": "个人",
       "groupOrganization": "机构",
       "noContacts": "目前没有任何对象",
-      "all": "所有对象"
+      "all": "所有对象",
+      "totalLent": "总借出",
+      "totalBorrowed": "总借入",
+      "contactNotFound": "找不到该对象。",
+      "editContact": "编辑对象",
+      "archiveContact": "归档对象",
+      "deleteContact": "删除对象"
     },
     "setup": {
       "welcomeTagline": "以优雅的方式掌握您的个人财务。",

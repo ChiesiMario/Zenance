@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Plus, Target } from 'lucide-react';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
 
 export default function Budgets() {
   const { t } = useTranslation();
@@ -20,7 +21,6 @@ export default function Budgets() {
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
-  const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
   
   // Set default dates to current month
   const today = new Date();
@@ -116,11 +116,14 @@ export default function Budgets() {
                     <h3 className="text-base font-medium leading-none">{budget.name}</h3>
                   </div>
                   <div className="text-right">
-                    <span className={cn("text-xl font-mono tracking-tight font-medium", isOver ? 'text-destructive' : 'text-foreground')}>
-                      {currencySymbol}{spent.toLocaleString()}
-                    </span>
+                    <AmountDisplay 
+                      amount={spent} 
+                      baseCurrency={activeLedger?.baseCurrency} 
+                      type="neutral" 
+                      className={cn("text-xl font-mono tracking-tight font-medium", isOver ? 'text-destructive' : 'text-foreground')}
+                    />
                     <span className="text-sm text-muted-foreground ml-1">
-                      / {currencySymbol}{budget.amount.toLocaleString()}
+                      / <AmountDisplay amount={budget.amount} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
                     </span>
                   </div>
                 </div>
@@ -133,9 +136,11 @@ export default function Budgets() {
                   />
                 </div>
                 
-                <div className="flex justify-between text-xs uppercase tracking-widest text-muted-foreground mt-1">
+                <div className="flex justify-between text-xs uppercase tracking-widest text-muted-foreground mt-1 items-baseline">
                   <span className="font-mono text-muted-foreground">{percentage.toFixed(0)}%</span>
-                  <span>{t('budgets.remaining')} {currencySymbol}{(budget.amount - spent).toLocaleString()}</span>
+                  <span>
+                    {t('budgets.remaining')} <AmountDisplay amount={Math.max(0, budget.amount - spent)} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+                  </span>
                 </div>
               </div>
             </div>

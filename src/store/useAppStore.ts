@@ -8,6 +8,8 @@ interface AppState {
   setSyncing: (isSyncing: boolean) => void;
   setLastSyncTime: (time: string) => void;
   setActiveLedgerId: (id: string) => void;
+  editingTransactionId: string | null;
+  setEditingTransactionId: (id: string | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -16,9 +18,11 @@ export const useAppStore = create<AppState>()(
       isSyncing: false,
       lastSyncTime: null,
       activeLedgerId: null,
+      editingTransactionId: null,
       setSyncing: (isSyncing) => set({ isSyncing }),
       setLastSyncTime: (time) => set({ lastSyncTime: time }),
       setActiveLedgerId: (id) => set({ activeLedgerId: id }),
+      setEditingTransactionId: (id) => set({ editingTransactionId: id }),
     }),
     {
       name: 'zenance-app-storage',

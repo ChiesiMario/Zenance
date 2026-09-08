@@ -141,6 +141,7 @@
       "contactNotFound": "Contact not found.",
       "editContact": "Edit Contact",
       "archiveContact": "Archive Contact",
+      "archived": "Archived",
       "deleteContact": "Delete Contact"
     },
     "setup": {

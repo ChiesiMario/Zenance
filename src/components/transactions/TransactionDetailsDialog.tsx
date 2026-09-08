@@ -17,9 +17,9 @@ interface Props {
 export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const { t } = useTranslation();
   const { transactions, deleteTransaction } = useTransactions();
-  const { categories } = useCategories();
+  const { allCategories } = useCategories();
   const { accounts } = useAccounts();
-  const { activeLedgerId } = useAppStore();
+  const { activeLedgerId, setEditingTransactionId } = useAppStore();
   const { ledgers } = useLedgers();
 
   const selectedTransaction = useMemo(() => {
@@ -35,7 +35,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
   const getCategoryName = (categoryId: string) => {
     if (categoryId === 'transfer') return t('add.transfer');
-    return categories?.find(c => c.id === categoryId)?.name || categoryId;
+    return allCategories?.find(c => c.id === categoryId)?.name || categoryId;
   };
 
   const handleDelete = async () => {
@@ -113,13 +113,21 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           </div>
         </div>
 
-        <DialogFooter className="sm:justify-between items-center mt-2 border-t pt-4 border-border">
+        <DialogFooter className="sm:justify-between items-center mt-2 border-t pt-4 border-border flex-row gap-2">
             <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
             {t('dashboard.delete')}
             </Button>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-            {t('dashboard.close')}
-            </DialogClose>
+            <div className="flex gap-2">
+              <DialogClose render={<Button variant="outline" type="button" />}>
+              {t('dashboard.close')}
+              </DialogClose>
+              <Button onClick={() => {
+                setEditingTransactionId(selectedTransaction.id);
+                onClose();
+              }}>
+                {t('dashboard.edit', '編輯')}
+              </Button>
+            </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

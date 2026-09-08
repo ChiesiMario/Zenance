@@ -15,13 +15,25 @@ export function useAccounts() {
     [activeLedgerId]
   );
 
-  const { wallets, contacts } = useMemo(() => {
-    if (!accounts) return { wallets: [], contacts: [] };
+  const archivedAccounts = useLiveQuery(
+    () => {
+      if (!activeLedgerId) return Promise.resolve([] as Account[]);
+      return db.accounts.filter(a => !a.deleted && a.archived === true && a.ledgerId === activeLedgerId).toArray();
+    },
+    [activeLedgerId]
+  );
+
+  const { wallets, contacts, archivedContacts } = useMemo(() => {
+    const activeWallets = accounts ? accounts.filter(a => !a.type || a.type === 'wallet') : [];
+    const activeContacts = accounts ? accounts.filter(a => a.type === 'contact') : [];
+    const archived = archivedAccounts ? archivedAccounts.filter(a => a.type === 'contact') : [];
+    
     return {
-      wallets: accounts.filter(a => !a.type || a.type === 'wallet'),
-      contacts: accounts.filter(a => a.type === 'contact')
+      wallets: activeWallets,
+      contacts: activeContacts,
+      archivedContacts: archived
     };
-  }, [accounts]);
+  }, [accounts, archivedAccounts]);
 
   const addAccount = async (name: string, type: 'wallet' | 'contact' = 'wallet', initialBalance: number = 0, currency?: string, group: string = 'cash'): Promise<Account | null> => {
     if (!activeLedgerId) return null;
@@ -80,6 +92,7 @@ export function useAccounts() {
     accounts,
     wallets,
     contacts,
+    archivedContacts,
     addAccount,
     updateAccount,
     archiveAccount,

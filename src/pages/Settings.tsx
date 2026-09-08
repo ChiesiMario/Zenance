@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { Cloud, CloudOff, RefreshCw, Globe, Moon } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, Globe, Moon, Tags, ChevronRight } from 'lucide-react';
 import { useAppStore } from '@/store/useAppStore';
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '@/components/ThemeProvider';
+import { Link } from 'react-router-dom';
 
 export default function Settings() {
   const { isSyncing, lastSyncTime } = useAppStore();
@@ -66,6 +67,14 @@ export default function Settings() {
       {/* Preferences Container */}
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         <div className="divide-y divide-border">
+          <Link to="/settings/categories" className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer">
+            <div className="flex items-center gap-3 pl-2">
+              <Tags className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm font-medium">{t('settings.categories', '分類管理')}</span>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground mr-2" />
+          </Link>
+          
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3 pl-2">
               <Globe className="h-5 w-5 text-muted-foreground" />

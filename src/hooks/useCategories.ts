@@ -9,6 +9,22 @@ export function useCategories() {
   const categories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
+      return db.categories.filter(c => !c.deleted && !c.archived && c.ledgerId === activeLedgerId).toArray();
+    },
+    [activeLedgerId]
+  );
+
+  const archivedCategories = useLiveQuery(
+    () => {
+      if (!activeLedgerId) return Promise.resolve([] as Category[]);
+      return db.categories.filter(c => !c.deleted && c.archived === true && c.ledgerId === activeLedgerId).toArray();
+    },
+    [activeLedgerId]
+  );
+
+  const allCategories = useLiveQuery(
+    () => {
+      if (!activeLedgerId) return Promise.resolve([] as Category[]);
       return db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).toArray();
     },
     [activeLedgerId]
@@ -30,11 +46,42 @@ export function useCategories() {
     return newCategory;
   };
 
-  const deleteCategory = async (id: string) => {
+  const updateCategory = async (id: string, name: string) => {
+    await db.categories.update(id, {
+      name,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const archiveCategory = async (id: string) => {
+    await db.categories.update(id, {
+      archived: true,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const unarchiveCategory = async (id: string) => {
+    await db.categories.update(id, {
+      archived: false,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
+  const deleteCategory = async (id: string): Promise<{ success: boolean; reason?: string }> => {
+    const txCount = await db.transactions
+      .filter(t => !t.deleted && t.category === id)
+      .count();
+
+    if (txCount > 0) {
+      return { success: false, reason: 'has_transactions' };
+    }
+
     await db.categories.update(id, {
       deleted: true,
       updatedAt: new Date().toISOString(),
     });
+    
+    return { success: true };
   };
 
   const initDefaultCategories = async () => {
@@ -80,7 +127,12 @@ export function useCategories() {
 
   return {
     categories,
+    archivedCategories,
+    allCategories,
     addCategory,
+    updateCategory,
+    archiveCategory,
+    unarchiveCategory,
     deleteCategory,
     initDefaultCategories,
   };

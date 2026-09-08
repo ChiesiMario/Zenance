@@ -23,7 +23,7 @@ export default function AccountDetails() {
   
   const { accounts, contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
   const { transactions } = useTransactions();
-  const { categories } = useCategories();
+  const { allCategories } = useCategories();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   
@@ -122,7 +122,7 @@ export default function AccountDetails() {
       const isLent = contacts?.some(c => c.id === tx.toAccountId);
       return isLent ? t('add.lent') : t('add.borrowed');
     }
-    return categories?.find(c => c.id === tx.category)?.name || tx.category;
+    return allCategories?.find(c => c.id === tx.category)?.name || tx.category;
   };
 
   const GROUP_I18N_KEYS: Record<string, string> = {

@@ -141,6 +141,7 @@
       "contactNotFound": "找不到该对象。",
       "editContact": "编辑对象",
       "archiveContact": "归档对象",
+      "archived": "已归档",
       "deleteContact": "删除对象"
     },
     "setup": {

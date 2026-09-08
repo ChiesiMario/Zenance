@@ -36,7 +36,7 @@ import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 export default function Dashboard() {
   const { transactions } = useTransactions();
   const { contacts } = useAccounts();
-  const { categories } = useCategories();
+  const { allCategories } = useCategories();
   const { activeBudget, budgetProgress } = useBudgets();
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
   const { activeLedgerId, setActiveLedgerId } = useAppStore();
@@ -142,7 +142,7 @@ export default function Dashboard() {
       const isLent = contacts?.some(c => c.id === tx.toAccountId);
       return isLent ? t('add.lent') : t('add.borrowed');
     }
-    return categories?.find(c => c.id === tx.category)?.name || tx.category;
+    return allCategories?.find(c => c.id === tx.category)?.name || tx.category;
   };
   
   return (
@@ -157,7 +157,7 @@ export default function Dashboard() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-(--anchor-width) min-w-[200px] max-w-[calc(100vw-2rem)]">
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="bg-foreground text-background text-sm text-center !px-3 !py-2.5 rounded-t-[7px] -mx-2 -mt-2 mb-1 font-semibold">{t('dashboard.switchLedger')}</DropdownMenuLabel>
+              <DropdownMenuLabel className="bg-foreground text-background text-sm text-center !px-3 !py-2.5 rounded-t-lg -mx-2 -mt-2 mb-1 font-semibold">{t('dashboard.switchLedger')}</DropdownMenuLabel>
               {ledgers?.map(ledger => (
                 <DropdownMenuItem 
                   key={ledger.id}

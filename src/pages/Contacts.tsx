@@ -13,13 +13,13 @@ import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
 
 export default function Contacts() {
   const { t } = useTranslation();
-  const { contacts, addAccount } = useAccounts();
+  const { contacts, archivedContacts, addAccount } = useAccounts();
   const { transactions } = useTransactions();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [newContactGroup, setNewContactGroup] = useState('personal');
-  const [filterGroup, setFilterGroup] = useState<'all' | 'personal' | 'organization'>('all');
+  const [filterGroup, setFilterGroup] = useState<'all' | 'personal' | 'organization' | 'archived'>('all');
 
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
@@ -29,10 +29,11 @@ export default function Contacts() {
   // Calculate balances for each contact
   const contactBalances = useMemo(() => {
     const balances: Record<string, number> = {};
-    if (!contacts || !transactions) return balances;
+    const allContacts = [...(contacts || []), ...(archivedContacts || [])];
+    if (!allContacts || !transactions) return balances;
 
     // Initialize balances
-    contacts.forEach(c => {
+    allContacts.forEach(c => {
       balances[c.id] = 0;
     });
 
@@ -50,7 +51,9 @@ export default function Contacts() {
 
   const filteredAndSortedContacts = useMemo(() => {
     let filtered = contacts || [];
-    if (filterGroup === 'personal') {
+    if (filterGroup === 'archived') {
+      filtered = archivedContacts || [];
+    } else if (filterGroup === 'personal') {
       filtered = filtered.filter(c => c.group === 'personal' || c.group === 'other' || !c.group);
     } else if (filterGroup === 'organization') {
       filtered = filtered.filter(c => c.group === 'organization');
@@ -67,7 +70,7 @@ export default function Contacts() {
       
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [contacts, filterGroup, contactBalances]);
+  }, [contacts, archivedContacts, filterGroup, contactBalances]);
 
 
 
@@ -156,6 +159,14 @@ export default function Contacts() {
                 className="rounded-full"
               >
                 {t('contacts.groupOrganization')}
+              </Button>
+              <Button 
+                variant={filterGroup === 'archived' ? 'default' : 'outline'} 
+                onClick={() => setFilterGroup('archived')}
+                size="sm"
+                className="rounded-full"
+              >
+                {t('contacts.archived')}
               </Button>
             </div>
           }

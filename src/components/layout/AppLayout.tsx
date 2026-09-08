@@ -7,7 +7,7 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 
 export function AppLayout() {
@@ -17,7 +17,7 @@ export function AppLayout() {
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
-  const { activeLedgerId } = useAppStore();
+  const { activeLedgerId, editingTransactionId, setEditingTransactionId } = useAppStore();
   
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
@@ -51,9 +51,11 @@ export function AppLayout() {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addModalType, setAddModalType] = useState<'expense' | 'income' | 'transfer' | 'loan'>('expense');
+  const [addModalLoanType, setAddModalLoanType] = useState<'borrow' | 'lend'>('borrow');
 
-  const handleOpenAddModal = (type: 'expense' | 'income' | 'transfer' | 'loan') => {
+  const handleOpenAddModal = (type: 'expense' | 'income' | 'transfer' | 'loan', loanType?: 'borrow' | 'lend') => {
     setAddModalType(type);
+    if (loanType) setAddModalLoanType(loanType);
     setIsAddModalOpen(true);
   };
 
@@ -107,11 +109,23 @@ export function AppLayout() {
                         <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.transfer}</span>
                       </DropdownMenuItem>
                       
-                      <DropdownMenuItem onClick={() => handleOpenAddModal('loan')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
-                        <HandCoins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
-                        <span className="text-[11px] font-medium">{t('add.loan')}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.loan}</span>
-                      </DropdownMenuItem>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md [&>svg:last-child]:hidden outline-none data-[state=open]:bg-accent/50 focus:bg-accent/50 text-muted-foreground focus:text-foreground">
+                          <HandCoins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
+                          <span className="text-[11px] font-medium text-foreground">{t('add.loan')}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.loan}</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent sideOffset={8} className="min-w-[120px]">
+                            <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'borrow')} className="cursor-pointer">
+                              {t('add.borrow')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'lend')} className="cursor-pointer">
+                              {t('add.lend')}
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -135,9 +149,14 @@ export function AppLayout() {
       </nav>
       
       <AddTransactionModal 
-        isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
+        isOpen={isAddModalOpen || !!editingTransactionId} 
+        onClose={() => {
+          setIsAddModalOpen(false);
+          if (editingTransactionId) setEditingTransactionId(null);
+        }} 
         initialType={addModalType}
+        initialLoanType={addModalLoanType}
+        transactionToEditId={editingTransactionId}
       />
     </div>
   );

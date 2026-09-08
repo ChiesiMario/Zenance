@@ -22,7 +22,7 @@ export default function ContactDetails() {
   
   const { contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
   const { transactions } = useTransactions();
-  const { categories } = useCategories();
+  const { allCategories } = useCategories();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   
@@ -106,7 +106,7 @@ export default function ContactDetails() {
     if (tx.type === 'loan') {
       return tx.toAccountId === id ? t('add.lent') : t('add.borrowed');
     }
-    return categories?.find(c => c.id === tx.category)?.name || tx.category;
+    return allCategories?.find(c => c.id === tx.category)?.name || tx.category;
   };
 
   return (

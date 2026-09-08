@@ -105,7 +105,7 @@ export default function Budgets() {
           const isOver = spent > budget.amount;
           
           return (
-            <div key={budget.id} className="border border-border rounded-xl p-5 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group">
+            <div key={budget.id} className="border border-border rounded-lg p-5 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group">
               <div className="absolute -right-6 -top-6 text-muted/10 transition-transform group-hover:scale-110 duration-500">
                 <Target className="h-32 w-32" />
               </div>
@@ -147,7 +147,7 @@ export default function Budgets() {
           );
         })}
         {budgets?.length === 0 && (
-          <div className="col-span-full p-8 text-center text-sm text-muted-foreground border border-dashed border-border rounded-xl">
+          <div className="col-span-full p-8 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
             No budgets found.
           </div>
         )}

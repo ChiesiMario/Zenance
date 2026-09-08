@@ -29,9 +29,13 @@ export function AmountDisplay({
     sign = showSign ? '+' : '';
   } else if (type === 'expense') {
     sign = showSign ? '-' : '';
-  } else if (type === 'transfer' || type === 'loan') {
+  } else if (type === 'transfer') {
     colorClass = 'text-blue-500';
     sign = '';
+  } else if (type === 'loan') {
+    if (showSign) {
+      sign = amount < 0 ? '-' : amount > 0 ? '+' : '';
+    }
   } else if (type === 'neutral') {
     if (showSign && amount < 0) sign = '-';
   }

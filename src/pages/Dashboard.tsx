@@ -1,4 +1,5 @@
 import { useTransactions } from '@/hooks/useTransactions';
+import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -34,6 +35,7 @@ import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 
 export default function Dashboard() {
   const { transactions } = useTransactions();
+  const { contacts } = useAccounts();
   const { categories } = useCategories();
   const { activeBudget, budgetProgress } = useBudgets();
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
@@ -134,9 +136,13 @@ export default function Dashboard() {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  const getCategoryName = (id: string) => {
-    if (id === 'transfer') return t('add.transfer');
-    return categories?.find(c => c.id === id)?.name || id;
+  const getCategoryName = (tx: any) => {
+    if (tx.type === 'transfer') return t('add.transfer');
+    if (tx.type === 'loan') {
+      const isLent = contacts?.some(c => c.id === tx.toAccountId);
+      return isLent ? t('add.lent') : t('add.borrowed');
+    }
+    return categories?.find(c => c.id === tx.category)?.name || tx.category;
   };
   
   return (
@@ -420,19 +426,19 @@ export default function Dashboard() {
               className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
             >
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(tx.category)}</span>
+                <span className="text-sm font-medium leading-none">{getCategoryName(tx)}</span>
                 <p className="text-sm text-muted-foreground truncate">
-                  {tx.type === 'transfer' ? t('add.transfer') : tx.type === 'loan' ? t('add.loan') : categories?.find(c => c.id === tx.category)?.name || tx.category}
+                  {getCategoryName(tx)}
                   {tx.note && ` · ${tx.note}`}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <AmountDisplay 
-                  amount={tx.amount} 
+                  amount={tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId) ? -tx.amount : tx.amount} 
                   originalCurrency={tx.originalCurrency} 
                   baseCurrency={activeLedger?.baseCurrency} 
                   type={tx.type as any} 
-                  className={cn("text-base", tx.type === 'expense' && "text-muted-foreground")}
+                  className={cn("text-base", (tx.type === 'expense' || (tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId))) && "text-muted-foreground")}
                 />
               </div>
             </button>

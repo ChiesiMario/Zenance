@@ -38,6 +38,8 @@
       "income": "收入",
       "transfer": "转账",
       "loan": "借贷",
+      "lent": "借出",
+      "borrowed": "借入",
       "borrow": "借入",
       "lend": "借出",
       "contact": "对象",
@@ -120,6 +122,8 @@
       "delete": "删除"
     },
     "contacts": {
+      "cannotDeleteHasTransactions": "无法删除包含交易记录的对象，但您可以将其归档。",
+      "category": "分类",
       "contacts": "对象",
       "addContact": "添加对象",
       "contactName": "对象名称",

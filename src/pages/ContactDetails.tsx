@@ -89,7 +89,7 @@ export default function ContactDetails() {
     if (!id) return;
     const res = await deleteAccount(id);
     if (!res.success) {
-      setDeleteError(res.reason === 'has_transactions' ? t('accounts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.') : t('common.error'));
+      setDeleteError(res.reason === 'has_transactions' ? t('contacts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.') : t('common.error'));
     } else {
       navigate('/contacts');
     }
@@ -101,9 +101,12 @@ export default function ContactDetails() {
     navigate('/contacts');
   };
 
-  const getCategoryName = (categoryId: string) => {
-    if (categoryId === 'transfer') return t('add.transfer');
-    return categories?.find(c => c.id === categoryId)?.name || categoryId;
+  const getCategoryName = (tx: any) => {
+    if (tx.type === 'transfer') return t('add.transfer');
+    if (tx.type === 'loan') {
+      return tx.toAccountId === id ? t('add.lent') : t('add.borrowed');
+    }
+    return categories?.find(c => c.id === tx.category)?.name || tx.category;
   };
 
   return (
@@ -159,21 +162,20 @@ export default function ContactDetails() {
               className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
             >
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(t.category)}</span>
+                <span className="text-sm font-medium leading-none">{getCategoryName(t)}</span>
                 <p className="text-sm text-muted-foreground truncate">
                   {t.date} {t.note && `· ${t.note}`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <AmountDisplay 
-                  amount={t.amount} 
+                  amount={((t.type === 'transfer' || t.type === 'loan') && t.accountId === id) ? -t.amount : t.amount} 
                   originalCurrency={t.originalCurrency} 
                   baseCurrency={activeLedger?.baseCurrency} 
                   type={t.type as any} 
                   className={cn("text-base", 
                     ((t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id) ? 'text-primary' : 
-                    ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id) ? 'text-foreground' : 
-                    t.type === 'expense' ? 'text-muted-foreground' : undefined
+                    (t.type === 'expense' || ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id)) ? 'text-muted-foreground' : undefined
                   )}
                   showSign={true}
                 />
@@ -199,7 +201,7 @@ export default function ContactDetails() {
             </div>
             
             <div className="space-y-1">
-              <label className="block text-sm font-medium">{t('accounts.accountGroup')}</label>
+              <label className="block text-sm font-medium">{t('contacts.category')}</label>
               <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
                 <SelectTrigger>
                   <SelectValue />
@@ -222,11 +224,19 @@ export default function ContactDetails() {
                 <ArchiveRestore className="mr-2 h-4 w-4" />
                 {t('contacts.archiveContact', 'Archive Contact')}
               </Button>
-              <Button variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
+              <Button disabled={contactTransactions.length > 0} variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('contacts.deleteContact', 'Delete Contact')}
               </Button>
             </div>
+            
+            {contactTransactions.length > 0 && (
+              <div className="text-center !mt-3">
+                <p className="text-[11px] text-muted-foreground leading-tight">
+                  {t('contacts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.')}
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" type="button" />}>

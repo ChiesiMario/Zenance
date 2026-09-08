@@ -38,6 +38,8 @@
       "income": "Income",
       "transfer": "Transfer",
       "loan": "Loan",
+      "lent": "Lent",
+      "borrowed": "Borrowed",
       "borrow": "Borrow",
       "lend": "Lend",
       "contact": "Contact",
@@ -120,6 +122,8 @@
       "delete": "Delete"
     },
     "contacts": {
+      "cannotDeleteHasTransactions": "Cannot delete contact with existing transactions. You can archive it instead.",
+      "category": "Category",
       "contacts": "Contacts",
       "addContact": "Add Contact",
       "contactName": "Contact Name",

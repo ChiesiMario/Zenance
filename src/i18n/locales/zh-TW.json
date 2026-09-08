@@ -38,6 +38,8 @@
       "income": "收入",
       "transfer": "轉帳",
       "loan": "借貸",
+      "lent": "借出",
+      "borrowed": "借入",
       "borrow": "借入",
       "lend": "借出",
       "contact": "對象",
@@ -120,6 +122,8 @@
       "delete": "刪除"
     },
     "contacts": {
+      "cannotDeleteHasTransactions": "無法刪除包含交易紀錄的對象，但您可以將其歸檔。",
+      "category": "分類",
       "contacts": "對象",
       "addContact": "新增對象",
       "contactName": "對象名稱",

@@ -21,7 +21,7 @@ export default function AccountDetails() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  const { accounts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
+  const { accounts, contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
   const { transactions } = useTransactions();
   const { categories } = useCategories();
   const { activeLedgerId } = useAppStore();
@@ -116,9 +116,13 @@ export default function AccountDetails() {
     navigate('/accounts');
   };
 
-  const getCategoryName = (categoryId: string) => {
-    if (categoryId === 'transfer') return t('add.transfer');
-    return categories?.find(c => c.id === categoryId)?.name || categoryId;
+  const getCategoryName = (tx: any) => {
+    if (tx.type === 'transfer') return t('add.transfer');
+    if (tx.type === 'loan') {
+      const isLent = contacts?.some(c => c.id === tx.toAccountId);
+      return isLent ? t('add.lent') : t('add.borrowed');
+    }
+    return categories?.find(c => c.id === tx.category)?.name || tx.category;
   };
 
   const GROUP_I18N_KEYS: Record<string, string> = {
@@ -181,21 +185,20 @@ export default function AccountDetails() {
               className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
             >
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(t.category)}</span>
+                <span className="text-sm font-medium leading-none">{getCategoryName(t)}</span>
                 <p className="text-sm text-muted-foreground truncate">
                   {t.date} {t.note && `· ${t.note}`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <AmountDisplay 
-                  amount={(t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id ? (t.transferInAmount ?? t.amount) : t.amount} 
+                  amount={(t.type === 'transfer' || t.type === 'loan') && t.accountId === id ? -t.amount : ((t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id ? (t.transferInAmount ?? t.amount) : t.amount)} 
                   originalCurrency={t.originalCurrency} 
                   baseCurrency={activeLedger?.baseCurrency} 
                   type={t.type as any} 
                   className={cn("text-base", 
                     (t.type === 'income' || (t.type === 'transfer' && t.toAccountId === id) || (t.type === 'loan' && t.toAccountId === id)) ? 'text-primary' : 
-                    ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id) ? 'text-foreground' : 
-                    t.type === 'expense' ? 'text-muted-foreground' : undefined
+                    (t.type === 'expense' || ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id)) ? 'text-muted-foreground' : undefined
                   )}
                   showSign={true}
                 />

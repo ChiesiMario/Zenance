@@ -115,7 +115,12 @@ export default function Categories() {
                       const hasTx = transactions?.some(t => !t.deleted && t.category === cat.id);
                       return (
                         <>
-                          <span className="font-medium text-sm">{cat.name}</span>
+                          <button 
+                            className="flex-1 text-left font-medium text-sm hover:underline cursor-pointer"
+                            onClick={() => navigate(`/settings/categories/${cat.id}`)}
+                          >
+                            {cat.name}
+                          </button>
                           
                           <DropdownMenu>
                             <DropdownMenuTrigger render={

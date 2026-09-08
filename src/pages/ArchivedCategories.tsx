@@ -48,7 +48,12 @@ export default function ArchivedCategories() {
           ) : (
             filteredCategories.map(cat => (
               <div key={cat.id} className="flex items-center justify-between p-3 pl-4 group">
-                <span className="font-medium text-sm text-muted-foreground">{cat.name}</span>
+                <button 
+                  className="flex-1 text-left font-medium text-sm text-muted-foreground hover:underline cursor-pointer"
+                  onClick={() => navigate(`/settings/categories/${cat.id}`)}
+                >
+                  {cat.name}
+                </button>
                 
                 <Button 
                   variant="ghost" 

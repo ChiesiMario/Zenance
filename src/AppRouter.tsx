@@ -8,6 +8,7 @@ import Budgets from './pages/Budgets';
 import Settings from './pages/Settings';
 import Categories from './pages/Categories';
 import ArchivedCategories from './pages/ArchivedCategories';
+import CategoryDetails from './pages/CategoryDetails';
 import Setup from './pages/Setup';
 import AccountDetails from './pages/AccountDetails';
 import ContactDetails from './pages/ContactDetails';
@@ -61,6 +62,10 @@ const router = createBrowserRouter([
       {
         path: 'settings/categories/archived',
         element: <ArchivedCategories />,
+      },
+      {
+        path: 'settings/categories/:id',
+        element: <CategoryDetails />,
       },
     ],
   },

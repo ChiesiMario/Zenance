@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useMemo } from 'react';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins } from 'lucide-react';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -12,12 +12,13 @@ import { AddTransactionModal } from '@/components/transactions/AddTransactionMod
 
 export function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   useExchangeRates(); // Trigger background sync
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
-  const { activeLedgerId, editingTransactionId, setEditingTransactionId } = useAppStore();
+  const { activeLedgerId, editingTransactionId, setEditingTransactionId, isAddModalOpen, addModalType, addModalLoanType, addModalContactId, openAddModal, closeAddModal } = useAppStore();
   
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
@@ -49,14 +50,8 @@ export function AppLayout() {
     };
   }, [transactions]);
   
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [addModalType, setAddModalType] = useState<'expense' | 'income' | 'transfer' | 'loan'>('expense');
-  const [addModalLoanType, setAddModalLoanType] = useState<'borrow' | 'lend'>('borrow');
-
   const handleOpenAddModal = (type: 'expense' | 'income' | 'transfer' | 'loan', loanType?: 'borrow' | 'lend') => {
-    setAddModalType(type);
-    if (loanType) setAddModalLoanType(loanType);
-    setIsAddModalOpen(true);
+    openAddModal(type, loanType);
   };
 
   const navItems = [
@@ -133,16 +128,16 @@ export function AppLayout() {
             }
             
             return (
-              <Link
+              <button
                 key={item.path}
-                to={item.path}
+                onClick={() => navigate(item.path)}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300",
+                  "flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 outline-none",
                   isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Icon className={cn("size-6 transition-transform duration-300", isActive && "scale-110")} strokeWidth={isActive ? 2.5 : 1.5} />
-              </Link>
+              </button>
             );
           })}
         </div>
@@ -151,12 +146,13 @@ export function AppLayout() {
       <AddTransactionModal 
         isOpen={isAddModalOpen || !!editingTransactionId} 
         onClose={() => {
-          setIsAddModalOpen(false);
+          closeAddModal();
           if (editingTransactionId) setEditingTransactionId(null);
         }} 
         initialType={addModalType}
         initialLoanType={addModalLoanType}
         transactionToEditId={editingTransactionId}
+        initialContactId={addModalContactId}
       />
     </div>
   );

@@ -10,6 +10,12 @@ interface AppState {
   setActiveLedgerId: (id: string) => void;
   editingTransactionId: string | null;
   setEditingTransactionId: (id: string | null) => void;
+  isAddModalOpen: boolean;
+  addModalType: 'expense' | 'income' | 'transfer' | 'loan';
+  addModalLoanType: 'borrow' | 'lend';
+  addModalContactId: string | null;
+  openAddModal: (type?: 'expense' | 'income' | 'transfer' | 'loan', loanType?: 'borrow' | 'lend', contactId?: string) => void;
+  closeAddModal: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -19,10 +25,17 @@ export const useAppStore = create<AppState>()(
       lastSyncTime: null,
       activeLedgerId: null,
       editingTransactionId: null,
+      isAddModalOpen: false,
+      addModalType: 'expense',
+      addModalLoanType: 'borrow',
+      addModalContactId: null,
       setSyncing: (isSyncing) => set({ isSyncing }),
       setLastSyncTime: (time) => set({ lastSyncTime: time }),
       setActiveLedgerId: (id) => set({ activeLedgerId: id }),
       setEditingTransactionId: (id) => set({ editingTransactionId: id }),
+      openAddModal: (type = 'expense', loanType = 'borrow', contactId) => 
+        set({ isAddModalOpen: true, addModalType: type, addModalLoanType: loanType, addModalContactId: contactId || null }),
+      closeAddModal: () => set({ isAddModalOpen: false, addModalContactId: null }),
     }),
     {
       name: 'zenance-app-storage',

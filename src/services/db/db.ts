@@ -47,6 +47,7 @@ export interface Category {
   updatedAt: string;
   deleted: boolean;
   archived?: boolean;
+  isSystem?: boolean;
 }
 
 export interface Account {

@@ -29,9 +29,10 @@ interface Props {
   initialType?: 'expense' | 'income' | 'transfer' | 'loan';
   initialLoanType?: 'borrow' | 'lend';
   transactionToEditId?: string | null;
+  initialContactId?: string | null;
 }
 
-export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', initialLoanType = 'borrow', transactionToEditId }: Props) {
+export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', initialLoanType = 'borrow', transactionToEditId, initialContactId }: Props) {
   const { t } = useTranslation();
   const { transactions, addTransaction, updateTransaction } = useTransactions();
   const { categories, addCategory } = useCategories();
@@ -241,7 +242,10 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   useEffect(() => {
     if (type === 'loan' && accounts && accounts.length > 0 && contacts && contacts.length > 0) {
       const defaultWallet = accounts.find(a => a.isDefault) || accounts[0];
-      const defaultContact = contacts[0];
+      const defaultContact = initialContactId 
+        ? (contacts.find(c => c.id === initialContactId) || contacts[0]) 
+        : contacts[0];
+        
       if (loanType === 'borrow') {
         setValue('fromAccountId', defaultContact.id);
         setValue('toAccountId', defaultWallet.id);
@@ -250,7 +254,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         setValue('toAccountId', defaultContact.id);
       }
     }
-  }, [type, loanType, accounts, contacts, setValue]);
+  }, [type, loanType, accounts, contacts, setValue, initialContactId]);
 
   const onSubmit = async (data: FormValues) => {
     const isSameCurrency = selectedCurrency === selectedToCurrency;

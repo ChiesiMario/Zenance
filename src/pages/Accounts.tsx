@@ -16,7 +16,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 
 export default function Accounts() {
   const { t } = useTranslation();
-  const { accounts, wallets, addAccount } = useAccounts();
+  const { accounts, wallets, contacts, addAccount } = useAccounts();
   const { transactions } = useTransactions();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function Accounts() {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] += tx.amount;
       } else if (tx.type === 'expense') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
-      } else if (tx.type === 'transfer') {
+      } else if (tx.type === 'transfer' || tx.type === 'loan') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
         if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount);
       }
@@ -83,19 +83,23 @@ export default function Accounts() {
     other: 'groupOther'
   };
 
-  const { totalAssets, totalLiabilities, netWorth } = useMemo(() => {
-    let assets = 0;
-    let liabilities = 0;
-    Object.values(accountBalances).forEach(balance => {
-      if (balance > 0) assets += balance;
-      else if (balance < 0) liabilities += Math.abs(balance);
+  const { totalWallets, totalLoans, netWorth } = useMemo(() => {
+    let wallets = 0;
+    let loans = 0;
+    Object.keys(accountBalances).forEach(id => {
+      const isContact = contacts?.some(c => c.id === id);
+      if (isContact) {
+        loans += accountBalances[id];
+      } else {
+        wallets += accountBalances[id];
+      }
     });
     return {
-      totalAssets: assets,
-      totalLiabilities: liabilities,
-      netWorth: assets - liabilities,
+      totalWallets: wallets,
+      totalLoans: loans,
+      netWorth: wallets + loans,
     };
-  }, [accountBalances]);
+  }, [accountBalances, contacts]);
 
   const handleAddAccount = async () => {
     if (!newAccountName.trim()) return;
@@ -194,15 +198,15 @@ export default function Accounts() {
         </div>
         <div className="grid grid-cols-2">
           <div className="p-5 border-r border-border flex flex-col">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.assets')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium text-primary">
-              <AmountDisplay amount={totalAssets} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.totalWallets')}</p>
+            <p className={cn("text-2xl font-mono tracking-tight font-medium", totalWallets >= 0 ? "text-primary" : "text-destructive")}>
+              <AmountDisplay amount={totalWallets} baseCurrency={activeLedger?.baseCurrency} type={totalWallets >= 0 ? "income" : "expense"} />
             </p>
           </div>
           <div className="p-5 flex flex-col">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.liabilities')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium text-destructive">
-              <AmountDisplay amount={totalLiabilities} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.netLoans')}</p>
+            <p className={cn("text-2xl font-mono tracking-tight font-medium", totalLoans >= 0 ? "text-primary" : "text-destructive")}>
+              <AmountDisplay amount={totalLoans} baseCurrency={activeLedger?.baseCurrency} type={totalLoans >= 0 ? "income" : "expense"} />
             </p>
           </div>
         </div>

@@ -94,8 +94,14 @@
       "default": "默认",
       "balance": "余额",
       "netWorth": "净资产",
-      "assets": "资产",
-      "liabilities": "负债"
+      "totalWallets": "账户总额",
+      "netLoans": "借贷净额",
+      "adjustBalance": "调整余额",
+      "currentAmount": "当前金额",
+      "newAmount": "新的金额",
+      "difference": "差额",
+      "balanceAdjustment": "余额调整",
+      "balanceAdjustmentNote": "手动余额调整"
     },
     "budgets": {
       "budgets": "预算",

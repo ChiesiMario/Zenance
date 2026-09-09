@@ -64,9 +64,11 @@ export default function CategoryDetails() {
             >
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium leading-none">{category.name}</span>
-                <p className="text-sm text-muted-foreground truncate">
-                  {tx.date} {tx.note && `· ${tx.note}`}
-                </p>
+                {tx.note && (
+                  <p className="text-sm text-muted-foreground truncate">
+                    {tx.note}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <AmountDisplay 

@@ -94,8 +94,14 @@
       "default": "預設",
       "balance": "餘額",
       "netWorth": "總淨值",
-      "assets": "資產",
-      "liabilities": "負債"
+      "totalWallets": "帳戶總額",
+      "netLoans": "借貸淨額",
+      "adjustBalance": "調整餘額",
+      "currentAmount": "現時金額",
+      "newAmount": "新的金額",
+      "difference": "差額",
+      "balanceAdjustment": "餘額調整",
+      "balanceAdjustmentNote": "手動餘額調整"
     },
     "budgets": {
       "budgets": "預算",

@@ -94,8 +94,14 @@
       "default": "Default",
       "balance": "Balance",
       "netWorth": "Net Worth",
-      "assets": "Assets",
-      "liabilities": "Liabilities"
+      "totalWallets": "Total Balances",
+      "netLoans": "Net Loans",
+      "adjustBalance": "Adjust Balance",
+      "currentAmount": "Current Amount",
+      "newAmount": "New Amount",
+      "difference": "Difference",
+      "balanceAdjustment": "Balance Adjustment",
+      "balanceAdjustmentNote": "Manual Balance Adjustment"
     },
     "budgets": {
       "budgets": "Budgets",

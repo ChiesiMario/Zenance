@@ -9,7 +9,7 @@ export function useCategories() {
   const categories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && !c.archived && c.ledgerId === activeLedgerId).toArray();
+      return db.categories.filter(c => !c.deleted && !c.archived && !c.isSystem && c.ledgerId === activeLedgerId).toArray();
     },
     [activeLedgerId]
   );
@@ -17,7 +17,7 @@ export function useCategories() {
   const archivedCategories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && c.archived === true && c.ledgerId === activeLedgerId).toArray();
+      return db.categories.filter(c => !c.deleted && c.archived === true && !c.isSystem && c.ledgerId === activeLedgerId).toArray();
     },
     [activeLedgerId]
   );
@@ -25,7 +25,7 @@ export function useCategories() {
   const allCategories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).toArray();
+      return db.categories.filter(c => !c.deleted && !c.isSystem && c.ledgerId === activeLedgerId).toArray();
     },
     [activeLedgerId]
   );
@@ -125,6 +125,32 @@ export function useCategories() {
     }
   };
 
+  const getOrCreateSystemBalanceAdjustmentCategory = async (type: 'income' | 'expense', name: string) => {
+    if (!activeLedgerId) return null;
+    const existing = await db.categories.filter(c => !c.deleted && c.isSystem === true && c.type === type && c.ledgerId === activeLedgerId).first();
+    if (existing) {
+      if (existing.name !== name) {
+        await updateCategory(existing.id, name);
+        existing.name = name;
+      }
+      return existing;
+    }
+    
+    const newCategory: Category = {
+      id: uuidv4(),
+      ledgerId: activeLedgerId,
+      name,
+      type,
+      isDefault: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deleted: false,
+      isSystem: true,
+    };
+    await db.categories.add(newCategory);
+    return newCategory;
+  };
+
   return {
     categories,
     archivedCategories,
@@ -135,5 +161,6 @@ export function useCategories() {
     unarchiveCategory,
     deleteCategory,
     initDefaultCategories,
+    getOrCreateSystemBalanceAdjustmentCategory,
   };
 }

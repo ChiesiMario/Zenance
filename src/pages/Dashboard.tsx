@@ -427,10 +427,11 @@ export default function Dashboard() {
             >
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium leading-none">{getCategoryName(tx)}</span>
-                <p className="text-sm text-muted-foreground truncate">
-                  {getCategoryName(tx)}
-                  {tx.note && ` · ${tx.note}`}
-                </p>
+                {tx.note && (
+                  <p className="text-sm text-muted-foreground truncate">
+                    {tx.note}
+                  </p>
+                )}
               </div>
               <div className="flex flex-col items-end gap-1">
                 <AmountDisplay 

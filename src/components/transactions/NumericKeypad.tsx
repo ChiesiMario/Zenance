@@ -1,9 +1,11 @@
-import { useRef, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Delete, CalendarDays, Check, Equal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogHeader } from '@/components/ui/dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { format, parseISO } from 'date-fns';
 
 interface Props {
   value: string;
@@ -33,7 +35,6 @@ const safeEvaluate = (expr: string): string => {
 
 export function NumericKeypad({ value, onChange, onSubmit, date, onDateChange }: Props) {
   const { t } = useTranslation();
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const isExpression = useMemo(() => {
     return /[+\-*/]/.test(value) && !/^[+-]?\d+(\.\d+)?$/.test(value);
@@ -86,17 +87,24 @@ export function NumericKeypad({ value, onChange, onSubmit, date, onDateChange }:
       
       {/* Row 1 */}
       <div className="relative w-full h-full col-span-4">
-        <Input 
-          ref={dateInputRef}
-          type="date" 
-          value={date}
-          onChange={(e) => onDateChange(e.target.value)}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-        />
-        <Button variant="ghost" className="w-full h-full flex gap-2 items-center justify-center p-0 rounded-xl bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white pointer-events-none transition-colors">
-          <CalendarDays className="size-5" />
-          <span className="text-sm uppercase tracking-wider font-medium">{dateDisplay}</span>
-        </Button>
+        <Dialog>
+          <DialogTrigger render={<button type="button" className="w-full h-full flex gap-2 items-center justify-center p-0 rounded-xl bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition-colors" />}>
+            <CalendarDays className="size-5" />
+            <span className="text-sm uppercase tracking-wider font-medium">{dateDisplay}</span>
+          </DialogTrigger>
+          <DialogContent className="w-auto p-4 z-[70] flex flex-col items-center justify-center rounded-2xl bg-popover shadow-lg" showCloseButton={false}>
+            <DialogHeader className="sr-only">
+              <DialogTitle>Select Date</DialogTitle>
+            </DialogHeader>
+            <Calendar
+              mode="single"
+              selected={parseISO(date)}
+              onSelect={(d: Date | undefined) => {
+                if (d) onDateChange(format(d, 'yyyy-MM-dd'));
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Row 2 */}

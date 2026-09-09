@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Pencil, Trash2, ArchiveRestore } from 'lucide-react';
+import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
@@ -22,8 +22,8 @@ export default function AccountDetails() {
   const { t } = useTranslation();
   
   const { accounts, contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
-  const { transactions } = useTransactions();
-  const { allCategories } = useCategories();
+  const { transactions, addTransaction } = useTransactions();
+  const { allCategories, getOrCreateSystemBalanceAdjustmentCategory } = useCategories();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   
@@ -36,6 +36,9 @@ export default function AccountDetails() {
   const [editCurrency, setEditCurrency] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  
+  const [isAdjustBalanceDialogOpen, setIsAdjustBalanceDialogOpen] = useState(false);
+  const [newBalanceStr, setNewBalanceStr] = useState('');
   
   useEffect(() => {
     if (account) {
@@ -90,6 +93,41 @@ export default function AccountDetails() {
     return { balance: bal, totalIncome: income, totalExpense: expense };
   }, [accountTransactions, account?.initialBalance, id]);
 
+  useEffect(() => {
+    if (isAdjustBalanceDialogOpen) {
+      setNewBalanceStr(balance.toString());
+    }
+  }, [isAdjustBalanceDialogOpen, balance]);
+
+  const parsedNewBalance = parseFloat(newBalanceStr) || 0;
+  const balanceDiff = parsedNewBalance - balance;
+
+  const handleAdjustBalance = async () => {
+    if (!id || balanceDiff === 0) {
+      setIsAdjustBalanceDialogOpen(false);
+      return;
+    }
+    
+    const diffType = balanceDiff > 0 ? 'income' : 'expense';
+    const catName = t('accounts.balanceAdjustment');
+    
+    const category = await getOrCreateSystemBalanceAdjustmentCategory(diffType, catName);
+    if (category) {
+      await addTransaction({
+        amount: Math.abs(balanceDiff),
+        originalAmount: Math.abs(balanceDiff),
+        originalCurrency: account?.currency || activeLedger?.baseCurrency || 'CNY',
+        exchangeRate: 1,
+        type: diffType,
+        category: category.id,
+        accountId: id,
+        date: new Date().toISOString().split('T')[0],
+        note: t('accounts.balanceAdjustmentNote')
+      });
+    }
+    setIsAdjustBalanceDialogOpen(false);
+  };
+
   const handleUpdate = async () => {
     if (!editName.trim() || !id) return;
     await updateAccount(id, {
@@ -141,31 +179,48 @@ export default function AccountDetails() {
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2 className="text-xl font-semibold tracking-tight truncate px-2">{account?.name}</h2>
-        <Button variant="ghost" size="icon" onClick={() => setIsEditDialogOpen(true)} className="h-8 w-8 -mr-2 text-muted-foreground hover:text-foreground">
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="w-8"></div>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground p-8 flex flex-col items-center justify-center">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('accounts.balance')}</p>
-        <div className={cn("text-6xl font-mono tracking-tighter font-medium text-center break-all px-4", balance < 0 ? 'text-destructive' : 'text-foreground')}>
-          <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+        <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('accounts.balance')}</p>
+          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", balance < 0 ? 'text-destructive' : 'text-foreground')}>
+            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-px bg-border">
+          <div className="bg-card p-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
+            <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
+              <AmountDisplay amount={totalIncome} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
+          </div>
+          <div className="bg-card p-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
+            <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
+              <AmountDisplay amount={totalExpense} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="border border-border rounded-lg bg-card p-4 flex flex-col">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
-          <p className="font-medium text-lg font-mono text-primary">
-            <AmountDisplay amount={totalIncome} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
-          </p>
-        </div>
-        <div className="border border-border rounded-lg bg-card p-4 flex flex-col">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
-          <p className="font-medium text-lg font-mono text-destructive">
-            <AmountDisplay amount={totalExpense} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
-          </p>
-        </div>
+      <div className="flex border border-border rounded-lg overflow-hidden bg-card text-card-foreground divide-x divide-border">
+        <button 
+          onClick={() => setIsEditDialogOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+        >
+          <Edit className="h-4 w-4 text-muted-foreground" />
+          <span>{t('accounts.editAccount', 'Edit Account')}</span>
+        </button>
+        <button 
+          onClick={() => setIsAdjustBalanceDialogOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+        >
+          <Scale className="h-4 w-4 text-muted-foreground" />
+          <span>{t('accounts.adjustBalance')}</span>
+        </button>
       </div>
 
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
@@ -186,9 +241,11 @@ export default function AccountDetails() {
             >
               <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium leading-none">{getCategoryName(t)}</span>
-                <p className="text-sm text-muted-foreground truncate">
-                  {t.date} {t.note && `· ${t.note}`}
-                </p>
+                {t.note && (
+                  <p className="text-sm text-muted-foreground truncate">
+                    {t.note}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <AmountDisplay 
@@ -288,6 +345,48 @@ export default function AccountDetails() {
               {t('common.cancel', 'Cancel')}
             </DialogClose>
             <Button onClick={handleUpdate} disabled={!editName.trim()}>
+              {t('common.save', 'Save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isAdjustBalanceDialogOpen} onOpenChange={setIsAdjustBalanceDialogOpen}>
+        <DialogContent className="sm:max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle className="text-center">{t('accounts.adjustBalance')}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-muted-foreground">{t('accounts.currentAmount')}</label>
+              <div className="text-2xl font-mono opacity-50">
+                <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+              </div>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">{t('accounts.newAmount')}</label>
+              <Input 
+                type="number"
+                step="any"
+                value={newBalanceStr}
+                onChange={(e) => setNewBalanceStr(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdjustBalance()}
+              />
+            </div>
+            
+            <div className="space-y-1 pt-2 border-t border-border">
+              <label className="block text-sm font-medium text-muted-foreground">{t('accounts.difference')}</label>
+              <div className={cn("text-xl font-mono", balanceDiff > 0 ? "text-primary" : balanceDiff < 0 ? "text-destructive" : "text-muted-foreground")}>
+                <AmountDisplay amount={balanceDiff} baseCurrency={activeLedger?.baseCurrency} type={balanceDiff > 0 ? 'income' : balanceDiff < 0 ? 'expense' : 'neutral'} showSign={true} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" type="button" />}>
+              {t('common.cancel')}
+            </DialogClose>
+            <Button onClick={handleAdjustBalance}>
               {t('common.save', 'Save')}
             </Button>
           </DialogFooter>

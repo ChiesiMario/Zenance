@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Delete, CalendarDays, Check, Equal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogHeader } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
 
@@ -35,6 +35,7 @@ const safeEvaluate = (expr: string): string => {
 
 export function NumericKeypad({ value, onChange, onSubmit, date, onDateChange }: Props) {
   const { t } = useTranslation();
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const isExpression = useMemo(() => {
     return /[+\-*/]/.test(value) && !/^[+-]?\d+(\.\d+)?$/.test(value);
@@ -87,24 +88,39 @@ export function NumericKeypad({ value, onChange, onSubmit, date, onDateChange }:
       
       {/* Row 1 */}
       <div className="relative w-full h-full col-span-4">
-        <Dialog>
-          <DialogTrigger render={<button type="button" className="w-full h-full flex gap-2 items-center justify-center p-0 rounded-xl bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition-colors" />}>
-            <CalendarDays className="size-5" />
-            <span className="text-sm uppercase tracking-wider font-medium">{dateDisplay}</span>
-          </DialogTrigger>
-          <DialogContent className="w-auto p-4 z-[70] flex flex-col items-center justify-center rounded-2xl bg-popover shadow-lg" showCloseButton={false}>
-            <DialogHeader className="sr-only">
-              <DialogTitle>Select Date</DialogTitle>
-            </DialogHeader>
-            <Calendar
-              mode="single"
-              selected={parseISO(date)}
-              onSelect={(d: Date | undefined) => {
-                if (d) onDateChange(format(d, 'yyyy-MM-dd'));
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        <button 
+          type="button" 
+          className="w-full h-full flex gap-2 items-center justify-center p-0 rounded-xl bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white transition-colors" 
+          onClick={() => setIsCalendarOpen(true)}
+        >
+          <CalendarDays className="size-5" />
+          <span className="text-sm uppercase tracking-wider font-medium">{dateDisplay}</span>
+        </button>
+
+        {isCalendarOpen && typeof document !== 'undefined' && (
+          createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center isolate">
+              {/* Full-screen Backdrop */}
+              <div 
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-200 animate-in fade-in-0" 
+                onClick={() => setIsCalendarOpen(false)}
+                aria-hidden="true" 
+              />
+              
+              {/* Calendar Popup */}
+              <div className="relative z-10 w-auto p-3 flex flex-col items-center justify-center rounded-xl bg-background border border-border shadow-lg animate-in zoom-in-95 duration-200">
+                <Calendar
+                  selected={parseISO(date)}
+                  onSelect={(d: Date) => {
+                    onDateChange(format(d, 'yyyy-MM-dd'));
+                    setIsCalendarOpen(false);
+                  }}
+                />
+              </div>
+            </div>,
+            document.body
+          )
+        )}
       </div>
 
       {/* Row 2 */}

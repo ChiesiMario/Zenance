@@ -40,10 +40,15 @@ export default function Accounts() {
     });
 
     transactions.forEach(tx => {
+      if (tx.deleted) return;
       if (tx.type === 'income') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] += tx.amount;
       } else if (tx.type === 'expense') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
+        // If this expense is a pending reimbursement, the contact holds it as a receivable
+        if (tx.reimbursementStatus === 'pending' && tx.reimbursementContactId && balances[tx.reimbursementContactId] !== undefined) {
+          balances[tx.reimbursementContactId] += tx.amount;
+        }
       } else if (tx.type === 'transfer' || tx.type === 'loan') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
         if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount);
@@ -226,12 +231,15 @@ export default function Accounts() {
           const groupTotal = groupAccounts.reduce((sum, account) => sum + (accountBalances[account.id] || 0), 0);
           
           return (
-            <div key={groupId} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <div className="flex items-center justify-between p-4 border-b border-border bg-muted/20">
-                <h3 className="text-sm font-medium">{t(`accounts.${GROUP_I18N_KEYS[groupId]}` as any)}</h3>
-                <span className="text-sm font-mono text-muted-foreground">
-                  <AmountDisplay amount={groupTotal} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
-                </span>
+            <div key={groupId} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground animate-in fade-in slide-in-from-bottom-2 duration-500 flex flex-col">
+              <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b border-border text-xs uppercase tracking-widest text-muted-foreground">
+                <span>{t(`accounts.${GROUP_I18N_KEYS[groupId]}` as any)}</span>
+                <AmountDisplay 
+                  amount={groupTotal} 
+                  baseCurrency={activeLedger?.baseCurrency} 
+                  type="neutral" 
+                  className="opacity-50 font-normal"
+                />
               </div>
               <div className="divide-y divide-border">
                 {groupAccounts.map(account => (

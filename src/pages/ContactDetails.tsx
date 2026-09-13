@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft, Receipt } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { SettleReimbursementDialog } from '@/components/contacts/SettleReimbursementDialog';
 
 export default function ContactDetails() {
   const { id } = useParams();
@@ -30,6 +31,7 @@ export default function ContactDetails() {
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSettleOpen, setIsSettleOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editGroup, setEditGroup] = useState('personal');
   const [deleteError, setDeleteError] = useState('');
@@ -52,14 +54,28 @@ export default function ContactDetails() {
     );
   }
 
+  // Include transactions associated with this contact:
+  // 1. Where accountId or toAccountId is the contact (loans & transfers)
+  // 2. Where reimbursementContactId is the contact (reimbursements & refunds)
   const contactTransactions = useMemo(() => {
-    return transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
+    return transactions?.filter(tx => 
+      !tx.deleted && (tx.accountId === id || tx.toAccountId === id || tx.reimbursementContactId === id)
+    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
   }, [transactions, id]);
 
-  const { balance, totalLent, totalBorrowed } = useMemo(() => {
+  const {
+    totalLent,
+    totalBorrowed,
+    pendingReimbursement,
+    netBalance,
+    pendingTxs,
+  } = useMemo(() => {
     let bal = 0;
     let lent = 0;
     let borrowed = 0;
+    let pendingReimb = 0;
+    let settledReimb = 0;
+    const pendingList: typeof contactTransactions = [];
     
     contactTransactions.forEach(tx => {
       if (tx.type === 'transfer' || tx.type === 'loan') {
@@ -71,9 +87,25 @@ export default function ContactDetails() {
           bal += tx.amount;
           lent += tx.amount;
         }
+      } else if (tx.reimbursementContactId === id && tx.type === 'expense') {
+        if (tx.reimbursementStatus === 'pending') {
+          pendingReimb += tx.amount;
+          pendingList.push(tx);
+        } else if (tx.reimbursementStatus === 'reimbursed') {
+          settledReimb += tx.amount;
+        }
       }
     });
-    return { balance: bal, totalLent: lent, totalBorrowed: borrowed };
+
+    return {
+      loanBalance: bal,
+      totalLent: lent,
+      totalBorrowed: borrowed,
+      pendingReimbursement: pendingReimb,
+      totalReimbursed: settledReimb,
+      netBalance: bal + pendingReimb,
+      pendingTxs: pendingList,
+    };
   }, [contactTransactions, id]);
 
   const handleUpdate = async () => {
@@ -111,65 +143,85 @@ export default function ContactDetails() {
 
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-6 pb-8">
+      {/* Top Bar */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/contacts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/contacts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer">
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2 className="text-xl font-semibold tracking-tight truncate px-2">{contact?.name}</h2>
         <div className="w-8"></div>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+      {/* Net Balance & Metrics Card */}
+      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground shadow-none">
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-             {balance === 0 ? t('contacts.settled') : balance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
+            {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
           </p>
-          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", balance === 0 ? 'text-muted-foreground' : balance > 0 ? 'text-primary' : 'text-destructive')}>
-            <AmountDisplay amount={Math.abs(balance)} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", netBalance === 0 ? 'text-muted-foreground' : netBalance > 0 ? 'text-emerald-500' : 'text-destructive')}>
+            <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-px bg-border">
+        {/* 3-Column Metrics Breakdown */}
+        <div className="grid grid-cols-3 gap-px bg-border">
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
+            <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground truncate">
               <AmountDisplay amount={totalLent} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
             </p>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
+            <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground truncate">
               <AmountDisplay amount={totalBorrowed} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            </p>
+          </div>
+          <div className="bg-card p-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.pendingReimbursement', '待報銷')}</p>
+            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", pendingReimbursement > 0 ? "text-amber-500" : "text-foreground")}>
+              <AmountDisplay amount={pendingReimbursement} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex border border-border rounded-lg overflow-hidden bg-card text-card-foreground divide-x divide-border">
+      {/* Quick Action Toolbar */}
+      <div className="flex border border-border rounded-lg overflow-hidden bg-card text-card-foreground divide-x divide-border shadow-none">
         <button 
           onClick={() => setIsEditDialogOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
         >
           <Edit className="h-4 w-4 text-muted-foreground" />
           <span>{t('contacts.editContact', 'Edit Contact')}</span>
         </button>
         <button 
           onClick={() => id && openAddModal('loan', 'lend', id)}
-          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
         >
           <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
           <span>{t('add.lend')}</span>
         </button>
         <button 
           onClick={() => id && openAddModal('loan', 'borrow', id)}
-          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
         >
           <ArrowDownLeft className="h-4 w-4 text-muted-foreground" />
           <span>{t('add.borrow')}</span>
         </button>
+        {pendingReimbursement > 0 && (
+          <button 
+            onClick={() => setIsSettleOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors text-amber-500 hover:text-amber-400 cursor-pointer"
+          >
+            <Receipt className="h-4 w-4 text-amber-500" />
+            <span>{t('reimbursements.settleReimbursement', '結算回款')}</span>
+          </button>
+        )}
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+      {/* Transactions History List */}
+      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground shadow-none">
         <div className="p-4 border-b border-border bg-muted/20">
           <h3 className="text-sm font-medium">{t('dashboard.recentTransactions')}</h3>
         </div>
@@ -179,38 +231,86 @@ export default function ContactDetails() {
               {t('dashboard.noActivity')}
             </div>
           )}
-          {contactTransactions.map(t => (
-            <button 
-              key={t.id} 
-              onClick={() => setSelectedTransactionId(t.id)}
-              className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(t)}</span>
-                {t.note && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {t.note}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <AmountDisplay 
-                  amount={((t.type === 'transfer' || t.type === 'loan') && t.accountId === id) ? -t.amount : t.amount} 
-                  originalCurrency={t.originalCurrency} 
-                  baseCurrency={activeLedger?.baseCurrency} 
-                  type={t.type as any} 
-                  className={cn("text-base", 
-                    ((t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id) ? 'text-primary' : 
-                    (t.type === 'expense' || ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id)) ? 'text-muted-foreground' : undefined
+          {contactTransactions.map(tx => {
+            const isReimbExpense = tx.reimbursementContactId === id && tx.type === 'expense';
+            const isReimbIncome = tx.reimbursementContactId === id && tx.type === 'income';
+
+            return (
+              <button 
+                key={tx.id} 
+                onClick={() => setSelectedTransactionId(tx.id)}
+                className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium leading-none">
+                      {isReimbIncome ? t('reimbursements.reimbursementRefund', '報銷回款') : getCategoryName(tx)}
+                    </span>
+                    {isReimbExpense && (
+                      <span className={cn(
+                        "text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono",
+                        tx.reimbursementStatus === 'pending'
+                          ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                          : "bg-muted text-muted-foreground border-border"
+                      )}>
+                        {tx.reimbursementStatus === 'pending' ? t('reimbursements.statusPending', '待報銷') : t('reimbursements.statusSettled', '已報銷')}
+                      </span>
+                    )}
+                    {isReimbIncome && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
+                        {t('contacts.refundIncome', '回款入帳')}
+                      </span>
+                    )}
+                  </div>
+                  {tx.note && (
+                    <p className="text-sm text-muted-foreground truncate">
+                      {tx.note}
+                    </p>
                   )}
-                  showSign={true}
-                />
-              </div>
-            </button>
-          ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  {isReimbExpense ? (
+                    <AmountDisplay 
+                      amount={tx.amount} 
+                      originalCurrency={tx.originalCurrency} 
+                      baseCurrency={activeLedger?.baseCurrency} 
+                      type="neutral"
+                      className={cn(
+                        "text-base font-mono",
+                        tx.reimbursementStatus === 'pending' ? "text-amber-500 font-medium" : "text-muted-foreground"
+                      )}
+                      showSign={true}
+                    />
+                  ) : isReimbIncome ? (
+                    <AmountDisplay 
+                      amount={tx.amount} 
+                      originalCurrency={tx.originalCurrency} 
+                      baseCurrency={activeLedger?.baseCurrency} 
+                      type="income" 
+                      className="text-base text-emerald-500 font-mono font-medium"
+                      showSign={true}
+                    />
+                  ) : (
+                    <AmountDisplay 
+                      amount={((tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === id) ? -tx.amount : tx.amount} 
+                      originalCurrency={tx.originalCurrency} 
+                      baseCurrency={activeLedger?.baseCurrency} 
+                      type={tx.type as any} 
+                      className={cn("text-base font-mono", 
+                        ((tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === id) ? 'text-emerald-500' : 
+                        (tx.type === 'expense' || ((tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === id)) ? 'text-muted-foreground' : undefined
+                      )}
+                      showSign={true}
+                    />
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {/* Edit Contact Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[350px] overflow-hidden">
           <DialogHeader>
@@ -246,11 +346,11 @@ export default function ContactDetails() {
             )}
             
             <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full justify-center text-muted-foreground hover:text-foreground" onClick={handleArchive}>
+              <Button variant="outline" className="w-full justify-center text-muted-foreground hover:text-foreground cursor-pointer" onClick={handleArchive}>
                 <ArchiveRestore className="mr-2 h-4 w-4" />
                 {t('contacts.archiveContact', 'Archive Contact')}
               </Button>
-              <Button disabled={contactTransactions.length > 0} variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
+              <Button disabled={contactTransactions.length > 0} variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10 cursor-pointer" onClick={handleDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('contacts.deleteContact', 'Delete Contact')}
               </Button>
@@ -265,10 +365,10 @@ export default function ContactDetails() {
             )}
           </div>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
+            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
               {t('common.cancel', 'Cancel')}
             </DialogClose>
-            <Button onClick={handleUpdate} disabled={!editName.trim()}>
+            <Button onClick={handleUpdate} disabled={!editName.trim()} className="cursor-pointer">
               {t('common.save', 'Save')}
             </Button>
           </DialogFooter>
@@ -278,6 +378,18 @@ export default function ContactDetails() {
       <TransactionDetailsDialog 
         transactionId={selectedTransactionId} 
         onClose={() => setSelectedTransactionId(null)} 
+      />
+
+      {/* Settle Reimbursement Dialog */}
+      <SettleReimbursementDialog
+        open={isSettleOpen}
+        onOpenChange={setIsSettleOpen}
+        target={contact && pendingTxs.length > 0 ? {
+          contactId: contact.id,
+          contactName: contact.name,
+          transactions: pendingTxs,
+          totalAmount: pendingReimbursement,
+        } : null}
       />
     </div>
   );

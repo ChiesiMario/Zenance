@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Accounts from './pages/Accounts';
 import Contacts from './pages/Contacts';
 import Budgets from './pages/Budgets';
+import BudgetHistory from './pages/BudgetHistory';
+import BudgetDetails from './pages/BudgetDetails';
 import Settings from './pages/Settings';
 import Categories from './pages/Categories';
 import ArchivedCategories from './pages/ArchivedCategories';
@@ -50,6 +52,14 @@ const router = createBrowserRouter([
       {
         path: 'budgets',
         element: <Budgets />,
+      },
+      {
+        path: 'budgets/history',
+        element: <BudgetHistory />,
+      },
+      {
+        path: 'budgets/:id',
+        element: <BudgetDetails />,
       },
       {
         path: 'settings',

@@ -10,6 +10,7 @@ import { TransactionDetailsDialog } from '@/components/transactions/TransactionD
 import { Link } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { isToday, isYesterday, parseISO, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { type Ledger } from '@/services/db/db';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
@@ -31,13 +32,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useNavigate } from 'react-router-dom';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { transactions } = useTransactions();
   const { contacts } = useAccounts();
   const { allCategories } = useCategories();
-  const { activeBudget, budgetProgress } = useBudgets();
+  const { getActiveBudgetsForMonth } = useBudgets();
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
   const { activeLedgerId, setActiveLedgerId } = useAppStore();
   const { t, i18n } = useTranslation();
@@ -99,9 +102,42 @@ export default function Dashboard() {
 
   const currentMonthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
   
+  const currentMonthBudgets = useMemo(() => {
+    return getActiveBudgetsForMonth(currentMonth, 3);
+  }, [getActiveBudgetsForMonth, currentMonth]);
+
   const filteredTransactions = useMemo(() => {
     return transactions?.filter(t => t.date.startsWith(currentMonthPrefix)) || [];
   }, [transactions, currentMonthPrefix]);
+
+  const groupedTransactions = useMemo(() => {
+    const groups: Record<string, typeof filteredTransactions> = {};
+    filteredTransactions.forEach(tx => {
+      const date = tx.date.split('T')[0];
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(tx);
+    });
+    return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(date => {
+      let dailyInc = 0;
+      let dailyExp = 0;
+      groups[date].forEach(t => {
+        if (t.type === 'income') dailyInc += t.amount;
+        else if (t.type === 'expense') dailyExp += t.amount;
+      });
+      return {
+        date,
+        transactions: groups[date],
+        dailyBalance: dailyInc - dailyExp
+      };
+    });
+  }, [filteredTransactions]);
+
+  const formatDateHeader = (dateStr: string) => {
+    const dateObj = parseISO(dateStr);
+    if (isToday(dateObj)) return t('common.today');
+    if (isYesterday(dateObj)) return t('common.yesterday');
+    return format(dateObj, 'MM/dd');
+  };
 
   const { income, expense, balance } = useMemo(() => {
     let inc = 0;
@@ -377,74 +413,166 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
-
-        {/* Overview Row: Active Budget */}
-        {activeBudget && (
-          <div className="border-t border-border p-4 bg-card">
-            <div className="flex justify-between items-baseline mb-2">
-              <h2 className="text-xs uppercase tracking-widest text-muted-foreground">{activeBudget.name}</h2>
-              <div className="text-right">
-                <AmountDisplay 
-                  amount={budgetProgress[activeBudget.id] || 0} 
-                  baseCurrency={activeLedger?.baseCurrency} 
-                  type="neutral" 
-                  className="text-lg text-foreground"
-                />
-                <span className="text-sm text-muted-foreground ml-1">
-                  / <AmountDisplay amount={activeBudget.amount} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
-                </span>
-              </div>
-            </div>
-            {/* Progress Bar */}
-            <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
-              <div 
-                className={cn("h-full transition-all duration-1000 ease-out", (budgetProgress[activeBudget.id] || 0) > activeBudget.amount ? "bg-destructive" : "bg-primary")}
-                style={{ width: `${Math.min(100, ((budgetProgress[activeBudget.id] || 0) / activeBudget.amount) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Recent Transactions List Container */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="p-4 border-b border-border bg-muted/20">
-          <h3 className="text-sm font-medium">{t('dashboard.activity')}</h3>
-        </div>
-        
-        <div className="divide-y divide-border">
-          {filteredTransactions.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              {t('dashboard.noActivity')}
+      {/* Standalone Budget Container (up to 3) */}
+      {currentMonthBudgets.length > 0 && (
+        <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+          {currentMonthBudgets.length === 1 && (() => {
+            const item = currentMonthBudgets[0];
+            const target = item.effectiveAmount;
+            const isOver = item.spent > target;
+            const percentage = Math.min(100, (item.spent / target) * 100);
+
+            return (
+              <button
+                key={item.budget.id}
+                type="button"
+                onClick={() => navigate(`/budgets/${item.budget.id}`, { state: { period: currentMonthPrefix } })}
+                className="w-full p-4 bg-card text-left hover:bg-muted/10 transition-colors cursor-pointer block group"
+              >
+                <div className="flex justify-between items-baseline mb-2">
+                  <h2 className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors truncate pr-2">
+                    {item.budget.name}
+                  </h2>
+                  <div className="text-right shrink-0">
+                    <AmountDisplay 
+                      amount={item.spent} 
+                      baseCurrency={activeLedger?.baseCurrency} 
+                      type="neutral" 
+                      className={cn(
+                        "text-lg font-mono tracking-tight font-medium",
+                        isOver ? 'text-destructive' : 'text-foreground'
+                      )}
+                    />
+                    <span className="text-sm text-muted-foreground ml-1">
+                      / <AmountDisplay amount={target} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+                    </span>
+                  </div>
+                </div>
+                {/* Progress Bar */}
+                <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-700 ease-out",
+                      isOver ? "bg-destructive" : "bg-primary"
+                    )}
+                    style={{ width: `${percentage}%` }}
+                  />
+                </div>
+              </button>
+            );
+          })()}
+
+          {currentMonthBudgets.length >= 2 && (
+            <div
+              className={cn(
+                "grid gap-px bg-border",
+                currentMonthBudgets.length === 2 ? "grid-cols-2" : "grid-cols-3"
+              )}
+            >
+              {currentMonthBudgets.map(({ budget, spent, effectiveAmount }) => {
+                const isOver = spent > effectiveAmount;
+                const percentage = Math.min(100, (spent / effectiveAmount) * 100);
+
+                return (
+                  <button
+                    key={budget.id}
+                    type="button"
+                    onClick={() => navigate(`/budgets/${budget.id}`, { state: { period: currentMonthPrefix } })}
+                    className="bg-card p-3.5 sm:p-4 text-left hover:bg-muted/10 transition-colors cursor-pointer flex flex-col justify-between group overflow-hidden"
+                  >
+                    <div className="w-full mb-1.5">
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors truncate">
+                        {budget.name}
+                      </p>
+                    </div>
+
+                    <div className="w-full mb-2">
+                      <div className="flex items-baseline flex-wrap gap-x-1">
+                        <AmountDisplay 
+                          amount={spent} 
+                          baseCurrency={activeLedger?.baseCurrency} 
+                          type="neutral" 
+                          className={cn(
+                            "text-base sm:text-lg font-mono tracking-tight font-medium",
+                            isOver ? 'text-destructive' : 'text-foreground'
+                          )}
+                        />
+                        <span className="text-xs text-muted-foreground font-mono">
+                          / <AmountDisplay amount={effectiveAmount} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full mt-auto">
+                      <div 
+                        className={cn(
+                          "h-full transition-all duration-700 ease-out",
+                          isOver ? "bg-destructive" : "bg-primary"
+                        )}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
-          
-          {filteredTransactions.slice(0, 15).map((tx) => (
-            <button 
-              key={tx.id} 
-              onClick={() => setSelectedTransactionId(tx.id)}
-              className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(tx)}</span>
-                {tx.note && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {tx.note}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <AmountDisplay 
-                  amount={tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId) ? -tx.amount : tx.amount} 
-                  originalCurrency={tx.originalCurrency} 
-                  baseCurrency={activeLedger?.baseCurrency} 
-                  type={tx.type as any} 
-                  className={cn("text-base", (tx.type === 'expense' || (tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId))) && "text-muted-foreground")}
-                />
-              </div>
-            </button>
-          ))}
         </div>
+      )}
+
+      {/* Recent Transactions List Container */}
+      <div className="flex flex-col gap-4">
+        {filteredTransactions.length === 0 && (
+          <div className="border border-border rounded-lg p-8 text-center text-sm text-muted-foreground bg-card">
+            {t('dashboard.noActivity')}
+          </div>
+        )}
+        
+        {groupedTransactions.map((group) => (
+          <div key={group.date} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground flex flex-col">
+            <div className="sticky top-0 z-10 p-4 bg-background/80 backdrop-blur-md border-b border-border text-xs uppercase tracking-widest text-muted-foreground flex justify-between items-center">
+              <span>{formatDateHeader(group.date)}</span>
+              {group.dailyBalance !== 0 && (
+                <AmountDisplay 
+                  amount={group.dailyBalance} 
+                  baseCurrency={activeLedger?.baseCurrency} 
+                  type="neutral"
+                  className="opacity-50 font-normal"
+                />
+              )}
+            </div>
+            <div className="divide-y divide-border">
+              {group.transactions.map((tx) => (
+                <button 
+                  key={tx.id} 
+                  onClick={() => setSelectedTransactionId(tx.id)}
+                  className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
+                >
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium leading-none">{getCategoryName(tx)}</span>
+                    {tx.note && (
+                      <p className="text-sm text-muted-foreground truncate">
+                        {tx.note}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <AmountDisplay 
+                      amount={tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId) ? -tx.amount : tx.amount} 
+                      originalCurrency={tx.originalCurrency} 
+                      baseCurrency={activeLedger?.baseCurrency} 
+                      type={tx.type as any} 
+                      className={cn("text-base", (tx.type === 'expense' || (tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId))) && "text-muted-foreground")}
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       <TransactionDetailsDialog 

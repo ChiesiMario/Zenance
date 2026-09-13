@@ -13,6 +13,7 @@ import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
+import { useBudgets } from '@/hooks/useBudgets';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import {
   Select,
@@ -36,9 +37,10 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   const { t } = useTranslation();
   const { transactions, addTransaction, updateTransaction } = useTransactions();
   const { categories, addCategory } = useCategories();
-  const { wallets: accounts, contacts } = useAccounts();
+  const { wallets: accounts, contacts, addAccount } = useAccounts();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
+  const { budgets } = useBudgets();
   const { getRate } = useExchangeRates();
   
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
@@ -63,6 +65,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     toAccountId: (type === 'transfer' || type === 'loan') ? z.string().min(1, t('add.errors.accountRequired')) : z.string().optional(),
     transferInAmount: z.number().nonnegative(t('add.errors.amountPositive')).optional(),
     feeCategoryId: z.string().optional(),
+    budgetId: z.string().optional(),
+    reimbursementContactId: z.string().optional(),
     date: z.string().min(1, t('add.errors.dateRequired')),
     note: z.string().optional(),
   }).refine((data) => {
@@ -95,6 +99,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
       toAccountId: '',
       transferInAmount: undefined,
       feeCategoryId: undefined,
+      budgetId: initialType === 'income' ? 'none' : 'auto',
+      reimbursementContactId: initialContactId || undefined,
       date: new Date().toISOString().split('T')[0],
       note: '',
     },
@@ -140,6 +146,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           fromAccountId: transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan' ? transactionToEdit.accountId : undefined,
           toAccountId: transactionToEdit.toAccountId || undefined,
           transferInAmount: transactionToEdit.transferInAmount,
+          budgetId: transactionToEdit.budgetId || (transactionToEdit.type === 'income' ? 'none' : 'auto'),
+          reimbursementContactId: transactionToEdit.reimbursementContactId,
           date: transactionToEdit.date,
           note: transactionToEdit.note || '',
         });
@@ -148,6 +156,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         // Add mode
         setType(initialType);
         reset();
+        setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
+        setValue('reimbursementContactId', initialContactId || undefined);
         setDisplayAmount('');
         setDisplayInAmount('');
         setFocusedAmount('out');
@@ -162,6 +172,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;
     setType(newType);
     reset();
+    setValue('budgetId', newType === 'income' ? 'none' : 'auto');
+    setValue('reimbursementContactId', undefined);
     setDisplayAmount('');
     setDisplayInAmount('');
     setFocusedAmount('out');
@@ -323,6 +335,11 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
       accountId: (type === 'transfer' || type === 'loan') ? data.fromAccountId! : data.accountId!,
       toAccountId: (type === 'transfer' || type === 'loan') ? data.toAccountId : undefined,
       transferInAmount: (type === 'transfer' || type === 'loan') && data.transferInAmount !== undefined ? data.transferInAmount : undefined,
+      budgetId: (type === 'expense' || type === 'income') ? data.budgetId : undefined,
+      reimbursementStatus: (type === 'expense' && data.reimbursementContactId)
+        ? (transactionToEdit?.reimbursementStatus || 'pending')
+        : undefined,
+      reimbursementContactId: type === 'expense' ? data.reimbursementContactId : undefined,
       note: data.note,
       date: data.date,
     };
@@ -910,6 +927,14 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
               onSubmit={handleKeypadSubmit} 
               date={selectedDate}
               onDateChange={(val) => setValue('date', val)}
+              type={type}
+              budgetId={watch('budgetId')}
+              onBudgetChange={(bId) => setValue('budgetId', bId)}
+              budgets={budgets}
+              reimbursementContactId={watch('reimbursementContactId')}
+              onReimbursementContactChange={(cId) => setValue('reimbursementContactId', cId)}
+              contacts={contacts}
+              onAddContact={addAccount}
             />
           </div>
         </div>

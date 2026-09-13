@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
-import { useCategories } from '@/hooks/useCategories';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -12,9 +11,9 @@ import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft,
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { SettleReimbursementDialog } from '@/components/contacts/SettleReimbursementDialog';
+import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 
 export default function ContactDetails() {
   const { id } = useParams();
@@ -23,7 +22,6 @@ export default function ContactDetails() {
   
   const { contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
   const { transactions } = useTransactions();
-  const { allCategories } = useCategories();
   const { activeLedgerId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
   
@@ -35,7 +33,6 @@ export default function ContactDetails() {
   const [editName, setEditName] = useState('');
   const [editGroup, setEditGroup] = useState('personal');
   const [deleteError, setDeleteError] = useState('');
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   
   useEffect(() => {
     if (contact) {
@@ -133,13 +130,6 @@ export default function ContactDetails() {
     navigate('/contacts');
   };
 
-  const getCategoryName = (tx: any) => {
-    if (tx.type === 'transfer') return t('add.transfer');
-    if (tx.type === 'loan') {
-      return tx.toAccountId === id ? t('add.lent') : t('add.borrowed');
-    }
-    return allCategories?.find(c => c.id === tx.category)?.name || tx.category;
-  };
 
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-6 pb-8">
@@ -221,94 +211,20 @@ export default function ContactDetails() {
       </div>
 
       {/* Transactions History List */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground shadow-none">
-        <div className="p-4 border-b border-border bg-muted/20">
-          <h3 className="text-sm font-medium">{t('dashboard.recentTransactions')}</h3>
-        </div>
-        <div className="divide-y divide-border">
-          {contactTransactions.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              {t('dashboard.noActivity')}
-            </div>
-          )}
-          {contactTransactions.map(tx => {
-            const isReimbExpense = tx.reimbursementContactId === id && tx.type === 'expense';
-            const isReimbIncome = tx.reimbursementContactId === id && tx.type === 'income';
-
-            return (
-              <button 
-                key={tx.id} 
-                onClick={() => setSelectedTransactionId(tx.id)}
-                className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
-              >
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium leading-none">
-                      {isReimbIncome ? t('reimbursements.reimbursementRefund', '報銷回款') : getCategoryName(tx)}
-                    </span>
-                    {isReimbExpense && (
-                      <span className={cn(
-                        "text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono",
-                        tx.reimbursementStatus === 'pending'
-                          ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                          : "bg-muted text-muted-foreground border-border"
-                      )}>
-                        {tx.reimbursementStatus === 'pending' ? t('reimbursements.statusPending', '待報銷') : t('reimbursements.statusSettled', '已報銷')}
-                      </span>
-                    )}
-                    {isReimbIncome && (
-                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
-                        {t('contacts.refundIncome', '回款入帳')}
-                      </span>
-                    )}
-                  </div>
-                  {tx.note && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {tx.note}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  {isReimbExpense ? (
-                    <AmountDisplay 
-                      amount={tx.amount} 
-                      originalCurrency={tx.originalCurrency} 
-                      baseCurrency={activeLedger?.baseCurrency} 
-                      type="neutral"
-                      className={cn(
-                        "text-base font-mono",
-                        tx.reimbursementStatus === 'pending' ? "text-amber-500 font-medium" : "text-muted-foreground"
-                      )}
-                      showSign={true}
-                    />
-                  ) : isReimbIncome ? (
-                    <AmountDisplay 
-                      amount={tx.amount} 
-                      originalCurrency={tx.originalCurrency} 
-                      baseCurrency={activeLedger?.baseCurrency} 
-                      type="income" 
-                      className="text-base text-emerald-500 font-mono font-medium"
-                      showSign={true}
-                    />
-                  ) : (
-                    <AmountDisplay 
-                      amount={((tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === id) ? -tx.amount : tx.amount} 
-                      originalCurrency={tx.originalCurrency} 
-                      baseCurrency={activeLedger?.baseCurrency} 
-                      type={tx.type as any} 
-                      className={cn("text-base font-mono", 
-                        ((tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === id) ? 'text-emerald-500' : 
-                        (tx.type === 'expense' || ((tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === id)) ? 'text-muted-foreground' : undefined
-                      )}
-                      showSign={true}
-                    />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <GroupedTransactionList
+        transactions={contactTransactions}
+        contextContactId={id}
+        title={
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              {t('dashboard.recentTransactions')}
+            </h3>
+            <span className="text-xs font-mono text-muted-foreground">
+              {t('reimbursements.items', { count: contactTransactions.length })}
+            </span>
+          </div>
+        }
+      />
 
       {/* Edit Contact Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -375,10 +291,7 @@ export default function ContactDetails() {
         </DialogContent>
       </Dialog>
       
-      <TransactionDetailsDialog 
-        transactionId={selectedTransactionId} 
-        onClose={() => setSelectedTransactionId(null)} 
-      />
+
 
       {/* Settle Reimbursement Dialog */}
       <SettleReimbursementDialog

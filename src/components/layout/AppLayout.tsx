@@ -9,6 +9,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
+import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 
 export function AppLayout() {
   const location = useLocation();
@@ -18,7 +19,7 @@ export function AppLayout() {
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
-  const { activeLedgerId, editingTransactionId, setEditingTransactionId, isAddModalOpen, addModalType, addModalLoanType, addModalContactId, openAddModal, closeAddModal } = useAppStore();
+  const { activeLedgerId, editingTransactionId, setEditingTransactionId, viewingTransactionId, setViewingTransactionId, isAddModalOpen, addModalType, addModalLoanType, addModalContactId, openAddModal, closeAddModal } = useAppStore();
   
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
@@ -153,6 +154,11 @@ export function AppLayout() {
         initialLoanType={addModalLoanType}
         transactionToEditId={editingTransactionId}
         initialContactId={addModalContactId}
+      />
+
+      <TransactionDetailsDialog 
+        transactionId={viewingTransactionId} 
+        onClose={() => setViewingTransactionId(null)} 
       />
     </div>
   );

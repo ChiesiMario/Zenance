@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NumericKeypad } from './NumericKeypad';
+import { NoteInputWithMentions } from './NoteInputWithMentions';
 
 interface Props {
   isOpen: boolean;
@@ -82,7 +83,6 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   type FormValues = z.infer<typeof formSchema>;
 
   const {
-    register,
     handleSubmit,
     setValue,
     watch,
@@ -845,11 +845,11 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                     : (focusedAmount === 'out' ? t('add.loanOutAmount') : t('add.loanInAmount'))}
                 </div>
               ) : (
-                <Input 
+                <NoteInputWithMentions 
                   id="note" 
                   placeholder={t('add.note')} 
-                  className="w-full h-8 px-3 border-white/10 bg-white/5 text-white shadow-none focus-visible:ring-0 text-xs font-medium rounded-lg placeholder:text-zinc-500"
-                  {...register('note')}
+                  value={watch('note') || ''}
+                  onChange={(val) => setValue('note', val, { shouldDirty: true })}
                 />
               )}
             </div>

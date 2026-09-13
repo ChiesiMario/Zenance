@@ -111,6 +111,7 @@
       "settledAt": "结算于 {{date}}",
       "settleModalTitle": "结算报销回款",
       "statusPending": "待报销",
+      "statusPendingWithContact": "待报销 · {{name}}",
       "statusSettled": "已报销"
     },
     "accounts": {
@@ -312,6 +313,28 @@
       "themeLight": "浅色",
       "themeDark": "暗色",
       "themeSystem": "跟随系统"
+    },
+    "reports": {
+      "title": "财务报表",
+      "week": "周",
+      "month": "月",
+      "quarter": "季",
+      "year": "年",
+      "netBalance": "净结余",
+      "totalExpense": "总支出",
+      "totalIncome": "总收入",
+      "trendTitle": "收支走势",
+      "expenseBreakdown": "支出结构拆解",
+      "incomeBreakdown": "收入结构拆解",
+      "categoryRanking": "分类排行",
+      "noTransactions": "此期间暂无任何交易记录",
+      "noExpenses": "此期间无任何支出记录",
+      "noIncomes": "此期间无任何收入记录",
+      "transactionCount": "{{count}} 笔明细",
+      "weekFormat": "{{year}} 年第 {{week}} 周",
+      "quarterFormat": "{{year}} 年 Q{{quarter}}",
+      "percentage": "占比",
+      "others": "其他分类"
     }
   }
 }

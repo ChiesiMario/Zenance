@@ -14,6 +14,7 @@ import CategoryDetails from './pages/CategoryDetails';
 import Setup from './pages/Setup';
 import AccountDetails from './pages/AccountDetails';
 import ContactDetails from './pages/ContactDetails';
+import Reports from './pages/Reports';
 import { SetupGuard } from './components/layout/SetupGuard';
 
 const router = createBrowserRouter([
@@ -60,6 +61,10 @@ const router = createBrowserRouter([
       {
         path: 'budgets/:id',
         element: <BudgetDetails />,
+      },
+      {
+        path: 'reports',
+        element: <Reports />,
       },
       {
         path: 'settings',

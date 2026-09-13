@@ -16,6 +16,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
+import { NoteRenderer } from '@/components/transactions/NoteRenderer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -439,13 +441,16 @@ export default function BudgetDetails() {
                           className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
                         >
                           <div className="flex flex-col gap-1 min-w-0 pr-4">
-                            <span className="text-sm font-medium leading-none truncate">
-                              {category?.name || t('common.uncategorized')}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-medium leading-none truncate">
+                                {category?.name || t('common.uncategorized')}
+                              </span>
+                              <ReimbursementBadge transaction={tx} />
+                            </div>
                             {tx.note && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {tx.note}
-                              </p>
+                              <div className="text-xs text-muted-foreground truncate">
+                                <NoteRenderer note={tx.note} />
+                              </div>
                             )}
                           </div>
                           <div className="flex items-center gap-3 shrink-0">

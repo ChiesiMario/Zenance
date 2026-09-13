@@ -1,19 +1,16 @@
 import { useTransactions } from '@/hooks/useTransactions';
-import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
-import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { Link } from 'react-router-dom';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, BarChart3 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isToday, isYesterday, parseISO, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { type Ledger } from '@/services/db/db';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,13 +29,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { transactions } = useTransactions();
-  const { contacts } = useAccounts();
   const { allCategories } = useCategories();
   const { getActiveBudgetsForMonth } = useBudgets();
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
@@ -56,7 +52,6 @@ export default function Dashboard() {
   const [ledgerToDelete, setLedgerToDelete] = useState<Ledger | null>(null);
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
 
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -110,44 +105,24 @@ export default function Dashboard() {
     return transactions?.filter(t => t.date.startsWith(currentMonthPrefix)) || [];
   }, [transactions, currentMonthPrefix]);
 
-  const groupedTransactions = useMemo(() => {
-    const groups: Record<string, typeof filteredTransactions> = {};
-    filteredTransactions.forEach(tx => {
-      const date = tx.date.split('T')[0];
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(tx);
-    });
-    return Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(date => {
-      let dailyInc = 0;
-      let dailyExp = 0;
-      groups[date].forEach(t => {
-        if (t.type === 'income') dailyInc += t.amount;
-        else if (t.type === 'expense') dailyExp += t.amount;
-      });
-      return {
-        date,
-        transactions: groups[date],
-        dailyBalance: dailyInc - dailyExp
-      };
-    });
-  }, [filteredTransactions]);
-
-  const formatDateHeader = (dateStr: string) => {
-    const dateObj = parseISO(dateStr);
-    if (isToday(dateObj)) return t('common.today');
-    if (isYesterday(dateObj)) return t('common.yesterday');
-    return format(dateObj, 'MM/dd');
+  const isBalanceAdjustment = (tx: any) => {
+    if (tx.type !== 'income' && tx.type !== 'expense') return false;
+    const cat = allCategories?.find(c => c.id === tx.category);
+    return !!cat?.isSystem;
   };
+
+
 
   const { income, expense, balance } = useMemo(() => {
     let inc = 0;
     let exp = 0;
     filteredTransactions.forEach(t => {
+      if (isBalanceAdjustment(t)) return;
       if (t.type === 'income') inc += t.amount;
       else if (t.type === 'expense') exp += t.amount;
     });
     return { income: inc, expense: exp, balance: inc - exp };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, allCategories]);
 
   const formatMonth = (date: Date) => {
     const isCurrentYear = date.getFullYear() === new Date().getFullYear();
@@ -172,14 +147,7 @@ export default function Dashboard() {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
-  const getCategoryName = (tx: any) => {
-    if (tx.type === 'transfer') return t('add.transfer');
-    if (tx.type === 'loan') {
-      const isLent = contacts?.some(c => c.id === tx.toAccountId);
-      return isLent ? t('add.lent') : t('add.borrowed');
-    }
-    return allCategories?.find(c => c.id === tx.category)?.name || tx.category;
-  };
+
   
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-4">
@@ -371,9 +339,22 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        <Link to="/settings" className="p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors shrink-0">
-          <Settings className="size-5" strokeWidth={1.5} />
-        </Link>
+        <div className="flex items-center gap-0.5 -mr-2 shrink-0">
+          <Link 
+            to="/reports" 
+            title={t('reports.title')}
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            <BarChart3 className="size-5" strokeWidth={1.5} />
+          </Link>
+          <Link 
+            to="/settings" 
+            title={t('settings.settings')}
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            <Settings className="size-5" strokeWidth={1.5} />
+          </Link>
+        </div>
       </div>
       
       {/* Top Overview Container */}
@@ -524,61 +505,7 @@ export default function Dashboard() {
       )}
 
       {/* Recent Transactions List Container */}
-      <div className="flex flex-col gap-4">
-        {filteredTransactions.length === 0 && (
-          <div className="border border-border rounded-lg p-8 text-center text-sm text-muted-foreground bg-card">
-            {t('dashboard.noActivity')}
-          </div>
-        )}
-        
-        {groupedTransactions.map((group) => (
-          <div key={group.date} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground flex flex-col">
-            <div className="sticky top-0 z-10 p-4 bg-background/80 backdrop-blur-md border-b border-border text-xs uppercase tracking-widest text-muted-foreground flex justify-between items-center">
-              <span>{formatDateHeader(group.date)}</span>
-              {group.dailyBalance !== 0 && (
-                <AmountDisplay 
-                  amount={group.dailyBalance} 
-                  baseCurrency={activeLedger?.baseCurrency} 
-                  type="neutral"
-                  className="opacity-50 font-normal"
-                />
-              )}
-            </div>
-            <div className="divide-y divide-border">
-              {group.transactions.map((tx) => (
-                <button 
-                  key={tx.id} 
-                  onClick={() => setSelectedTransactionId(tx.id)}
-                  className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium leading-none">{getCategoryName(tx)}</span>
-                    {tx.note && (
-                      <p className="text-sm text-muted-foreground truncate">
-                        {tx.note}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <AmountDisplay 
-                      amount={tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId) ? -tx.amount : tx.amount} 
-                      originalCurrency={tx.originalCurrency} 
-                      baseCurrency={activeLedger?.baseCurrency} 
-                      type={tx.type as any} 
-                      className={cn("text-base", (tx.type === 'expense' || (tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId))) && "text-muted-foreground")}
-                    />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <TransactionDetailsDialog 
-        transactionId={selectedTransactionId} 
-        onClose={() => setSelectedTransactionId(null)} 
-      />
+      <GroupedTransactionList transactions={filteredTransactions} />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useMemo } from 'react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
+import { NoteRenderer } from '@/components/transactions/NoteRenderer';
 
 interface Props {
   transactionId: string | null;
@@ -35,7 +37,11 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
   const getCategoryName = (categoryId: string) => {
     if (categoryId === 'transfer') return t('add.transfer');
-    return allCategories?.find(c => c.id === categoryId)?.name || categoryId;
+    const cat = allCategories?.find(c => c.id === categoryId);
+    if (cat?.isSystem) {
+      return t('accounts.balanceAdjustment');
+    }
+    return cat?.name || categoryId;
   };
 
   const handleDelete = async () => {
@@ -55,9 +61,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         
         <div className="py-2">
           <div className="text-center mb-6">
-            <div className="flex items-center justify-center gap-2 mb-1">
+            <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
               <p className="text-sm text-muted-foreground uppercase tracking-widest">{getCategoryName(selectedTransaction.category)}</p>
               <span className="text-[10px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">#{selectedTransaction.displayId || selectedTransaction.id.split('-')[0].toUpperCase()}</span>
+              <ReimbursementBadge transaction={selectedTransaction} />
             </div>
             <p className={`text-5xl font-mono tracking-tighter font-medium ${selectedTransaction.type === 'income' ? 'text-primary' : (selectedTransaction.type === 'transfer' || selectedTransaction.type === 'loan') ? 'text-blue-500' : 'text-foreground'}`}>
               <AmountDisplay 
@@ -104,10 +111,28 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               </div>
             )}
             
-            {selectedTransaction.note && (
+            {(() => {
+              const cat = allCategories?.find(c => c.id === selectedTransaction.category);
+              const isAdj = !!cat?.isSystem;
+              const isDefaultNote = selectedTransaction.note === t('accounts.balanceAdjustmentNote') || selectedTransaction.note === '手動餘額調整' || selectedTransaction.note === '手动余额调整' || selectedTransaction.note === 'Manual Balance Adjustment';
+              if (isAdj && isDefaultNote) return null;
+              if (!selectedTransaction.note) return null;
+              return (
+                <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
+                  <span className="text-muted-foreground shrink-0 mr-2">{t('add.note')}</span>
+                  <div className="font-medium text-right break-words">
+                    <NoteRenderer note={selectedTransaction.note} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {selectedTransaction.reimbursementStatus && selectedTransaction.reimbursementStatus !== 'none' && (
               <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                <span className="text-muted-foreground">{t('add.note')}</span>
-                <span className="font-medium">{selectedTransaction.note}</span>
+                <span className="text-muted-foreground">{t('reimbursements.title', '報銷')}</span>
+                <div className="flex items-center gap-2">
+                  <ReimbursementBadge transaction={selectedTransaction} />
+                </div>
               </div>
             )}
           </div>

@@ -25,7 +25,7 @@ export function useCategories() {
   const allCategories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && !c.isSystem && c.ledgerId === activeLedgerId).toArray();
+      return db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).toArray();
     },
     [activeLedgerId]
   );

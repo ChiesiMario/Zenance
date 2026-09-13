@@ -23,7 +23,7 @@ export function useAccounts() {
     [activeLedgerId]
   );
 
-  const { wallets, contacts, archivedContacts } = useMemo(() => {
+  const { wallets, contacts, archivedContacts, allContacts } = useMemo(() => {
     const activeWallets = accounts ? accounts.filter(a => !a.type || a.type === 'wallet') : [];
     const activeContacts = accounts ? accounts.filter(a => a.type === 'contact') : [];
     const archived = archivedAccounts ? archivedAccounts.filter(a => a.type === 'contact') : [];
@@ -31,7 +31,8 @@ export function useAccounts() {
     return {
       wallets: activeWallets,
       contacts: activeContacts,
-      archivedContacts: archived
+      archivedContacts: archived,
+      allContacts: [...activeContacts, ...archived]
     };
   }, [accounts, archivedAccounts]);
 
@@ -93,6 +94,7 @@ export function useAccounts() {
     wallets,
     contacts,
     archivedContacts,
+    allContacts,
     addAccount,
     updateAccount,
     archiveAccount,

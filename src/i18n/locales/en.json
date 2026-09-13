@@ -111,6 +111,7 @@
       "settledAt": "Settled on {{date}}",
       "settleModalTitle": "Settle Reimbursement Refund",
       "statusPending": "Pending",
+      "statusPendingWithContact": "Pending · {{name}}",
       "statusSettled": "Settled"
     },
     "accounts": {
@@ -312,6 +313,28 @@
       "themeLight": "Light",
       "themeDark": "Dark",
       "themeSystem": "System"
+    },
+    "reports": {
+      "title": "Analytics & Reports",
+      "week": "Week",
+      "month": "Month",
+      "quarter": "Quarter",
+      "year": "Year",
+      "netBalance": "Net Balance",
+      "totalExpense": "Total Expense",
+      "totalIncome": "Total Income",
+      "trendTitle": "Income & Expense Trend",
+      "expenseBreakdown": "Expense Breakdown",
+      "incomeBreakdown": "Income Breakdown",
+      "categoryRanking": "Category Ranking",
+      "noTransactions": "No transactions in this period",
+      "noExpenses": "No expense records",
+      "noIncomes": "No income records",
+      "transactionCount": "{{count}} transactions",
+      "weekFormat": "Week {{week}}, {{year}}",
+      "quarterFormat": "Q{{quarter}} {{year}}",
+      "percentage": "Share",
+      "others": "Other Categories"
     }
   }
 }

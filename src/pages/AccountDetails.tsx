@@ -13,17 +13,17 @@ import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
-import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 
 export default function AccountDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  const { accounts, contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
+  const { accounts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
   const { transactions, addTransaction } = useTransactions();
-  const { allCategories, getOrCreateSystemBalanceAdjustmentCategory } = useCategories();
+  const { getOrCreateSystemBalanceAdjustmentCategory } = useCategories();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   
@@ -35,7 +35,6 @@ export default function AccountDetails() {
   const [editGroup, setEditGroup] = useState('cash');
   const [editCurrency, setEditCurrency] = useState('');
   const [deleteError, setDeleteError] = useState('');
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   
   const [isAdjustBalanceDialogOpen, setIsAdjustBalanceDialogOpen] = useState(false);
   const [newBalanceStr, setNewBalanceStr] = useState('');
@@ -122,7 +121,7 @@ export default function AccountDetails() {
         category: category.id,
         accountId: id,
         date: new Date().toISOString().split('T')[0],
-        note: t('accounts.balanceAdjustmentNote')
+        note: ''
       });
     }
     setIsAdjustBalanceDialogOpen(false);
@@ -154,14 +153,6 @@ export default function AccountDetails() {
     navigate('/accounts');
   };
 
-  const getCategoryName = (tx: any) => {
-    if (tx.type === 'transfer') return t('add.transfer');
-    if (tx.type === 'loan') {
-      const isLent = contacts?.some(c => c.id === tx.toAccountId);
-      return isLent ? t('add.lent') : t('add.borrowed');
-    }
-    return allCategories?.find(c => c.id === tx.category)?.name || tx.category;
-  };
 
   const GROUP_I18N_KEYS: Record<string, string> = {
     cash: 'groupCash',
@@ -223,47 +214,20 @@ export default function AccountDetails() {
         </button>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="p-4 border-b border-border bg-muted/20">
-          <h3 className="text-sm font-medium">{t('dashboard.recentTransactions')}</h3>
-        </div>
-        <div className="divide-y divide-border">
-          {accountTransactions.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              {t('dashboard.noActivity')}
-            </div>
-          )}
-          {accountTransactions.map(t => (
-            <button 
-              key={t.id} 
-              onClick={() => setSelectedTransactionId(t.id)}
-              className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
-            >
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium leading-none">{getCategoryName(t)}</span>
-                {t.note && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {t.note}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                <AmountDisplay 
-                  amount={(t.type === 'transfer' || t.type === 'loan') && t.accountId === id ? -t.amount : ((t.type === 'transfer' || t.type === 'loan') && t.toAccountId === id ? (t.transferInAmount ?? t.amount) : t.amount)} 
-                  originalCurrency={t.originalCurrency} 
-                  baseCurrency={activeLedger?.baseCurrency} 
-                  type={t.type as any} 
-                  className={cn("text-base", 
-                    (t.type === 'income' || (t.type === 'transfer' && t.toAccountId === id) || (t.type === 'loan' && t.toAccountId === id)) ? 'text-primary' : 
-                    (t.type === 'expense' || ((t.type === 'transfer' || t.type === 'loan') && t.accountId === id)) ? 'text-muted-foreground' : undefined
-                  )}
-                  showSign={true}
-                />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+      <GroupedTransactionList
+        transactions={accountTransactions}
+        contextAccountId={id}
+        title={
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              {t('dashboard.recentTransactions')}
+            </h3>
+            <span className="text-xs font-mono text-muted-foreground">
+              {t('reimbursements.items', { count: accountTransactions.length })}
+            </span>
+          </div>
+        }
+      />
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[350px] overflow-hidden">
@@ -393,10 +357,6 @@ export default function AccountDetails() {
         </DialogContent>
       </Dialog>
       
-      <TransactionDetailsDialog 
-        transactionId={selectedTransactionId} 
-        onClose={() => setSelectedTransactionId(null)} 
-      />
     </div>
   );
 }

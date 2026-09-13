@@ -111,6 +111,7 @@
       "settledAt": "結算於 {{date}}",
       "settleModalTitle": "結算報銷回款",
       "statusPending": "待報銷",
+      "statusPendingWithContact": "待報銷 · {{name}}",
       "statusSettled": "已報銷"
     },
     "accounts": {
@@ -312,6 +313,28 @@
       "themeLight": "淺色",
       "themeDark": "暗色",
       "themeSystem": "跟隨系統"
+    },
+    "reports": {
+      "title": "財務報表",
+      "week": "週",
+      "month": "月",
+      "quarter": "季",
+      "year": "年",
+      "netBalance": "淨結餘",
+      "totalExpense": "總支出",
+      "totalIncome": "總收入",
+      "trendTitle": "收支走勢",
+      "expenseBreakdown": "支出結構拆解",
+      "incomeBreakdown": "收入結構拆解",
+      "categoryRanking": "分類排行",
+      "noTransactions": "此期間尚無任何交易紀錄",
+      "noExpenses": "此期間無任何支出紀錄",
+      "noIncomes": "此期間無任何收入紀錄",
+      "transactionCount": "{{count}} 筆明細",
+      "weekFormat": "{{year}} 年第 {{week}} 週",
+      "quarterFormat": "{{year}} 年 Q{{quarter}}",
+      "percentage": "佔比",
+      "others": "其他分類"
     }
   }
 }

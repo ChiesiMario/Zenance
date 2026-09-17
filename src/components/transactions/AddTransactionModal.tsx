@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NumericKeypad } from './NumericKeypad';
-import { NoteInputWithMentions } from './NoteInputWithMentions';
 
 interface Props {
   isOpen: boolean;
@@ -845,11 +844,12 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                     : (focusedAmount === 'out' ? t('add.loanOutAmount') : t('add.loanInAmount'))}
                 </div>
               ) : (
-                <NoteInputWithMentions 
+                <Input 
                   id="note" 
                   placeholder={t('add.note')} 
                   value={watch('note') || ''}
-                  onChange={(val) => setValue('note', val, { shouldDirty: true })}
+                  onChange={(e) => setValue('note', e.target.value, { shouldDirty: true })}
+                  className="w-full h-8 px-3 border border-white/10 bg-white/5 text-white shadow-none focus:outline-none focus:border-white/20 text-xs font-medium rounded-lg placeholder:text-zinc-500"
                 />
               )}
             </div>

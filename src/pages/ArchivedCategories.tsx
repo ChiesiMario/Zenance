@@ -16,8 +16,8 @@ export default function ArchivedCategories() {
   const filteredCategories = archivedCategories?.filter(c => c.type === activeTab) || [];
 
   return (
-    <div className="animate-in fade-in duration-500 w-full pb-20 p-4 sm:p-6 md:p-8">
-      <div className="flex items-center mb-6 gap-2">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
+      <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
           <ChevronLeft className="h-5 w-5" />
         </Button>

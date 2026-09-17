@@ -17,7 +17,6 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
-import { NoteRenderer } from '@/components/transactions/NoteRenderer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -245,7 +244,7 @@ export default function BudgetDetails() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full pb-20 p-4 sm:p-6 md:p-8 space-y-6 max-w-4xl mx-auto">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
       {/* Top Header Navigation & Period Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-2 min-w-0">
@@ -449,7 +448,7 @@ export default function BudgetDetails() {
                             </div>
                             {tx.note && (
                               <div className="text-xs text-muted-foreground truncate">
-                                <NoteRenderer note={tx.note} />
+                                {tx.note}
                               </div>
                             )}
                           </div>

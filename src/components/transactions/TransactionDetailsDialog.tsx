@@ -9,7 +9,6 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useMemo } from 'react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
-import { NoteRenderer } from '@/components/transactions/NoteRenderer';
 
 interface Props {
   transactionId: string | null;
@@ -121,7 +120,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
                   <span className="text-muted-foreground shrink-0 mr-2">{t('add.note')}</span>
                   <div className="font-medium text-right break-words">
-                    <NoteRenderer note={selectedTransaction.note} />
+                    {selectedTransaction.note}
                   </div>
                 </div>
               );

@@ -394,115 +394,56 @@ export default function Dashboard() {
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Standalone Budget Container (up to 3) */}
-      {currentMonthBudgets.length > 0 && (
-        <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-          {currentMonthBudgets.length === 1 && (() => {
-            const item = currentMonthBudgets[0];
-            const target = item.effectiveAmount;
-            const isOver = item.spent > target;
-            const percentage = Math.min(100, (item.spent / target) * 100);
+        {/* Integrated Budget Section (up to 3, vertical stack) */}
+        {currentMonthBudgets.length > 0 && (
+          <div className="border-t border-border divide-y divide-border">
+            {currentMonthBudgets.map(({ budget, spent, effectiveAmount }) => {
+              const isOver = spent > effectiveAmount;
+              const percentage = Math.min(100, (spent / effectiveAmount) * 100);
 
-            return (
-              <button
-                key={item.budget.id}
-                type="button"
-                onClick={() => navigate(`/budgets/${item.budget.id}`, { state: { period: currentMonthPrefix } })}
-                className="w-full p-4 bg-card text-left hover:bg-muted/10 transition-colors cursor-pointer block group"
-              >
-                <div className="flex justify-between items-baseline mb-2">
-                  <h2 className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors truncate pr-2">
-                    {item.budget.name}
-                  </h2>
-                  <div className="text-right shrink-0">
-                    <AmountDisplay 
-                      amount={item.spent} 
-                      baseCurrency={activeLedger?.baseCurrency} 
-                      type="neutral" 
-                      className={cn(
-                        "text-lg font-mono tracking-tight font-medium",
-                        isOver ? 'text-destructive' : 'text-foreground'
-                      )}
-                    />
-                    <span className="text-sm text-muted-foreground ml-1">
-                      / <AmountDisplay amount={target} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+              return (
+                <button
+                  key={budget.id}
+                  type="button"
+                  onClick={() => navigate(`/budgets/${budget.id}`, { state: { period: currentMonthPrefix } })}
+                  className="w-full p-4 bg-card text-left hover:bg-muted/10 transition-colors cursor-pointer block group"
+                >
+                  <div className="flex justify-between items-center mb-2.5">
+                    <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors truncate pr-2 block m-0 leading-none">
+                      {budget.name}
                     </span>
-                  </div>
-                </div>
-                {/* Progress Bar */}
-                <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
-                  <div 
-                    className={cn(
-                      "h-full transition-all duration-700 ease-out",
-                      isOver ? "bg-destructive" : "bg-primary"
-                    )}
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-              </button>
-            );
-          })()}
-
-          {currentMonthBudgets.length >= 2 && (
-            <div
-              className={cn(
-                "grid gap-px bg-border",
-                currentMonthBudgets.length === 2 ? "grid-cols-2" : "grid-cols-3"
-              )}
-            >
-              {currentMonthBudgets.map(({ budget, spent, effectiveAmount }) => {
-                const isOver = spent > effectiveAmount;
-                const percentage = Math.min(100, (spent / effectiveAmount) * 100);
-
-                return (
-                  <button
-                    key={budget.id}
-                    type="button"
-                    onClick={() => navigate(`/budgets/${budget.id}`, { state: { period: currentMonthPrefix } })}
-                    className="bg-card p-3.5 sm:p-4 text-left hover:bg-muted/10 transition-colors cursor-pointer flex flex-col justify-between group overflow-hidden"
-                  >
-                    <div className="w-full mb-1.5">
-                      <p className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors truncate">
-                        {budget.name}
-                      </p>
-                    </div>
-
-                    <div className="w-full mb-2">
-                      <div className="flex items-baseline flex-wrap gap-x-1">
-                        <AmountDisplay 
-                          amount={spent} 
-                          baseCurrency={activeLedger?.baseCurrency} 
-                          type="neutral" 
-                          className={cn(
-                            "text-base sm:text-lg font-mono tracking-tight font-medium",
-                            isOver ? 'text-destructive' : 'text-foreground'
-                          )}
-                        />
-                        <span className="text-xs text-muted-foreground font-mono">
-                          / <AmountDisplay amount={effectiveAmount} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full mt-auto">
-                      <div 
+                    <div className="text-right shrink-0 flex items-center leading-none">
+                      <AmountDisplay 
+                        amount={spent} 
+                        baseCurrency={activeLedger?.baseCurrency} 
+                        type="neutral" 
                         className={cn(
-                          "h-full transition-all duration-700 ease-out",
-                          isOver ? "bg-destructive" : "bg-primary"
+                          "text-xs font-mono font-normal",
+                          isOver ? 'text-destructive' : 'text-foreground'
                         )}
-                        style={{ width: `${percentage}%` }}
                       />
+                      <span className="text-xs text-muted-foreground ml-1 font-mono font-normal">
+                        / <AmountDisplay amount={effectiveAmount} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+                      </span>
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                  </div>
+                  {/* Progress Bar */}
+                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                    <div 
+                      className={cn(
+                        "h-full transition-all duration-700 ease-out",
+                        isOver ? "bg-destructive" : "bg-primary"
+                      )}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Recent Transactions List Container */}
       <GroupedTransactionList transactions={filteredTransactions} />

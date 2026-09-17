@@ -87,7 +87,7 @@ export default function BudgetHistory() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full pb-20 p-4 sm:p-6 md:p-8 space-y-6 max-w-4xl mx-auto">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
       {/* Header & Back Button */}
       <div className="flex items-center gap-3">
         <Button

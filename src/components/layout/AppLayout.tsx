@@ -66,7 +66,7 @@ export function AppLayout() {
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-8">
+      <main className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-8 [scrollbar-gutter:stable]">
         <Outlet />
       </main>
 

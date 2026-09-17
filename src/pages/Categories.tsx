@@ -48,8 +48,8 @@ export default function Categories() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full pb-20 p-4 sm:p-6 md:p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
             <ChevronLeft className="h-5 w-5" />
@@ -66,7 +66,7 @@ export default function Categories() {
         </div>
       </div>
 
-      <div className="flex bg-muted p-1 rounded-lg mb-6">
+      <div className="flex bg-muted p-1 rounded-lg">
         <button
           onClick={() => setActiveTab('expense')}
           className={cn("flex-1 text-sm font-medium py-1.5 rounded-md transition-colors", activeTab === 'expense' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}

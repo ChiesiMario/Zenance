@@ -15,25 +15,24 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Plus,
   Target,
   Pencil,
   Trash2,
-  ChevronRight,
   Calendar,
   Check,
   Zap,
   Power,
-  History,
   Clock,
+  ChevronDown,
+  Archive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { type Budget, type BudgetRule } from '@/services/db/db';
-
-type BudgetsTab = 'ongoing' | 'rules';
 
 export default function Budgets() {
   const { t } = useTranslation();
@@ -45,7 +44,6 @@ export default function Budgets() {
     budgetRules,
     getBudgetSpent,
     addBudget,
-    updateBudget,
     deleteBudget,
     addBudgetRule,
     updateBudgetRule,
@@ -62,31 +60,74 @@ export default function Budgets() {
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
 
-  // Active Tab State: ongoing | rules
+  // Active Tab & Filter State derived directly from URL searchParams
   const queryTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<BudgetsTab>(
-    queryTab === 'rules' ? 'rules' : 'ongoing'
-  );
+  const activeSection: 'budgets' | 'rules' = queryTab === 'rules' ? 'rules' : 'budgets';
+
+  // Retain the last selected budget filter ('ongoing' | 'ended') even when viewing 'rules'
+  const [lastBudgetFilter, setLastBudgetFilter] = useState<'ongoing' | 'ended'>('ongoing');
 
   useEffect(() => {
-    if (queryTab === 'rules' && activeTab !== 'rules') {
-      setActiveTab('rules');
-    } else if (queryTab && queryTab !== 'rules' && activeTab !== 'ongoing') {
-      setActiveTab('ongoing');
+    if (queryTab === 'ended') {
+      setLastBudgetFilter('ended');
+    } else if (queryTab !== 'rules') {
+      setLastBudgetFilter('ongoing');
     }
-  }, [queryTab, activeTab]);
+  }, [queryTab]);
 
-  const handleTabChange = (val: string) => {
-    const tab = val === 'rules' ? 'rules' : 'ongoing';
-    setActiveTab(tab);
+  const currentBudgetFilter: 'ongoing' | 'ended' =
+    queryTab === 'ended' ? 'ended' : queryTab === 'rules' ? lastBudgetFilter : 'ongoing';
+
+  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
+
+  const handleBudgetFilterChange = (filter: 'ongoing' | 'ended') => {
+    setLastBudgetFilter(filter);
     setSearchParams(
       prev => {
         const next = new URLSearchParams(prev);
-        next.set('tab', tab);
+        if (filter === 'ended') {
+          next.set('tab', 'ended');
+        } else {
+          next.delete('tab');
+        }
         return next;
       },
       { replace: true }
     );
+  };
+
+  const handleSectionChange = (val: string) => {
+    if (val === 'rules') {
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          next.set('tab', 'rules');
+          return next;
+        },
+        { replace: true }
+      );
+    } else {
+      // Switching from 'rules' back to 'budgets'
+      // Switch directly to whichever filter is currently displayed on the tab (What you see is what you get)
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (lastBudgetFilter === 'ended') {
+            next.set('tab', 'ended');
+          } else {
+            next.delete('tab');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  };
+
+  const handleDeleteBudget = async () => {
+    if (!budgetToDelete) return;
+    await deleteBudget(budgetToDelete.id);
+    setBudgetToDelete(null);
   };
 
   const today = useMemo(() => new Date(), []);
@@ -94,11 +135,10 @@ export default function Budgets() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   }, [today]);
 
-  // Unified Ongoing Budgets & Historical Count
-  const { ongoingBudgets, historicalCount } = useMemo(() => {
-    if (!budgets) return { ongoingBudgets: [], historicalCount: 0 };
+  // Unified Ongoing Budgets
+  const ongoingBudgets = useMemo(() => {
+    if (!budgets) return [];
 
-    let historicalCount = 0;
     const ongoingList: Array<{
       budget: Budget;
       spent: number;
@@ -110,7 +150,6 @@ export default function Budgets() {
 
     for (const b of budgets) {
       if (b.endDate && b.endDate < todayStr) {
-        historicalCount++;
         continue;
       }
 
@@ -145,20 +184,39 @@ export default function Budgets() {
       return (a.budget.startDate || '').localeCompare(b.budget.startDate || '');
     });
 
-    return { ongoingBudgets: ongoingList, historicalCount };
+    return ongoingList;
   }, [budgets, todayStr, today, getBudgetSpent]);
 
+  // Unified Ended Budgets (sorted descending by endDate)
+  const endedBudgets = useMemo(() => {
+    if (!budgets) return [];
+    return budgets
+      .filter(b => b.endDate && b.endDate < todayStr)
+      .sort((a, b) => (b.endDate || '').localeCompare(a.endDate || ''))
+      .map(b => {
+        const spent = getBudgetSpent(b);
+        const effectiveAmount = b.amount;
+        const isOver = spent > effectiveAmount;
+        const percentage = effectiveAmount > 0 ? Math.min(100, (spent / effectiveAmount) * 100) : 0;
+        return {
+          budget: b,
+          spent,
+          effectiveAmount,
+          isOver,
+          percentage,
+        };
+      });
+  }, [budgets, todayStr, getBudgetSpent]);
+
   // ----------------------------------------------------
-  // Budget Modal States (Add / Edit Manual Fixed-Period Budget)
+  // Budget Modal States (Add Manual Fixed-Period Budget)
   // ----------------------------------------------------
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
-  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [formBudgetName, setFormBudgetName] = useState('');
   const [formBudgetAmount, setFormBudgetAmount] = useState('');
   const [formBudgetStartDate, setFormBudgetStartDate] = useState('');
   const [formBudgetEndDate, setFormBudgetEndDate] = useState('');
   const [formBudgetCategoryIds, setFormBudgetCategoryIds] = useState<string[]>([]);
-  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
 
   const applyDatePreset = (preset: 'month' | 'year' | 'next30') => {
     const now = new Date();
@@ -185,21 +243,10 @@ export default function Budgets() {
   };
 
   const handleOpenAddBudget = () => {
-    setEditingBudget(null);
     setFormBudgetName('');
     setFormBudgetAmount('');
     setFormBudgetCategoryIds([]);
     applyDatePreset('month');
-    setIsBudgetModalOpen(true);
-  };
-
-  const handleOpenEditBudget = (b: Budget) => {
-    setEditingBudget(b);
-    setFormBudgetName(b.name);
-    setFormBudgetAmount(String(b.amount));
-    setFormBudgetStartDate(b.startDate || '');
-    setFormBudgetEndDate(b.endDate || '');
-    setFormBudgetCategoryIds(b.categoryIds || []);
     setIsBudgetModalOpen(true);
   };
 
@@ -208,32 +255,16 @@ export default function Budgets() {
     if (!formBudgetStartDate || !formBudgetEndDate || formBudgetStartDate > formBudgetEndDate) return;
     const amountNum = parseFloat(formBudgetAmount);
 
-    if (editingBudget) {
-      await updateBudget(editingBudget.id, {
-        name: formBudgetName.trim(),
-        amount: amountNum,
-        startDate: formBudgetStartDate,
-        endDate: formBudgetEndDate,
-        categoryIds: formBudgetCategoryIds,
-      });
-    } else {
-      await addBudget({
-        name: formBudgetName.trim(),
-        amount: amountNum,
-        periodType: 'custom',
-        startDate: formBudgetStartDate,
-        endDate: formBudgetEndDate,
-        categoryIds: formBudgetCategoryIds,
-      });
-    }
+    await addBudget({
+      name: formBudgetName.trim(),
+      amount: amountNum,
+      periodType: 'custom',
+      startDate: formBudgetStartDate,
+      endDate: formBudgetEndDate,
+      categoryIds: formBudgetCategoryIds,
+    });
 
     setIsBudgetModalOpen(false);
-  };
-
-  const handleDeleteBudget = async () => {
-    if (!budgetToDelete) return;
-    await deleteBudget(budgetToDelete.id);
-    setBudgetToDelete(null);
   };
 
   // ----------------------------------------------------
@@ -296,54 +327,94 @@ export default function Budgets() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full pb-20 p-4 sm:p-6 md:p-8 space-y-6 max-w-4xl mx-auto">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
       {/* Header & Tabs */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{t('budgets.title')}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('budgets.desc')}</p>
-        </div>
+      <div className="flex items-center justify-between h-8">
+        <h2 className="text-xl font-semibold tracking-tight leading-none">{t('budgets.title')}</h2>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          {activeTab === 'rules' ? (
-            <Button onClick={handleOpenAddRule} size="sm" className="gap-1.5 cursor-pointer w-full sm:w-auto">
-              <Plus className="h-4 w-4" />
-              <span>{t('budgets.addRule')}</span>
-            </Button>
-          ) : (
-            <Button onClick={handleOpenAddBudget} size="sm" className="gap-1.5 cursor-pointer w-full sm:w-auto">
-              <Plus className="h-4 w-4" />
-              <span>{t('budgets.add')}</span>
+        <div className="h-8 w-8 flex items-center justify-center">
+          {!(activeSection === 'budgets' && currentBudgetFilter === 'ended') && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={activeSection === 'rules' ? handleOpenAddRule : handleOpenAddBudget}
+              title={activeSection === 'rules' ? t('budgets.addRule') : t('budgets.add')}
+              aria-label={activeSection === 'rules' ? t('budgets.addRule') : t('budgets.add')}
+            >
+              <Plus className="h-5 w-5" />
             </Button>
           )}
         </div>
       </div>
 
-      {/* Tabs: Ongoing vs Rules */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid grid-cols-2 w-full h-9">
-          <TabsTrigger value="ongoing" className="text-xs sm:text-sm px-1 sm:px-2">
-            {t('budgets.tabOngoing')}
-          </TabsTrigger>
-          <TabsTrigger value="rules" className="gap-1 sm:gap-1.5 text-xs sm:text-sm px-1 sm:px-2">
-            <Zap className="h-3.5 w-3.5 opacity-70" />
-            <span>{t('budgets.tabRules')}</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {/* Segmented Control: Budgets (Dropdown) vs Rules */}
+      <SegmentedControl
+        value={activeSection}
+        onChange={handleSectionChange}
+        fullWidth
+        options={[
+          {
+            value: 'budgets',
+            label: (
+              <span className="flex items-center gap-1">
+                <span>
+                  {currentBudgetFilter === 'ended'
+                    ? t('budgets.tabEnded')
+                    : t('budgets.tabOngoing')}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+              </span>
+            ),
+            dropdown: (
+              <DropdownMenuContent align="start" sideOffset={6} className="min-w-[130px]">
+                <DropdownMenuItem
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => handleBudgetFilterChange('ongoing')}
+                >
+                  <span>{t('budgets.tabOngoing')}</span>
+                  {currentBudgetFilter === 'ongoing' && activeSection === 'budgets' && (
+                    <Check className="h-3.5 w-3.5 ml-2" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => handleBudgetFilterChange('ended')}
+                >
+                  <span>{t('budgets.tabEnded')}</span>
+                  {currentBudgetFilter === 'ended' && activeSection === 'budgets' && (
+                    <Check className="h-3.5 w-3.5 ml-2" />
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            ),
+          },
+          {
+            value: 'rules',
+            label: t('budgets.tabRules'),
+            icon: <Zap className="h-3.5 w-3.5" />,
+          },
+        ]}
+      />
 
       {/* -------------------------------------------------- */}
       {/* Ongoing Budgets List View                           */}
       {/* -------------------------------------------------- */}
-      {activeTab === 'ongoing' && (
-        <div className="space-y-4">
+      {activeSection === 'budgets' && currentBudgetFilter === 'ongoing' && (
+        <div key="ongoing" className="animate-in fade-in duration-150 space-y-4">
           {ongoingBudgets.length === 0 ? (
             <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card space-y-3">
               <Calendar className="h-8 w-8 mx-auto text-muted-foreground/50" />
               <p>{t('budgets.noOngoingBudgets')}</p>
-              <Button variant="outline" size="sm" onClick={handleOpenAddBudget} className="cursor-pointer">
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                {t('budgets.add')}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleOpenAddBudget}
+                className="cursor-pointer mx-auto h-8 w-8 text-muted-foreground hover:text-foreground"
+                title={t('budgets.add')}
+                aria-label={t('budgets.add')}
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           ) : (
@@ -362,65 +433,33 @@ export default function Budgets() {
                 <div
                   key={budget.id}
                   onClick={() => navigate(`/budgets/${budget.id}`)}
-                  className="border border-border rounded-lg p-5 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors cursor-pointer hover:border-foreground/40"
+                  className="border border-border rounded-lg px-5 pb-5 pt-3 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors cursor-pointer hover:border-foreground/40"
                 >
                   <div className="absolute -right-6 -top-6 text-muted/10 transition-transform group-hover:scale-110 duration-500 pointer-events-none">
                     <Target className="h-32 w-32" />
                   </div>
 
                   <div className="relative z-10 space-y-3">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-base font-semibold leading-none group-hover:text-primary transition-colors">
-                            {budget.name}
-                          </h3>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border flex items-center gap-1">
-                            <Clock className="h-2.5 w-2.5 opacity-70" />
-                            <span>{countdownLabel}</span>
-                          </span>
-                          {budget.ruleId && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-primary/10 text-primary border-primary/20">
-                              {t('budgets.ruleBadge')}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-                          {budget.startDate} ~ {budget.endDate}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer"
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleOpenEditBudget(budget);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer"
-                          onClick={e => {
-                            e.stopPropagation();
-                            setBudgetToDelete(budget);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    {/* Top Pill Bar with Divider */}
+                    <div className="flex items-center gap-1.5 flex-wrap pb-3 border-b border-border/50">
+                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                        <Clock className="h-2.5 w-2.5 opacity-70" />
+                        <span>{countdownLabel}</span>
+                      </span>
+                      {budget.ruleId && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                          {t('budgets.ruleBadge')}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                        {t('budgets.spent')}
-                      </span>
-                      <div className="text-right">
+                    {/* Title & Amount Row */}
+                    <div className="flex justify-between items-center gap-3">
+                      <h3 className="text-base font-semibold leading-none group-hover:text-primary transition-colors truncate">
+                        {budget.name}
+                      </h3>
+
+                      <div className="text-right shrink-0">
                         <AmountDisplay
                           amount={spent}
                           baseCurrency={activeLedger?.baseCurrency}
@@ -430,7 +469,7 @@ export default function Budgets() {
                             isOver ? 'text-destructive' : 'text-foreground'
                           )}
                         />
-                        <span className="text-sm text-muted-foreground ml-1">
+                        <span className="text-sm text-muted-foreground ml-1 font-mono">
                           /{' '}
                           <AmountDisplay
                             amount={effectiveAmount}
@@ -479,42 +518,153 @@ export default function Budgets() {
               );
             })
           )}
+        </div>
+      )}
 
-          {/* Bottom Entry Card to Historical Budgets */}
-          <div
-            onClick={() => navigate('/budgets/history')}
-            className="border border-border border-dashed rounded-lg p-4 bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer flex items-center justify-between group mt-6"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-md border border-border bg-background flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors">
-                <History className="h-4 w-4" />
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold tracking-tight group-hover:text-foreground">
-                  {t('budgets.viewHistory')}
-                </h4>
-                <p className="text-xs text-muted-foreground">
-                  {t('budgets.historyBudgetCount', { count: historicalCount })}
-                </p>
-              </div>
+      {/* -------------------------------------------------- */}
+      {/* Ended Budgets List View                             */}
+      {/* -------------------------------------------------- */}
+      {activeSection === 'budgets' && currentBudgetFilter === 'ended' && (
+        <div key="ended" className="animate-in fade-in duration-150 space-y-4">
+          {endedBudgets.length === 0 ? (
+            <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card space-y-3">
+              <Archive className="h-8 w-8 mx-auto text-muted-foreground/50" />
+              <p>{t('budgets.noEndedBudgets')}</p>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
-          </div>
+          ) : (
+            endedBudgets.map(({ budget, spent, effectiveAmount, isOver, percentage }) => {
+              return (
+                <div
+                  key={budget.id}
+                  onClick={() => navigate(`/budgets/${budget.id}`)}
+                  className="border border-border rounded-lg px-5 pb-5 pt-3 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors cursor-pointer hover:border-foreground/40"
+                >
+                  <div className="space-y-3">
+                    {/* Top Pill Bar with Actions & Divider */}
+                    <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={cn(
+                            'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border shrink-0',
+                            isOver
+                              ? 'bg-destructive/10 text-destructive border-destructive/20'
+                              : 'bg-muted/60 text-muted-foreground border-border'
+                          )}
+                        >
+                          {isOver ? t('budgets.settledOver') : t('budgets.settledUnder')}
+                        </span>
+
+                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                          <Calendar className="h-2.5 w-2.5 opacity-70" />
+                          <span>
+                            {budget.startDate} ~ {budget.endDate}
+                          </span>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 -mr-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBudgetToDelete(budget);
+                          }}
+                          title={t('budgets.deleteBudget')}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Title & Amount Row */}
+                    <div className="flex justify-between items-center gap-3">
+                      <h3 className="text-base font-semibold leading-none group-hover:text-primary transition-colors truncate">
+                        {budget.name}
+                      </h3>
+
+                      <div className="text-right shrink-0">
+                        <AmountDisplay
+                          amount={spent}
+                          baseCurrency={activeLedger?.baseCurrency}
+                          type="neutral"
+                          className={cn(
+                            'text-xl font-mono tracking-tight font-medium',
+                            isOver ? 'text-destructive' : 'text-foreground'
+                          )}
+                        />
+                        <span className="text-sm text-muted-foreground ml-1 font-mono">
+                          /{' '}
+                          <AmountDisplay
+                            amount={effectiveAmount}
+                            baseCurrency={activeLedger?.baseCurrency}
+                            type="neutral"
+                          />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                      <div
+                        className={cn(
+                          'h-full transition-all duration-700 ease-out',
+                          isOver ? 'bg-destructive' : 'bg-primary'
+                        )}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+
+                    {/* Result Row */}
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      {isOver ? (
+                        <span className="text-destructive font-semibold">
+                          {t('budgets.overBudget')}: +
+                          <AmountDisplay
+                            amount={spent - effectiveAmount}
+                            baseCurrency={activeLedger?.baseCurrency}
+                            type="neutral"
+                          />
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {t('budgets.saved')}:{' '}
+                          <AmountDisplay
+                            amount={effectiveAmount - spent}
+                            baseCurrency={activeLedger?.baseCurrency}
+                            type="neutral"
+                          />
+                        </span>
+                      )}
+                      <span className="text-muted-foreground font-mono">{percentage.toFixed(0)}%</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
       {/* -------------------------------------------------- */}
       {/* Recurring Rules Tab Content                         */}
       {/* -------------------------------------------------- */}
-      {activeTab === 'rules' && (
-        <div className="space-y-4">
+      {activeSection === 'rules' && (
+        <div key="rules" className="animate-in fade-in duration-150 space-y-4">
           {(!budgetRules || budgetRules.length === 0) ? (
             <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card space-y-3">
               <Zap className="h-8 w-8 mx-auto text-muted-foreground/50" />
               <p>{t('budgets.noRulesFound')}</p>
-              <Button variant="outline" size="sm" onClick={handleOpenAddRule} className="cursor-pointer">
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                {t('budgets.addRule')}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleOpenAddRule}
+                className="cursor-pointer mx-auto h-8 w-8 text-muted-foreground hover:text-foreground"
+                title={t('budgets.addRule')}
+                aria-label={t('budgets.addRule')}
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           ) : (
@@ -526,30 +676,29 @@ export default function Budgets() {
               return (
                 <div
                   key={rule.id}
-                  className="border border-border rounded-lg p-5 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors"
+                  className="border border-border rounded-lg px-5 pb-5 pt-3 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors"
                 >
                   <div className="space-y-3">
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold leading-none">{rule.name}</h3>
-                          <span
-                            className={cn(
-                              'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border',
-                              rule.isActive
-                                ? 'bg-primary/10 text-primary border-primary/20'
-                                : 'bg-muted text-muted-foreground border-border'
-                            )}
-                          >
-                            {rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider">
-                          {rule.periodType === 'monthly' ? t('budgets.cycleMonthly') : t('budgets.cycleYearly')}
-                        </div>
+                    {/* Top Pill Bar with Actions & Divider */}
+                    <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={cn(
+                            'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border shrink-0',
+                            rule.isActive
+                              ? 'bg-muted/60 text-muted-foreground border-border'
+                              : 'bg-muted/30 text-muted-foreground/60 border-border/60'
+                          )}
+                        >
+                          {rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                          <Calendar className="h-2.5 w-2.5 opacity-70" />
+                          <span>{rule.periodType === 'monthly' ? t('budgets.cycleMonthly') : t('budgets.cycleYearly')}</span>
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0 -mr-1">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -581,20 +730,21 @@ export default function Budgets() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-baseline pt-1">
-                      <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                        {t('budgets.ruleDefaultAmount')}
-                      </span>
-                      <AmountDisplay
-                        amount={rule.amount}
-                        baseCurrency={activeLedger?.baseCurrency}
-                        type="neutral"
-                        className="text-xl font-mono tracking-tight font-bold"
-                      />
+                    {/* Title & Amount Row */}
+                    <div className="flex justify-between items-center gap-3">
+                      <h3 className="text-base font-semibold leading-none truncate">{rule.name}</h3>
+                      <div className="text-right shrink-0">
+                        <AmountDisplay
+                          amount={rule.amount}
+                          baseCurrency={activeLedger?.baseCurrency}
+                          type="neutral"
+                          className="text-xl font-mono tracking-tight font-medium"
+                        />
+                      </div>
                     </div>
 
                     {/* Monitored Categories */}
-                    <div className="pt-2 border-t border-border flex flex-wrap gap-1.5 items-center">
+                    <div className="flex flex-wrap gap-1.5 items-center">
                       <span className="text-[11px] text-muted-foreground mr-1">
                         {t('budgets.monitoredCategories')}:
                       </span>
@@ -627,7 +777,7 @@ export default function Budgets() {
       <Dialog open={isBudgetModalOpen} onOpenChange={setIsBudgetModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingBudget ? t('budgets.editBudget') : t('budgets.add')}</DialogTitle>
+            <DialogTitle>{t('budgets.add')}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
@@ -767,7 +917,7 @@ export default function Budgets() {
                 formBudgetStartDate > formBudgetEndDate
               }
             >
-              {editingBudget ? t('budgets.save') : t('budgets.add')}
+              {t('budgets.add')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -890,32 +1040,6 @@ export default function Budgets() {
         </DialogContent>
       </Dialog>
 
-      {/* -------------------------------------------------- */}
-      {/* Modal 3: Delete Budget Instance Confirmation       */}
-      {/* -------------------------------------------------- */}
-      <Dialog open={!!budgetToDelete} onOpenChange={open => !open && setBudgetToDelete(null)}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.deleteBudget')}</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-2">
-            <p className="text-sm text-muted-foreground">{t('budgets.deleteBudgetConfirm')}</p>
-            {budgetToDelete && (
-              <p className="text-sm font-semibold font-mono bg-muted p-2 rounded border border-border">
-                {budgetToDelete.name}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setBudgetToDelete(null)}>
-              {t('budgets.cancel')}
-            </Button>
-            <Button variant="destructive" type="button" onClick={handleDeleteBudget}>
-              {t('budgets.delete')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* -------------------------------------------------- */}
       {/* Modal 4: Delete Rule Confirmation                  */}
@@ -938,6 +1062,33 @@ export default function Budgets() {
               {t('budgets.cancel')}
             </Button>
             <Button variant="destructive" type="button" onClick={handleDeleteRule}>
+              {t('budgets.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* -------------------------------------------------- */}
+      {/* Modal 5: Delete Budget Confirmation (Ended Budget) */}
+      {/* -------------------------------------------------- */}
+      <Dialog open={!!budgetToDelete} onOpenChange={open => !open && setBudgetToDelete(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>{t('budgets.deleteBudget')}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <p className="text-sm text-muted-foreground">{t('budgets.deleteBudgetConfirm')}</p>
+            {budgetToDelete && (
+              <p className="text-sm font-semibold font-mono bg-muted p-2 rounded border border-border">
+                {budgetToDelete.name}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setBudgetToDelete(null)}>
+              {t('budgets.cancel')}
+            </Button>
+            <Button variant="destructive" type="button" onClick={handleDeleteBudget}>
               {t('budgets.delete')}
             </Button>
           </DialogFooter>

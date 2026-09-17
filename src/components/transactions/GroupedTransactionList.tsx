@@ -9,7 +9,6 @@ import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { NoteRenderer } from '@/components/transactions/NoteRenderer';
 import type { Transaction } from '@/services/db/db';
 
 export interface GroupedTransactionListProps {
@@ -235,7 +234,7 @@ export function GroupedTransactionList({
                           if (!tx.note) return null;
                           return (
                             <div className="text-sm text-muted-foreground truncate">
-                              <NoteRenderer note={tx.note} />
+                              {tx.note}
                             </div>
                           );
                         })()}

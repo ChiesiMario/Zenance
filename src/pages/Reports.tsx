@@ -33,9 +33,9 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
-import { NoteRenderer } from '@/components/transactions/NoteRenderer';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 
@@ -312,7 +312,7 @@ export default function Reports() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6 pb-12 max-w-4xl mx-auto">
+    <div className="animate-in fade-in duration-500 w-full space-y-6">
       
       {/* Top Header */}
       <div className="flex items-center justify-between">
@@ -333,23 +333,17 @@ export default function Reports() {
       {/* Period Selector & Navigation Bar */}
       <div className="border border-border rounded-xl p-3 bg-card flex flex-col gap-3 shadow-none">
         {/* Segmented Period Tabs */}
-        <div className="flex bg-muted/60 p-1 rounded-lg border border-border">
-          {(['week', 'month', 'quarter', 'year'] as PeriodType[]).map(type => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setPeriodType(type)}
-              className={cn(
-                "flex-1 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-center",
-                periodType === type
-                  ? "bg-background text-foreground font-semibold shadow-none"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t(`reports.${type}`)}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl<PeriodType>
+          value={periodType}
+          onChange={setPeriodType}
+          fullWidth
+          options={[
+            { value: 'week', label: t('reports.week') },
+            { value: 'month', label: t('reports.month') },
+            { value: 'quarter', label: t('reports.quarter') },
+            { value: 'year', label: t('reports.year') },
+          ]}
+        />
 
         {/* Previous / Next Navigator */}
         <div className="flex items-center justify-between px-2 pt-1">
@@ -562,7 +556,7 @@ export default function Reports() {
                               <div className="flex flex-col min-w-0 pr-2">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-xs text-foreground font-medium truncate">
-                                      {tx.note ? <NoteRenderer note={tx.note} /> : cat.name}
+                                      {tx.note || cat.name}
                                     </span>
                                     <ReimbursementBadge transaction={tx} />
                                   </div>
@@ -684,7 +678,7 @@ export default function Reports() {
                               <div className="flex flex-col min-w-0 pr-2">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="text-xs text-foreground font-medium truncate">
-                                    {tx.note ? <NoteRenderer note={tx.note} /> : cat.name}
+                                    {tx.note || cat.name}
                                   </span>
                                   <ReimbursementBadge transaction={tx} />
                                 </div>

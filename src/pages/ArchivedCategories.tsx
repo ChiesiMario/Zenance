@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCategories } from '@/hooks/useCategories';
-import { cn } from '@/lib/utils';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 export default function ArchivedCategories() {
   const { t } = useTranslation();
@@ -16,28 +16,29 @@ export default function ArchivedCategories() {
   const filteredCategories = archivedCategories?.filter(c => c.type === activeTab) || [];
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-4">
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2 cursor-pointer">
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2 className="text-xl font-semibold tracking-tight">{t('contacts.archived', '已歸檔分類')}</h2>
       </div>
 
-      <div className="flex bg-muted p-1 rounded-lg mb-6">
-        <button
-          onClick={() => setActiveTab('expense')}
-          className={cn("flex-1 text-sm font-medium py-1.5 rounded-md transition-colors", activeTab === 'expense' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
-        >
-          {t('add.expense')}
-        </button>
-        <button
-          onClick={() => setActiveTab('income')}
-          className={cn("flex-1 text-sm font-medium py-1.5 rounded-md transition-colors", activeTab === 'income' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
-        >
-          {t('add.income')}
-        </button>
-      </div>
+      <SegmentedControl<'expense' | 'income'>
+        value={activeTab}
+        onChange={setActiveTab}
+        fullWidth
+        options={[
+          {
+            value: 'expense',
+            label: t('add.expense'),
+          },
+          {
+            value: 'income',
+            label: t('add.income'),
+          },
+        ]}
+      />
 
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         <div className="divide-y divide-border">

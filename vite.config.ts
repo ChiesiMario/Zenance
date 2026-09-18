@@ -7,7 +7,7 @@ import path from "path"
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 4000,
+    port: 3011,
   },
   resolve: {
     alias: {

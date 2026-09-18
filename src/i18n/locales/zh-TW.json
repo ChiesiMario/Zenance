@@ -2,8 +2,22 @@
   "translation": {
     "common": {
       "confirm": "確認",
+      "cancel": "取消",
+      "save": "儲存",
+      "edit": "編輯",
+      "delete": "刪除",
+      "close": "關閉",
+      "back": "返回",
       "today": "今天",
-      "yesterday": "昨天"
+      "yesterday": "昨天",
+      "loading": "載入中...",
+      "error": "發生錯誤",
+      "unknown": "未知",
+      "uncategorized": "未分類"
+    },
+    "alerts": {
+      "noAccounts": "尚無任何帳戶，請先建立一個帳戶。",
+      "transferNeedsTwoAccounts": "轉帳需要兩個帳戶。"
     },
     "nav": {
       "overview": "總覽",
@@ -29,7 +43,9 @@
       "original": "原始金額",
       "rate": "匯率",
       "delete": "刪除",
-      "close": "關閉"
+      "close": "關閉",
+      "edit": "編輯",
+      "save": "儲存"
     },
     "add": {
       "addExpense": "新增支出",
@@ -57,6 +73,7 @@
       "addExpenseCategory": "新增支出分類",
       "addIncomeCategory": "新增收入分類",
       "categoryName": "分類名稱",
+      "newCategoryPlaceholder": "請輸入分類名稱",
       "cancel": "取消",
       "date": "日期",
       "today": "今天",
@@ -130,6 +147,7 @@
       "editAccount": "編輯帳戶",
       "archiveAccount": "歸檔帳戶",
       "deleteAccount": "刪除帳戶",
+      "currency": "預設貨幣",
       "accountNotFound": "找不到帳戶。",
       "cannotDeleteHasTransactions": "無法刪除包含交易紀錄的帳戶，但您可以將其歸檔。",
       "cannotEditCurrencyHasTransactions": "有交易紀錄無法更改「預設貨幣」和「刪除帳戶」。",
@@ -142,10 +160,18 @@
       "netLoans": "借貸淨額",
       "adjustBalance": "調整餘額",
       "currentAmount": "現時金額",
-      "newAmount": "新的金額",
+      "newAmount": "新金額",
       "difference": "差額",
       "balanceAdjustment": "餘額調整",
-      "balanceAdjustmentNote": "手動餘額調整"
+      "balanceAdjustmentNote": "手動餘額調整",
+      "noAccounts": "尚無任何帳戶",
+      "noAccountsDesc": "建立您的第一個帳戶以開始管理資產與收支。",
+      "archived": "已歸檔",
+      "noArchivedAccounts": "目前沒有任何已歸檔帳戶",
+      "noDifference": "無變動",
+      "recordAsIncome": "將計入收入",
+      "recordAsExpense": "將計入支出",
+      "confirmAdjust": "確認調整"
     },
     "budgets": {
       "budgets": "預算",
@@ -261,7 +287,9 @@
       "category": "分類",
       "contacts": "對象",
       "addContact": "新增對象",
+      "type": "類型",
       "contactName": "對象名稱",
+      "namePlaceholder": "對象名稱",
       "cancel": "取消",
       "add": "新增",
       "owesYou": "應收",
@@ -277,6 +305,7 @@
       "editContact": "編輯對象",
       "archiveContact": "封存對象",
       "archived": "已歸檔",
+      "noArchivedContacts": "目前沒有任何已歸檔對象",
       "deleteContact": "刪除對象",
       "loanShort": "借貸",
       "reimbShort": "報銷",
@@ -315,7 +344,11 @@
       "theme": "外觀主題",
       "themeLight": "淺色",
       "themeDark": "暗色",
-      "themeSystem": "跟隨系統"
+      "themeSystem": "跟隨系統",
+      "categories": "分類管理",
+      "archived": "已歸檔",
+      "unarchive": "取消歸檔",
+      "noArchivedCategories": "暫無已歸檔分類"
     },
     "reports": {
       "title": "財務報表",

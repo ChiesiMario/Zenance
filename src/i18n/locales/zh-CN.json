@@ -2,8 +2,22 @@
   "translation": {
     "common": {
       "confirm": "确认",
+      "cancel": "取消",
+      "save": "保存",
+      "edit": "编辑",
+      "delete": "删除",
+      "close": "关闭",
+      "back": "返回",
       "today": "今天",
-      "yesterday": "昨天"
+      "yesterday": "昨天",
+      "loading": "加载中...",
+      "error": "发生错误",
+      "unknown": "未知",
+      "uncategorized": "未分类"
+    },
+    "alerts": {
+      "noAccounts": "尚无任何账户，请先建立一个账户。",
+      "transferNeedsTwoAccounts": "转账需要两个账户。"
     },
     "nav": {
       "overview": "概览",
@@ -29,7 +43,9 @@
       "original": "原始金额",
       "rate": "汇率",
       "delete": "删除",
-      "close": "关闭"
+      "close": "关闭",
+      "edit": "编辑",
+      "save": "保存"
     },
     "add": {
       "addExpense": "添加支出",
@@ -57,6 +73,7 @@
       "addExpenseCategory": "添加支出分类",
       "addIncomeCategory": "添加收入分类",
       "categoryName": "分类名称",
+      "newCategoryPlaceholder": "请输入分类名称",
       "cancel": "取消",
       "date": "日期",
       "today": "今天",
@@ -130,6 +147,7 @@
       "editAccount": "编辑账户",
       "archiveAccount": "归档账户",
       "deleteAccount": "删除账户",
+      "currency": "默认货币",
       "accountNotFound": "找不到账户。",
       "cannotDeleteHasTransactions": "无法删除包含交易记录的账户，但您可以将其归档。",
       "cannotEditCurrencyHasTransactions": "有交易记录无法更改“默认货币”和“删除账户”。",
@@ -142,10 +160,18 @@
       "netLoans": "借贷净额",
       "adjustBalance": "调整余额",
       "currentAmount": "当前金额",
-      "newAmount": "新的金额",
+      "newAmount": "新金额",
       "difference": "差额",
       "balanceAdjustment": "余额调整",
-      "balanceAdjustmentNote": "手动余额调整"
+      "balanceAdjustmentNote": "手动余额调整",
+      "noAccounts": "暂无任何账户",
+      "noAccountsDesc": "创建您的第一个账户以开始管理资产与收支。",
+      "archived": "已归档",
+      "noArchivedAccounts": "目前没有任何已归档账户",
+      "noDifference": "无变动",
+      "recordAsIncome": "将计入收入",
+      "recordAsExpense": "将计入支出",
+      "confirmAdjust": "确认调整"
     },
     "budgets": {
       "budgets": "预算",
@@ -261,7 +287,9 @@
       "category": "分类",
       "contacts": "对象",
       "addContact": "添加对象",
+      "type": "类型",
       "contactName": "对象名称",
+      "namePlaceholder": "对象名称",
       "cancel": "取消",
       "add": "添加",
       "owesYou": "应收",
@@ -277,6 +305,7 @@
       "editContact": "编辑对象",
       "archiveContact": "归档对象",
       "archived": "已归档",
+      "noArchivedContacts": "目前没有任何已归档对象",
       "deleteContact": "删除对象",
       "loanShort": "借贷",
       "reimbShort": "报销",
@@ -315,7 +344,11 @@
       "theme": "外观主题",
       "themeLight": "浅色",
       "themeDark": "暗色",
-      "themeSystem": "跟随系统"
+      "themeSystem": "跟随系统",
+      "categories": "分类管理",
+      "archived": "已归档",
+      "unarchive": "取消归档",
+      "noArchivedCategories": "暂无已归档分类"
     },
     "reports": {
       "title": "财务报表",

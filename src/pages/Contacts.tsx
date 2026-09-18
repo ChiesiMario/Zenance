@@ -7,32 +7,31 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
-import { getCurrencySymbol, cn } from '@/lib/utils';
+import { Plus, ChevronDown, Check } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { getCurrencySymbol } from '@/lib/utils';
 import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
-import { ReimbursementList } from '@/components/contacts/ReimbursementList';
 
 export default function Contacts() {
   const { t } = useTranslation();
   const { contacts, archivedContacts, addAccount } = useAccounts();
   const { transactions } = useTransactions();
   
-  const [mainTab, setMainTab] = useState<'contacts' | 'reimbursements'>('contacts');
+  const [currentView, setCurrentView] = useState<'active' | 'archived'>('active');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [newContactGroup, setNewContactGroup] = useState('personal');
-  const [filterGroup, setFilterGroup] = useState<'all' | 'personal' | 'organization' | 'archived'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'personal' | 'organization'>('all');
 
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
-
-  // Count of pending reimbursements
-  const pendingReimbursementsCount = useMemo(() => {
-    if (!transactions) return 0;
-    return transactions.filter(t => !t.deleted && t.reimbursementStatus === 'pending').length;
-  }, [transactions]);
 
   // Calculate balances for each contact
   const contactBalances = useMemo(() => {
@@ -77,16 +76,14 @@ export default function Contacts() {
   }, [contacts, archivedContacts, transactions]);
 
   const filteredAndSortedContacts = useMemo(() => {
-    let filtered = contacts || [];
-    if (filterGroup === 'archived') {
-      filtered = archivedContacts || [];
-    } else if (filterGroup === 'personal') {
-      filtered = filtered.filter(c => c.group === 'personal' || c.group === 'other' || !c.group);
-    } else if (filterGroup === 'organization') {
-      filtered = filtered.filter(c => c.group === 'organization');
+    let source = currentView === 'archived' ? (archivedContacts || []) : (contacts || []);
+    if (filterType === 'personal') {
+      source = source.filter(c => c.group === 'personal' || c.group === 'other' || !c.group);
+    } else if (filterType === 'organization') {
+      source = source.filter(c => c.group === 'organization');
     }
 
-    return filtered.sort((a, b) => {
+    return source.sort((a, b) => {
       const aNet = Math.abs((contactBalances[a.id] || 0) + (contactReimbursements[a.id] || 0));
       const bNet = Math.abs((contactBalances[b.id] || 0) + (contactReimbursements[b.id] || 0));
       const aHasBalance = aNet > 0;
@@ -98,7 +95,7 @@ export default function Contacts() {
       
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [contacts, archivedContacts, filterGroup, contactBalances, contactReimbursements]);
+  }, [contacts, archivedContacts, currentView, filterType, contactBalances, contactReimbursements]);
 
   const handleAddContact = async () => {
     if (!newContactName.trim()) return;
@@ -109,79 +106,83 @@ export default function Contacts() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-4">
       
-      {/* Top Header with Segmented Navigation and Action */}
+      {/* Top Header */}
       <div className="flex items-center justify-between">
-        <div className="flex bg-muted/60 p-1 rounded-lg border border-border">
-          <button
-            type="button"
-            onClick={() => setMainTab('contacts')}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
-              mainTab === 'contacts'
-                ? "bg-background text-foreground font-semibold shadow-none"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t('contacts.contacts')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab('reimbursements')}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5",
-              mainTab === 'reimbursements'
-                ? "bg-background text-foreground font-semibold shadow-none"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <span>{t('reimbursements.title')}</span>
-            {pendingReimbursementsCount > 0 && (
-              <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-amber-500/20 text-amber-400 font-mono font-bold">
-                {pendingReimbursementsCount}
-              </span>
-            )}
-          </button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none cursor-pointer">
+            <span>
+              {currentView === 'archived' ? t('contacts.archived', '已歸檔') : t('contacts.contacts')}
+            </span>
+            <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[140px]">
+            <DropdownMenuItem 
+              onClick={() => setCurrentView('active')}
+              className="justify-between cursor-pointer"
+            >
+              <span>{t('contacts.contacts')}</span>
+              {currentView === 'active' && <Check className="h-4 w-4 text-foreground shrink-0" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => setCurrentView('archived')}
+              className="justify-between cursor-pointer"
+            >
+              <span>{t('contacts.archived', '已歸檔')}</span>
+              {currentView === 'archived' && <Check className="h-4 w-4 text-foreground shrink-0" />}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        {mainTab === 'contacts' && (
+        {currentView === 'active' ? (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer" />}>
               <Plus className="h-5 w-5" />
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[300px]">
               <DialogHeader>
                 <DialogTitle>{t('contacts.addContact')}</DialogTitle>
               </DialogHeader>
-              <div className="py-4 space-y-4">
-                <Input 
-                  placeholder={t('contacts.namePlaceholder')} 
-                  value={newContactName}
-                  onChange={(e) => setNewContactName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddContact()}
-                />
-                <div className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    variant={newContactGroup === 'personal' ? 'default' : 'outline'} 
-                    className="flex-1 cursor-pointer" 
-                    onClick={() => setNewContactGroup('personal')}
-                  >
-                    {t('contacts.groupPersonal')}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant={newContactGroup === 'organization' ? 'default' : 'outline'} 
-                    className="flex-1 cursor-pointer" 
-                    onClick={() => setNewContactGroup('organization')}
-                  >
-                    {t('contacts.groupOrganization')}
-                  </Button>
+              <div className="space-y-4 py-1">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {t('contacts.type')}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      type="button" 
+                      variant={newContactGroup === 'personal' ? 'default' : 'outline'} 
+                      className="cursor-pointer" 
+                      onClick={() => setNewContactGroup('personal')}
+                    >
+                      {t('contacts.groupPersonal')}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant={newContactGroup === 'organization' ? 'default' : 'outline'} 
+                      className="cursor-pointer" 
+                      onClick={() => setNewContactGroup('organization')}
+                    >
+                      {t('contacts.groupOrganization')}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {t('contacts.contactName')}
+                  </label>
+                  <Input 
+                    placeholder={t('contacts.namePlaceholder')} 
+                    value={newContactName}
+                    onChange={(e) => setNewContactName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddContact()}
+                  />
                 </div>
               </div>
               <DialogFooter>
-                <DialogClose render={<Button variant="outline" className="cursor-pointer" />}>
+                <DialogClose render={<Button variant="ghost" className="cursor-pointer" />}>
                   {t('contacts.cancel')}
                 </DialogClose>
                 <Button onClick={handleAddContact} disabled={!newContactName.trim()} className="cursor-pointer">
@@ -190,59 +191,50 @@ export default function Contacts() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        ) : (
+          <div className="w-8 h-8" />
         )}
       </div>
 
-      {/* Tab Content */}
-      {mainTab === 'contacts' ? (
-        <div className="space-y-6">
-          <ContactGroupCard 
-            title={
-              <div className="flex gap-2">
-                <Button 
-                  variant={filterGroup === 'all' ? 'default' : 'outline'} 
-                  onClick={() => setFilterGroup('all')}
-                  size="sm"
-                  className="rounded-full cursor-pointer"
-                >
-                  {t('contacts.all')}
-                </Button>
-                <Button 
-                  variant={filterGroup === 'personal' ? 'default' : 'outline'} 
-                  onClick={() => setFilterGroup('personal')}
-                  size="sm"
-                  className="rounded-full cursor-pointer"
-                >
-                  {t('contacts.groupPersonal')}
-                </Button>
-                <Button 
-                  variant={filterGroup === 'organization' ? 'default' : 'outline'} 
-                  onClick={() => setFilterGroup('organization')}
-                  size="sm"
-                  className="rounded-full cursor-pointer"
-                >
-                  {t('contacts.groupOrganization')}
-                </Button>
-                <Button 
-                  variant={filterGroup === 'archived' ? 'default' : 'outline'} 
-                  onClick={() => setFilterGroup('archived')}
-                  size="sm"
-                  className="rounded-full cursor-pointer"
-                >
-                  {t('contacts.archived')}
-                </Button>
-              </div>
-            }
-            contacts={filteredAndSortedContacts}
-            contactBalances={contactBalances}
-            contactReimbursements={contactReimbursements}
-            currencySymbol={currencySymbol}
-            hideGroupTag={filterGroup !== 'all'}
-          />
-        </div>
-      ) : (
-        <ReimbursementList />
-      )}
+      {/* Contacts List */}
+      <div className="space-y-6">
+        <ContactGroupCard 
+          title={
+            <div className="flex gap-2">
+              <Button 
+                variant={filterType === 'all' ? 'default' : 'outline'} 
+                onClick={() => setFilterType('all')}
+                size="sm"
+                className="rounded-full cursor-pointer"
+              >
+                {t('contacts.all')}
+              </Button>
+              <Button 
+                variant={filterType === 'personal' ? 'default' : 'outline'} 
+                onClick={() => setFilterType('personal')}
+                size="sm"
+                className="rounded-full cursor-pointer"
+              >
+                {t('contacts.groupPersonal')}
+              </Button>
+              <Button 
+                variant={filterType === 'organization' ? 'default' : 'outline'} 
+                onClick={() => setFilterType('organization')}
+                size="sm"
+                className="rounded-full cursor-pointer"
+              >
+                {t('contacts.groupOrganization')}
+              </Button>
+            </div>
+          }
+          contacts={filteredAndSortedContacts}
+          contactBalances={contactBalances}
+          contactReimbursements={contactReimbursements}
+          currencySymbol={currencySymbol}
+          hideGroupTag={filterType !== 'all'}
+          emptyMessage={currentView === 'archived' ? t('contacts.noArchivedContacts', '目前沒有任何已歸檔對象') : undefined}
+        />
+      </div>
     </div>
   );
 }

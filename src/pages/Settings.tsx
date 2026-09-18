@@ -13,7 +13,7 @@ export default function Settings() {
   const isAuthenticated = false; // Placeholder
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-4">
       <h2 className="text-xl font-semibold tracking-tight">{t('settings.settings')}</h2>
       
       {/* Dropbox Container */}

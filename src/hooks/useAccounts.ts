@@ -23,13 +23,15 @@ export function useAccounts() {
     [activeLedgerId]
   );
 
-  const { wallets, contacts, archivedContacts, allContacts } = useMemo(() => {
+  const { wallets, archivedWallets, contacts, archivedContacts, allContacts } = useMemo(() => {
     const activeWallets = accounts ? accounts.filter(a => !a.type || a.type === 'wallet') : [];
+    const archivedW = archivedAccounts ? archivedAccounts.filter(a => !a.type || a.type === 'wallet') : [];
     const activeContacts = accounts ? accounts.filter(a => a.type === 'contact') : [];
     const archived = archivedAccounts ? archivedAccounts.filter(a => a.type === 'contact') : [];
     
     return {
       wallets: activeWallets,
+      archivedWallets: archivedW,
       contacts: activeContacts,
       archivedContacts: archived,
       allContacts: [...activeContacts, ...archived]
@@ -71,6 +73,13 @@ export function useAccounts() {
     });
   };
 
+  const unarchiveAccount = async (id: string) => {
+    await db.accounts.update(id, {
+      archived: false,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   const deleteAccount = async (id: string): Promise<{ success: boolean; reason?: string }> => {
     // Check if account has any transactions
     const txCount = await db.transactions
@@ -91,13 +100,16 @@ export function useAccounts() {
 
   return {
     accounts,
+    archivedAccounts,
     wallets,
+    archivedWallets,
     contacts,
     archivedContacts,
     allContacts,
     addAccount,
     updateAccount,
     archiveAccount,
+    unarchiveAccount,
     deleteAccount,
   };
 }

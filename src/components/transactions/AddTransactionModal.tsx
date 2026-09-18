@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Plus, X, ArrowRight } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { toast } from '@/components/ui/toast';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useBudgets } from '@/hooks/useBudgets';
@@ -43,6 +44,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   const { budgets } = useBudgets();
   const { getRate } = useExchangeRates();
   
+  const walletCount = accounts?.length ?? 0;
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
   const currencySymbol = getCurrencySymbol(baseCurrency);
@@ -411,9 +413,18 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
               <Button 
                 type="button"
                 variant={type === 'transfer' ? 'default' : 'outline'} 
-                onClick={() => handleTypeChange('transfer')}
+                onClick={() => {
+                  if (walletCount < 2) {
+                    toast.show(t('alerts.transferNeedsTwoAccounts'));
+                    return;
+                  }
+                  handleTypeChange('transfer');
+                }}
                 size="sm"
-                className="rounded-full shrink-0"
+                className={cn(
+                  "rounded-full shrink-0",
+                  walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed"
+                )}
               >
                 {t('add.transfer')}
               </Button>
@@ -508,16 +519,17 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                         <Plus className="w-3 h-3" />
                       </div>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
+                    <DialogContent className="sm:max-w-[300px]">
                       <DialogHeader>
                         <DialogTitle>{type === 'expense' ? t('add.addExpenseCategory') : t('add.addIncomeCategory')}</DialogTitle>
                       </DialogHeader>
-                      <div className="py-4">
+                      <div className="space-y-4 py-1">
                         <Input 
                           placeholder={t('add.newCategoryPlaceholder')}
                           value={newCatName}
                           onChange={(e) => setNewCatName(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                          autoFocus
                         />
                       </div>
                       <DialogFooter>

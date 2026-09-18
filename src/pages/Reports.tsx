@@ -312,7 +312,7 @@ export default function Reports() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-4">
       
       {/* Top Header */}
       <div className="flex items-center justify-between">

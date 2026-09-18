@@ -4,7 +4,7 @@ import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, BarChart3 } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, BarChart3, Check } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuGroup,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -159,31 +158,37 @@ export default function Dashboard() {
             </span>
             <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-(--anchor-width) min-w-[200px] max-w-[calc(100vw-2rem)]">
+          <DropdownMenuContent align="start" className="w-[200px]">
             <DropdownMenuGroup>
-              <DropdownMenuLabel className="bg-foreground text-background text-sm text-center !px-3 !py-2.5 rounded-t-lg -mx-2 -mt-2 mb-1 font-semibold">{t('dashboard.switchLedger')}</DropdownMenuLabel>
-              {ledgers?.map(ledger => (
-                <DropdownMenuItem 
-                  key={ledger.id}
-                  onClick={() => setActiveLedgerId(ledger.id)}
-                  className="justify-between"
-                >
-                  <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0 mr-2">
-                    <span className="truncate block">{ledger.name}</span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm shrink-0">{ledger.baseCurrency || 'CNY'}</span>
-                  </div>
-                  {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm shrink-0">Active</span>}
-                </DropdownMenuItem>
-              ))}
+              {ledgers?.map(ledger => {
+                const isActive = ledger.id === activeLedgerId;
+                return (
+                  <DropdownMenuItem 
+                    key={ledger.id}
+                    onClick={() => setActiveLedgerId(ledger.id)}
+                    className="justify-between cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0 mr-1.5">
+                      <span className={cn("truncate block", isActive && "font-medium text-foreground")}>
+                        {ledger.name}
+                      </span>
+                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                        {ledger.baseCurrency || 'CNY'}
+                      </span>
+                    </div>
+                    {isActive && <Check className="h-4 w-4 text-foreground shrink-0" />}
+                  </DropdownMenuItem>
+                );
+              })}
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setIsCreateLedgerOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              {t('dashboard.createLedger')}
+            <DropdownMenuSeparator className="-mx-1 my-1" />
+            <DropdownMenuItem onClick={() => setIsCreateLedgerOpen(true)} className="cursor-pointer">
+              <Plus className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>{t('dashboard.createLedger')}</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsManageLedgersOpen(true)}>
-              <Settings className="mr-2 h-4 w-4" />
-              {t('dashboard.manageLedgers')}
+            <DropdownMenuItem onClick={() => setIsManageLedgersOpen(true)} className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
+              <span>{t('dashboard.manageLedgers')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

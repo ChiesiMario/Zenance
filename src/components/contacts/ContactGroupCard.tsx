@@ -11,6 +11,7 @@ interface ContactGroupCardProps {
   contactReimbursements?: Record<string, number>;
   currencySymbol: string;
   hideGroupTag?: boolean;
+  emptyMessage?: string;
 }
 
 export function ContactGroupCard({
@@ -20,6 +21,7 @@ export function ContactGroupCard({
   contactReimbursements = {},
   currencySymbol,
   hideGroupTag,
+  emptyMessage,
 }: ContactGroupCardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -34,7 +36,7 @@ export function ContactGroupCard({
       
       {(!contacts || contacts.length === 0) ? (
         <div className="p-8 text-center text-sm text-muted-foreground">
-          {t('contacts.noContacts')}
+          {emptyMessage || t('contacts.noContacts')}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 -mr-px -mb-px">

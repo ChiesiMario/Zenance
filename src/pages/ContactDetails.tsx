@@ -46,7 +46,7 @@ export default function ContactDetails() {
     return (
       <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
         <p>{t('contacts.contactNotFound', 'Contact not found.')}</p>
-        <Button variant="outline" onClick={() => navigate('/contacts')}>{t('dashboard.close', 'Go back')}</Button>
+        <Button variant="outline" onClick={() => navigate('/contacts')}>{t('common.back')}</Button>
       </div>
     );
   }
@@ -132,7 +132,7 @@ export default function ContactDetails() {
 
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6 pb-8">
+    <div className="animate-in fade-in duration-500 w-full space-y-4 pb-8">
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigate('/contacts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer">
@@ -282,10 +282,10 @@ export default function ContactDetails() {
           </div>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
-              {t('common.cancel', 'Cancel')}
+              {t('common.cancel')}
             </DialogClose>
             <Button onClick={handleUpdate} disabled={!editName.trim()} className="cursor-pointer">
-              {t('common.save', 'Save')}
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

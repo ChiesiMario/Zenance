@@ -7,6 +7,8 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
+import { useAccounts } from '@/hooks/useAccounts';
+import { toast, Toaster } from '@/components/ui/toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
@@ -19,8 +21,10 @@ export function AppLayout() {
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
+  const { wallets } = useAccounts();
   const { activeLedgerId, editingTransactionId, setEditingTransactionId, viewingTransactionId, setViewingTransactionId, isAddModalOpen, addModalType, addModalLoanType, addModalContactId, openAddModal, closeAddModal } = useAppStore();
   
+  const walletCount = wallets?.length ?? 0;
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
   
@@ -66,7 +70,7 @@ export function AppLayout() {
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-8 [scrollbar-gutter:stable]">
+      <main className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-4 [scrollbar-gutter:stable]">
         <Outlet />
       </main>
 
@@ -78,6 +82,20 @@ export function AppLayout() {
             const isActive = location.pathname === item.path;
             
             if (item.path === '/add') {
+              if (walletCount === 0) {
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    onClick={() => toast.show(t('alerts.noAccounts'))}
+                    className="flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 opacity-40 text-muted-foreground hover:text-foreground cursor-pointer"
+                    aria-label={t('nav.add')}
+                  >
+                    <Icon className="size-6 transition-transform duration-300" strokeWidth={1.5} />
+                  </button>
+                );
+              }
+
               return (
                 <DropdownMenu key={item.path}>
                   <DropdownMenuTrigger
@@ -99,7 +117,19 @@ export function AppLayout() {
                         <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.income}</span>
                       </DropdownMenuItem>
                       
-                      <DropdownMenuItem onClick={() => handleOpenAddModal('transfer')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          if (walletCount < 2) {
+                            toast.show(t('alerts.transferNeedsTwoAccounts'));
+                            return;
+                          }
+                          handleOpenAddModal('transfer');
+                        }} 
+                        className={cn(
+                          "flex flex-col items-center justify-center p-2 w-16 gap-1 rounded-md",
+                          walletCount < 2 ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                        )}
+                      >
                         <ArrowRightLeft className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
                         <span className="text-[11px] font-medium">{t('add.transfer')}</span>
                         <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.transfer}</span>
@@ -160,6 +190,8 @@ export function AppLayout() {
         transactionId={viewingTransactionId} 
         onClose={() => setViewingTransactionId(null)} 
       />
+
+      <Toaster />
     </div>
   );
 }

@@ -2,8 +2,22 @@
   "translation": {
     "common": {
       "confirm": "Confirm",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "close": "Close",
+      "back": "Back",
       "today": "Today",
-      "yesterday": "Yesterday"
+      "yesterday": "Yesterday",
+      "loading": "Loading...",
+      "error": "An error occurred",
+      "unknown": "Unknown",
+      "uncategorized": "Uncategorized"
+    },
+    "alerts": {
+      "noAccounts": "No accounts available. Please create an account first.",
+      "transferNeedsTwoAccounts": "Transfer requires at least two accounts."
     },
     "nav": {
       "overview": "Overview",
@@ -29,7 +43,9 @@
       "original": "Original",
       "rate": "Exchange Rate",
       "delete": "Delete",
-      "close": "Close"
+      "close": "Close",
+      "edit": "Edit",
+      "save": "Save"
     },
     "add": {
       "addExpense": "Add Expense",
@@ -57,6 +73,7 @@
       "addExpenseCategory": "Add Expense Category",
       "addIncomeCategory": "Add Income Category",
       "categoryName": "Category Name",
+      "newCategoryPlaceholder": "Enter category name",
       "cancel": "Cancel",
       "date": "Date",
       "today": "Today",
@@ -130,6 +147,7 @@
       "editAccount": "Edit Account",
       "archiveAccount": "Archive Account",
       "deleteAccount": "Delete Account",
+      "currency": "Default Currency",
       "accountNotFound": "Account not found.",
       "cannotDeleteHasTransactions": "Cannot delete account with existing transactions. You can archive it instead.",
       "cannotEditCurrencyHasTransactions": "Currency and Account Deletion are disabled when there are existing transactions.",
@@ -145,7 +163,15 @@
       "newAmount": "New Amount",
       "difference": "Difference",
       "balanceAdjustment": "Balance Adjustment",
-      "balanceAdjustmentNote": "Manual Balance Adjustment"
+      "balanceAdjustmentNote": "Manual Balance Adjustment",
+      "noAccounts": "No accounts found",
+      "noAccountsDesc": "Create your first account to start tracking your assets and cash flow.",
+      "archived": "Archived",
+      "noArchivedAccounts": "No archived accounts",
+      "noDifference": "No change",
+      "recordAsIncome": "Record as income",
+      "recordAsExpense": "Record as expense",
+      "confirmAdjust": "Confirm Adjustment"
     },
     "budgets": {
       "budgets": "Budgets",
@@ -261,7 +287,9 @@
       "category": "Category",
       "contacts": "Contacts",
       "addContact": "Add Contact",
+      "type": "Type",
       "contactName": "Contact Name",
+      "namePlaceholder": "Contact Name",
       "cancel": "Cancel",
       "add": "Add",
       "owesYou": "Owes you",
@@ -277,6 +305,7 @@
       "editContact": "Edit Contact",
       "archiveContact": "Archive Contact",
       "archived": "Archived",
+      "noArchivedContacts": "No archived contacts",
       "deleteContact": "Delete Contact",
       "loanShort": "Loan",
       "reimbShort": "Reimb",
@@ -315,7 +344,11 @@
       "theme": "Theme",
       "themeLight": "Light",
       "themeDark": "Dark",
-      "themeSystem": "System"
+      "themeSystem": "System",
+      "categories": "Categories",
+      "archived": "Archived",
+      "unarchive": "Unarchive",
+      "noArchivedCategories": "No archived categories"
     },
     "reports": {
       "title": "Analytics & Reports",

@@ -327,7 +327,7 @@ export default function Budgets() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-4">
       {/* Header & Tabs */}
       <div className="flex items-center justify-between h-8">
         <h2 className="text-xl font-semibold tracking-tight leading-none">{t('budgets.title')}</h2>
@@ -775,14 +775,14 @@ export default function Budgets() {
       {/* Modal 1: Add / Edit Fixed-Period Budget Instance   */}
       {/* -------------------------------------------------- */}
       <Dialog open={isBudgetModalOpen} onOpenChange={setIsBudgetModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>{t('budgets.add')}</DialogTitle>
+            <DialogTitle>{t('budgets.addBudget')}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="space-y-4 py-1 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.name')}
               </label>
               <Input
@@ -792,8 +792,8 @@ export default function Budgets() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.targetAmount')}
               </label>
               <Input
@@ -806,7 +806,7 @@ export default function Budgets() {
 
             {/* Quick Presets */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.quickPresets')}
               </label>
               <div className="flex gap-1.5 flex-wrap">
@@ -841,16 +841,16 @@ export default function Budgets() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">{t('budgets.startDate')}</label>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.startDate')}</label>
                 <Input
                   type="date"
                   value={formBudgetStartDate}
                   onChange={e => setFormBudgetStartDate(e.target.value)}
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
                 <Input
                   type="date"
                   value={formBudgetEndDate}
@@ -860,9 +860,9 @@ export default function Budgets() {
             </div>
 
             {/* Category Monitoring Selection */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex justify-between items-baseline">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t('budgets.categories')}
                 </label>
                 <span className="text-[11px] text-muted-foreground">
@@ -903,7 +903,7 @@ export default function Budgets() {
           </div>
 
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
+            <DialogClose render={<Button variant="ghost" type="button" />}>
               {t('budgets.cancel')}
             </DialogClose>
             <Button
@@ -916,6 +916,7 @@ export default function Budgets() {
                 !formBudgetEndDate ||
                 formBudgetStartDate > formBudgetEndDate
               }
+              className="cursor-pointer"
             >
               {t('budgets.add')}
             </Button>
@@ -927,15 +928,15 @@ export default function Budgets() {
       {/* Modal 2: Add / Edit Recurring Rule                 */}
       {/* -------------------------------------------------- */}
       <Dialog open={isRuleModalOpen} onOpenChange={setIsRuleModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>{editingRule ? t('budgets.editRule') : t('budgets.addRule')}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+          <div className="space-y-4 py-1 max-h-[70vh] overflow-y-auto pr-1">
             {/* Rule Cycle Selection */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.ruleCycle')}
               </label>
               <div className="grid grid-cols-2 gap-2 border border-border rounded-lg p-1 bg-muted/40">
@@ -960,8 +961,8 @@ export default function Budgets() {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.name')}
               </label>
               <Input
@@ -971,8 +972,8 @@ export default function Budgets() {
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.ruleDefaultAmount')}
               </label>
               <Input
@@ -984,9 +985,9 @@ export default function Budgets() {
             </div>
 
             {/* Category Monitoring Selection */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex justify-between items-baseline">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   {t('budgets.categories')}
                 </label>
                 <span className="text-[11px] text-muted-foreground">
@@ -1027,12 +1028,13 @@ export default function Budgets() {
           </div>
 
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
+            <DialogClose render={<Button variant="ghost" type="button" />}>
               {t('budgets.cancel')}
             </DialogClose>
             <Button
               onClick={handleSaveRule}
               disabled={!formRuleName.trim() || !formRuleAmount || parseFloat(formRuleAmount) <= 0}
+              className="cursor-pointer"
             >
               {editingRule ? t('budgets.save') : t('budgets.addRule')}
             </Button>

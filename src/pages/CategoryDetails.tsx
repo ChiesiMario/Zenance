@@ -28,7 +28,7 @@ export default function CategoryDetails() {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6">
+    <div className="animate-in fade-in duration-500 w-full space-y-4">
       <div className="flex items-center">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />

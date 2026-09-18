@@ -6,12 +6,11 @@ import { useCategories } from '@/hooks/useCategories';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMemo, useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { cn, getCurrencySymbol } from '@/lib/utils';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
@@ -29,6 +28,8 @@ export default function AccountDetails() {
   
   const account = accounts?.find(a => a.id === id);
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
+  const currency = account?.currency || activeLedger?.baseCurrency || 'CNY';
+  const currencySymbol = getCurrencySymbol(currency);
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -38,6 +39,7 @@ export default function AccountDetails() {
   
   const [isAdjustBalanceDialogOpen, setIsAdjustBalanceDialogOpen] = useState(false);
   const [newBalanceStr, setNewBalanceStr] = useState('');
+  const adjustInputRef = useRef<HTMLInputElement>(null);
   
   useEffect(() => {
     if (account) {
@@ -52,7 +54,7 @@ export default function AccountDetails() {
     return (
       <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
         <p>{t('accounts.accountNotFound', 'Account not found.')}</p>
-        <Button variant="outline" onClick={() => navigate('/accounts')}>Go back</Button>
+        <Button variant="outline" onClick={() => navigate('/accounts')}>{t('common.back')}</Button>
       </div>
     );
   }
@@ -94,7 +96,16 @@ export default function AccountDetails() {
 
   useEffect(() => {
     if (isAdjustBalanceDialogOpen) {
-      setNewBalanceStr(balance.toString());
+      const initialStr = balance.toString();
+      setNewBalanceStr(initialStr);
+      // 聚焦並將游標停留在末尾，不全選數字
+      setTimeout(() => {
+        if (adjustInputRef.current) {
+          adjustInputRef.current.focus();
+          const len = adjustInputRef.current.value.length;
+          adjustInputRef.current.setSelectionRange(len, len);
+        }
+      }, 50);
     }
   }, [isAdjustBalanceDialogOpen, balance]);
 
@@ -102,7 +113,7 @@ export default function AccountDetails() {
   const balanceDiff = parsedNewBalance - balance;
 
   const handleAdjustBalance = async () => {
-    if (!id || balanceDiff === 0) {
+    if (!id || balanceDiff === 0 || !newBalanceStr.trim()) {
       setIsAdjustBalanceDialogOpen(false);
       return;
     }
@@ -115,7 +126,7 @@ export default function AccountDetails() {
       await addTransaction({
         amount: Math.abs(balanceDiff),
         originalAmount: Math.abs(balanceDiff),
-        originalCurrency: account?.currency || activeLedger?.baseCurrency || 'CNY',
+        originalCurrency: currency,
         exchangeRate: 1,
         type: diffType,
         category: category.id,
@@ -164,7 +175,7 @@ export default function AccountDetails() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-6 pb-8">
+    <div className="animate-in fade-in duration-500 w-full space-y-4 pb-8">
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigate('/accounts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />
@@ -230,26 +241,38 @@ export default function AccountDetails() {
       />
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[350px] overflow-hidden">
+        <DialogContent className="sm:max-w-[350px]">
           <DialogHeader>
-            <DialogTitle className="text-center">{t('accounts.editAccount', 'Edit Account')}</DialogTitle>
+            <DialogTitle className="text-center">{t('accounts.editAccount')}</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-6">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium">{t('accounts.accountName')}</label>
-              <Input 
+
+          <div className="py-2 space-y-5">
+            {/* 無邊界大字體名稱輸入區 */}
+            <div className="flex flex-col items-center justify-center pt-2 pb-1">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                {t('accounts.accountName')}
+              </span>
+              <input 
+                type="text"
+                autoFocus
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUpdate()}
+                onKeyDown={(e) => e.key === 'Enter' && editName.trim() && handleUpdate()}
+                placeholder={t('accounts.namePlaceholder')}
+                className="w-full text-center text-3xl font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/40"
               />
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">{t('accounts.accountGroup')}</label>
+
+            {/* Vercel Usage 風格屬性清單卡片 */}
+            <div className="rounded-lg border border-border divide-y divide-border bg-card overflow-hidden">
+              {/* 帳戶分類 */}
+              <div className="flex items-center justify-between p-3">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  {t('accounts.accountGroup')}
+                </span>
                 <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
-                  <SelectTrigger>
-                    <SelectValue>
+                  <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-medium justify-end gap-1.5 cursor-pointer">
+                    <SelectValue className="flex-none text-right">
                       {t(`accounts.${GROUP_I18N_KEYS[editGroup]}` as any)}
                     </SelectValue>
                   </SelectTrigger>
@@ -264,11 +287,14 @@ export default function AccountDetails() {
                 </Select>
               </div>
               
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">{t('setup.currency', 'Currency')}</label>
+              {/* 預設貨幣 */}
+              <div className="flex items-center justify-between p-3">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  {t('accounts.currency')}
+                </span>
                 <Select disabled={hasTransactions} value={editCurrency || activeLedger?.baseCurrency || 'CNY'} onValueChange={(val) => { if (val) setEditCurrency(val); }}>
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-mono font-medium text-right justify-end gap-1.5 disabled:opacity-50 cursor-pointer">
+                    <SelectValue className="flex-none text-right" />
                   </SelectTrigger>
                   <SelectContent>
                     {COMMON_CURRENCIES.map(c => (
@@ -279,79 +305,136 @@ export default function AccountDetails() {
               </div>
             </div>
 
+            {hasTransactions && (
+              <p className="text-[11px] text-muted-foreground text-center leading-normal px-2">
+                {t('accounts.cannotEditCurrencyHasTransactions')}
+              </p>
+            )}
+
             {deleteError && (
-              <div className="text-xs text-destructive bg-destructive/10 p-3 rounded-md">
+              <div className="text-xs text-destructive bg-destructive/10 p-2.5 rounded-md text-center">
                 {deleteError}
               </div>
             )}
             
-            <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full justify-center text-muted-foreground hover:text-foreground" onClick={handleArchive}>
-                <ArchiveRestore className="mr-2 h-4 w-4" />
-                {t('accounts.archiveAccount', 'Archive Account')}
-              </Button>
-              <Button disabled={hasTransactions} variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('accounts.deleteAccount', 'Delete Account')}
-              </Button>
+            {/* 幽靈輔助操作（歸檔 · 刪除） */}
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleArchive}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <ArchiveRestore className="h-3.5 w-3.5" />
+                <span>{t('accounts.archiveAccount')}</span>
+              </button>
+              
+              <span className="text-border select-none">·</span>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={hasTransactions}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{t('accounts.deleteAccount')}</span>
+              </button>
             </div>
-            
-            {hasTransactions && (
-              <div className="text-center !mt-3">
-                <p className="text-[11px] text-muted-foreground leading-tight">
-                  {t('accounts.cannotEditCurrencyHasTransactions', 'Currency and Account Deletion are disabled when there are existing transactions.')}
-                </p>
-              </div>
-            )}
           </div>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('common.cancel', 'Cancel')}
+
+          <DialogFooter className="grid grid-cols-2 gap-2 sm:gap-2 pt-2">
+            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
+              {t('common.cancel')}
             </DialogClose>
-            <Button onClick={handleUpdate} disabled={!editName.trim()}>
-              {t('common.save', 'Save')}
+            <Button onClick={handleUpdate} disabled={!editName.trim()} className="cursor-pointer">
+              {t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
       <Dialog open={isAdjustBalanceDialogOpen} onOpenChange={setIsAdjustBalanceDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]">
+        <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
             <DialogTitle className="text-center">{t('accounts.adjustBalance')}</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium text-muted-foreground">{t('accounts.currentAmount')}</label>
-              <div className="text-2xl font-mono opacity-50">
-                <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+          
+          <div className="py-2 space-y-6">
+            {/* 無邊界大字體金額輸入區 */}
+            <div className="flex flex-col items-center justify-center pt-2 pb-1">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
+                {t('accounts.newAmount')}
+              </span>
+              <div className="inline-flex items-baseline justify-center gap-1.5 max-w-full">
+                <span className="text-2xl sm:text-3xl font-mono font-medium text-muted-foreground select-none">
+                  {currencySymbol}
+                </span>
+                <input
+                  ref={adjustInputRef}
+                  type="text"
+                  inputMode="decimal"
+                  value={newBalanceStr}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^-?\d*\.?\d*$/.test(val)) {
+                      setNewBalanceStr(val);
+                    }
+                  }}
+                  onFocus={(e) => {
+                    const len = e.target.value.length;
+                    e.target.setSelectionRange(len, len);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && balanceDiff !== 0 && handleAdjustBalance()}
+                  style={{ width: `${Math.max(1, newBalanceStr.length)}ch` }}
+                  className="min-w-[1ch] max-w-[220px] text-left text-4xl sm:text-5xl font-mono font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground p-0"
+                  placeholder="0"
+                />
               </div>
             </div>
-            
-            <div className="space-y-1">
-              <label className="block text-sm font-medium">{t('accounts.newAmount')}</label>
-              <Input 
-                type="number"
-                step="any"
-                value={newBalanceStr}
-                onChange={(e) => setNewBalanceStr(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAdjustBalance()}
-              />
-            </div>
-            
-            <div className="space-y-1 pt-2 border-t border-border">
-              <label className="block text-sm font-medium text-muted-foreground">{t('accounts.difference')}</label>
-              <div className={cn("text-xl font-mono", balanceDiff > 0 ? "text-primary" : balanceDiff < 0 ? "text-destructive" : "text-muted-foreground")}>
-                <AmountDisplay amount={balanceDiff} baseCurrency={activeLedger?.baseCurrency} type={balanceDiff > 0 ? 'income' : balanceDiff < 0 ? 'expense' : 'neutral'} showSign={true} />
+
+            {/* Vercel Usage 風格對比清單卡片 */}
+            <div className="rounded-lg border border-border divide-y divide-border bg-card overflow-hidden">
+              <div className="flex items-center justify-between p-3">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  {t('accounts.currentAmount')}
+                </span>
+                <span className="text-sm font-mono text-foreground font-medium">
+                  <AmountDisplay amount={balance} baseCurrency={currency} type="neutral" />
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  {t('accounts.difference')}
+                </span>
+                <div className="flex items-center">
+                  {balanceDiff === 0 ? (
+                    <span className="text-sm font-mono text-muted-foreground">
+                      {t('accounts.noDifference')}
+                    </span>
+                  ) : (
+                    <AmountDisplay 
+                      amount={balanceDiff} 
+                      baseCurrency={currency} 
+                      type={balanceDiff > 0 ? 'income' : 'expense'} 
+                      showSign={true} 
+                      className={cn("text-sm", balanceDiff < 0 && "text-destructive")}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
+
+          <DialogFooter className="grid grid-cols-2 gap-2 sm:gap-2">
+            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
               {t('common.cancel')}
             </DialogClose>
-            <Button onClick={handleAdjustBalance}>
-              {t('common.save', 'Save')}
+            <Button 
+              onClick={handleAdjustBalance}
+              disabled={balanceDiff === 0 || !newBalanceStr.trim()}
+              className="cursor-pointer"
+            >
+              {t('accounts.confirmAdjust')}
             </Button>
           </DialogFooter>
         </DialogContent>

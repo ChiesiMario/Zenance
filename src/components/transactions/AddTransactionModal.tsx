@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { NumericKeypad } from './NumericKeypad';
+import type { SplitItem } from './SplitAdvanceDialog';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Props {
   isOpen: boolean;
@@ -36,9 +38,10 @@ interface Props {
 
 export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', initialLoanType = 'borrow', transactionToEditId, initialContactId }: Props) {
   const { t } = useTranslation();
-  const { transactions, addTransaction, updateTransaction } = useTransactions();
+  const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactions();
   const { categories, addCategory } = useCategories();
-  const { wallets: accounts, contacts, addAccount } = useAccounts();
+  const [splits, setSplits] = useState<SplitItem[]>([]);
+  const { wallets: accounts, contacts } = useAccounts();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const { budgets } = useBudgets();
@@ -116,7 +119,26 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     if (isOpen) {
       if (transactionToEdit) {
         // Edit mode
-        setType(transactionToEdit.type);
+        if (transactionToEdit.splitGroupId) {
+          const groupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
+          const loadedSplits: SplitItem[] = groupTxs
+            .filter(t => t.type === 'loan' && t.toAccountId && t.reimbursementStatus)
+            .map(t => ({ contactId: t.toAccountId!, amount: t.originalAmount }));
+          setSplits(loadedSplits);
+          const totalGroupOriginalAmount = groupTxs.reduce((sum, t) => sum + t.originalAmount, 0);
+          setDisplayAmount(totalGroupOriginalAmount.toString());
+        } else if (transactionToEdit.reimbursementContactId) {
+          setSplits([{ contactId: transactionToEdit.reimbursementContactId, amount: transactionToEdit.originalAmount }]);
+        } else {
+          setSplits([]);
+        }
+
+        const isAdvanceLoan = transactionToEdit.type === 'loan' && !!transactionToEdit.reimbursementContactId;
+        if (isAdvanceLoan) {
+          setType('expense');
+        } else {
+          setType(transactionToEdit.type);
+        }
         const isLend = transactionToEdit.type === 'loan' && contacts?.some(c => c.id === transactionToEdit.toAccountId);
         setLoanType(isLend ? 'lend' : 'borrow');
         
@@ -128,8 +150,10 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           setCustomExchangeRate(null);
         }
 
-        // Set amount display correctly
-        setDisplayAmount(transactionToEdit.originalAmount.toString());
+        // Set amount display correctly if not already set by splitGroup
+        if (!transactionToEdit.splitGroupId) {
+          setDisplayAmount(transactionToEdit.originalAmount.toString());
+        }
         
         // If transfer, handle transferInAmount
         if (transactionToEdit.type === 'transfer' && transactionToEdit.transferInAmount !== undefined) {
@@ -144,8 +168,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           amount: transactionToEdit.originalAmount,
           categoryId: transactionToEdit.category,
           accountId: transactionToEdit.accountId,
-          fromAccountId: transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan' ? transactionToEdit.accountId : undefined,
-          toAccountId: transactionToEdit.toAccountId || undefined,
+          fromAccountId: !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan') ? transactionToEdit.accountId : undefined,
+          toAccountId: !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan') ? transactionToEdit.toAccountId || undefined : undefined,
           transferInAmount: transactionToEdit.transferInAmount,
           budgetId: transactionToEdit.budgetId || (transactionToEdit.type === 'income' ? 'none' : 'auto'),
           reimbursementContactId: transactionToEdit.reimbursementContactId,
@@ -157,6 +181,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         // Add mode
         setType(initialType);
         reset();
+        setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
         setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
         setValue('reimbursementContactId', initialContactId || undefined);
         setDisplayAmount('');
@@ -325,28 +350,116 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     }
 
     const calculatedBaseAmount = data.amount * exchangeRate;
+    const hasSplits = type === 'expense' && splits.length > 0;
+    const isAdvance = type === 'expense' && (hasSplits || !!data.reimbursementContactId);
+
+    // 多人分攤或部分代付分拆處理
+    if (type === 'expense' && splits.length > 0) {
+      const totalAdvanceOriginal = splits.reduce((sum, s) => sum + s.amount, 0);
+      const selfExpenseOriginal = Math.max(0, Math.round((data.amount - totalAdvanceOriginal) * 100) / 100);
+      const isMultiOrPartial = splits.length > 1 || (splits.length === 1 && selfExpenseOriginal > 0);
+
+      if (isMultiOrPartial) {
+        const splitGroupId = transactionToEdit?.splitGroupId || uuidv4();
+
+        // 若為編輯模式，清除舊群組所有交易
+        if (transactionToEdit) {
+          if (transactionToEdit.splitGroupId) {
+            const oldGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
+            for (const oldTx of oldGroupTxs) {
+              await deleteTransaction(oldTx.id);
+            }
+          } else {
+            await deleteTransaction(transactionToEdit.id);
+          }
+        }
+
+        // 1. 若有自己的自費支出，建立支出交易
+        if (selfExpenseOriginal > 0) {
+          const selfBaseAmount = selfExpenseOriginal * exchangeRate;
+          await addTransaction({
+            originalAmount: selfExpenseOriginal,
+            originalCurrency: selectedCurrency,
+            exchangeRate: exchangeRate,
+            amount: selfBaseAmount,
+            type: 'expense',
+            category: data.categoryId!,
+            accountId: data.accountId!,
+            budgetId: data.budgetId,
+            splitGroupId,
+            note: data.note,
+            date: data.date,
+          });
+        }
+
+        // 2. 為每位代付對象建立借貸代付交易 (type: 'loan'，分類為代付)
+        for (const s of splits) {
+          const advBaseAmount = s.amount * exchangeRate;
+          await addTransaction({
+            originalAmount: s.amount,
+            originalCurrency: selectedCurrency,
+            exchangeRate: exchangeRate,
+            amount: advBaseAmount,
+            type: 'loan',
+            category: 'advance', // 分類為「代付」
+            accountId: data.accountId!, // 付款錢包扣款
+            toAccountId: s.contactId,   // 借給代付對象（應收債權）
+            reimbursementContactId: s.contactId,
+            reimbursementStatus: 'pending',
+            splitGroupId,
+            note: data.note,
+            date: data.date,
+          });
+        }
+
+        onClose();
+        return;
+      }
+    }
+
+    const effectiveType = isAdvance ? 'loan' : type;
+    const singleContactId = splits.length === 1 ? splits[0].contactId : data.reimbursementContactId;
     
     const txData = {
       originalAmount: data.amount,
       originalCurrency: selectedCurrency,
       exchangeRate: exchangeRate,
       amount: calculatedBaseAmount,
-      type,
-      category: (type === 'transfer' || type === 'loan') ? (type === 'loan' ? 'loan' : 'transfer') : data.categoryId!,
-      accountId: (type === 'transfer' || type === 'loan') ? data.fromAccountId! : data.accountId!,
-      toAccountId: (type === 'transfer' || type === 'loan') ? data.toAccountId : undefined,
-      transferInAmount: (type === 'transfer' || type === 'loan') && data.transferInAmount !== undefined ? data.transferInAmount : undefined,
-      budgetId: (type === 'expense' || type === 'income') ? data.budgetId : undefined,
-      reimbursementStatus: (type === 'expense' && data.reimbursementContactId)
+      type: effectiveType,
+      category: isAdvance 
+        ? 'advance' 
+        : ((type === 'transfer' || type === 'loan') ? (type === 'loan' ? 'loan' : 'transfer') : data.categoryId!),
+      accountId: isAdvance 
+        ? data.accountId! 
+        : ((type === 'transfer' || type === 'loan') ? data.fromAccountId! : data.accountId!),
+      toAccountId: isAdvance 
+        ? singleContactId 
+        : ((type === 'transfer' || type === 'loan') ? data.toAccountId : undefined),
+      transferInAmount: !isAdvance && (type === 'transfer' || type === 'loan') && data.transferInAmount !== undefined ? data.transferInAmount : undefined,
+      budgetId: isAdvance ? undefined : ((type === 'expense' || type === 'income') ? data.budgetId : undefined),
+      reimbursementStatus: isAdvance
         ? (transactionToEdit?.reimbursementStatus || 'pending')
-        : undefined,
-      reimbursementContactId: type === 'expense' ? data.reimbursementContactId : undefined,
+        : (type === 'expense' && singleContactId
+          ? (transactionToEdit?.reimbursementStatus || 'pending')
+          : undefined),
+      reimbursementContactId: isAdvance
+        ? singleContactId
+        : (type === 'expense' ? singleContactId : undefined),
       note: data.note,
       date: data.date,
     };
 
     if (transactionToEdit) {
-      await updateTransaction(transactionToEdit.id, txData);
+      if (transactionToEdit.splitGroupId) {
+        const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+        for (const otherTx of otherGroupTxs) {
+          await deleteTransaction(otherTx.id);
+        }
+      }
+      await updateTransaction(transactionToEdit.id, {
+        ...txData,
+        splitGroupId: undefined,
+      });
     } else {
       await addTransaction(txData);
     }
@@ -383,7 +496,11 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent showCloseButton={false} className="w-screen h-[100dvh] max-w-none m-0 p-0 gap-0 rounded-none border-none overflow-hidden flex flex-col bg-background sm:w-full sm:max-w-[350px] sm:h-[700px] sm:max-h-[90vh] sm:rounded-2xl sm:border sm:border-border" aria-describedby={undefined}>
+      <DialogContent
+        showCloseButton={false}
+        className="m-0 p-0 gap-0 overflow-hidden flex flex-col bg-background border border-border rounded-2xl w-full sm:max-w-[350px] sm:h-[700px] sm:max-h-[90vh] max-sm:w-screen max-sm:h-[100dvh] max-sm:max-w-none max-sm:rounded-none max-sm:border-none"
+        aria-describedby={undefined}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>{transactionToEditId ? t('dashboard.edit', '編輯') : t('nav.add')}</DialogTitle>
         </DialogHeader>
@@ -943,10 +1060,17 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
               budgetId={watch('budgetId')}
               onBudgetChange={(bId) => setValue('budgetId', bId)}
               budgets={budgets}
-              reimbursementContactId={watch('reimbursementContactId')}
-              onReimbursementContactChange={(cId) => setValue('reimbursementContactId', cId)}
+              splits={splits}
+              onSplitsChange={(newSplits) => {
+                setSplits(newSplits);
+                setValue('reimbursementContactId', newSplits.length === 1 ? newSplits[0].contactId : undefined);
+              }}
+              currencySymbol={getCurrencySymbol(selectedCurrency)}
+              reimbursementContactId={splits.length === 1 ? splits[0].contactId : undefined}
+              onReimbursementContactChange={(cId) => {
+                setValue('reimbursementContactId', cId);
+              }}
               contacts={contacts}
-              onAddContact={addAccount}
             />
           </div>
         </div>

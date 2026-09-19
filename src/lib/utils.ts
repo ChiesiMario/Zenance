@@ -29,3 +29,13 @@ export function formatDisplayAmount(amountStr: string): string {
   
   return formattedInteger + decimalPart;
 }
+
+export function sortTransactionsDesc<T extends { date: string; createdAt?: string; id?: string }>(txs: T[]): T[] {
+  return [...txs].sort((a, b) => {
+    const dateDiff = (b.date || '').localeCompare(a.date || '');
+    if (dateDiff !== 0) return dateDiff;
+    const createdDiff = (b.createdAt || '').localeCompare(a.createdAt || '');
+    if (createdDiff !== 0) return createdDiff;
+    return (b.id || '').localeCompare(a.id || '');
+  });
+}

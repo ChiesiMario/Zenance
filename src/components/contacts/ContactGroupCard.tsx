@@ -44,7 +44,6 @@ export function ContactGroupCard({
             const loanBalance = contactBalances[contact.id] || 0;
             const reimbBalance = contactReimbursements[contact.id] || 0;
             const netReceivable = loanBalance + reimbBalance;
-            const hasSubDetails = loanBalance !== 0 && reimbBalance !== 0;
             const initial = contact.name ? contact.name.charAt(0).toUpperCase() : '?';
 
             return (
@@ -70,30 +69,19 @@ export function ContactGroupCard({
                   <div className="text-sm font-normal leading-none truncate w-full px-1">{contact.name}</div>
                 </div>
                 
-                {/* Bottom: Breakdown & Net Total */}
+                {/* Bottom: Net Total */}
                 <div className="w-full text-right mt-auto pt-1">
-                  {hasSubDetails && (
-                    <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground/80 leading-tight mb-0.5 px-0.5">
-                      <span className="truncate">
-                        {t('contacts.loanShort', '借貸')}: {loanBalance > 0 ? `+` : ''}{loanBalance.toLocaleString()}
-                      </span>
-                      <span className="truncate text-amber-500 font-medium">
-                        {t('contacts.reimbShort', '報銷')}: +{reimbBalance.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-
                   <span
                     className={cn(
                       "text-xl font-mono tracking-tight font-normal truncate block",
                       netReceivable === 0
-                        ? "text-muted-foreground"
+                        ? "text-muted-foreground/50"
                         : netReceivable > 0
-                        ? "text-emerald-500"
-                        : "text-destructive"
+                        ? "text-foreground"
+                        : "text-muted-foreground"
                     )}
                   >
-                    {currencySymbol}{Math.abs(netReceivable).toLocaleString()}
+                    {netReceivable < 0 ? '-' : ''}{currencySymbol}{Math.abs(netReceivable).toLocaleString()}
                   </span>
                 </div>
               </div>

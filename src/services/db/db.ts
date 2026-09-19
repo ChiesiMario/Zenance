@@ -15,6 +15,10 @@ export interface Transaction {
   id: string;
   displayId?: string; // Human-readable serial number
   ledgerId: string;
+  parentId?: string; // Optional ID of parent transaction if this is a sub-transaction
+  settlementId?: string; // Optional batch identifier for a reimbursement settlement session
+  splitGroupId?: string; // Optional identifier for a multi-person advance / split expense group
+  isWriteOff?: boolean; // True if this is a write-off / absorption child transaction (does not affect account balance)
   budgetId?: string; // Optional manual budget assignment ('none' or budget id)
   reimbursementStatus?: 'pending' | 'reimbursed' | 'none'; // Reimbursement status
   reimbursementContactId?: string; // Target contact ID for reimbursement
@@ -403,6 +407,14 @@ export class ZenanceDatabase extends Dexie {
 
     this.version(17).stores({
       transactions: 'id, displayId, ledgerId, budgetId, reimbursementStatus, reimbursementContactId, date, type, accountId, toAccountId, updatedAt, deleted',
+    });
+
+    this.version(18).stores({
+      transactions: 'id, displayId, ledgerId, parentId, budgetId, reimbursementStatus, reimbursementContactId, date, type, accountId, toAccountId, updatedAt, deleted',
+    });
+
+    this.version(19).stores({
+      transactions: 'id, displayId, ledgerId, parentId, settlementId, splitGroupId, budgetId, reimbursementStatus, reimbursementContactId, date, type, accountId, toAccountId, updatedAt, deleted',
     });
   }
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Category } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
@@ -5,6 +6,21 @@ import { useAppStore } from '@/store/useAppStore';
 
 export function useCategories() {
   const { activeLedgerId } = useAppStore();
+
+  // 自動遷移歷史「差額吸收 / 抹零」分類與舊備註
+  useEffect(() => {
+    if (!activeLedgerId) return;
+
+    db.categories
+      .filter(c => !c.deleted && (c.name.includes('差額吸收') || c.name.includes('差额吸收')))
+      .modify({ name: '抹零', updatedAt: new Date().toISOString() })
+      .catch(() => {});
+
+    db.transactions
+      .filter(t => !t.deleted && (t.note === '抹零 / 自行吸收差額' || t.note === '抹零 / 自行吸收差额'))
+      .modify({ note: '報銷抹零', updatedAt: new Date().toISOString() })
+      .catch(() => {});
+  }, [activeLedgerId]);
 
   const categories = useLiveQuery(
     () => {

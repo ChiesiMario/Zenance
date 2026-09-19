@@ -9,6 +9,8 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useMemo } from 'react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { getCurrencySymbol } from '@/lib/utils';
 
 interface Props {
   transactionId: string | null;
@@ -17,9 +19,10 @@ interface Props {
 
 export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const { t } = useTranslation();
+  const confirm = useConfirm();
   const { transactions, deleteTransaction } = useTransactions();
   const { allCategories } = useCategories();
-  const { accounts } = useAccounts();
+  const { accounts, contacts } = useAccounts();
   const { activeLedgerId, setEditingTransactionId } = useAppStore();
   const { ledgers } = useLedgers();
 
@@ -28,7 +31,30 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     return transactions.find(tx => tx.id === transactionId) || null;
   }, [transactionId, transactions]);
 
+  const parentTransaction = useMemo(() => {
+    if (!selectedTransaction?.parentId || !transactions) return null;
+    return transactions.find(t => t.id === selectedTransaction.parentId) || null;
+  }, [selectedTransaction?.parentId, transactions]);
+
+  // 子回款總額與徽章狀態
+  const { childRefundsTotal, reimbursementBadgeStatus } = useMemo(() => {
+    if (!selectedTransaction?.reimbursementStatus || selectedTransaction.reimbursementStatus === 'none') {
+      return { childRefundsTotal: 0, reimbursementBadgeStatus: null };
+    }
+    const childRefunds = transactions?.filter(
+      t => !t.deleted && t.parentId === selectedTransaction.id && t.type === 'income'
+    ) || [];
+    const total = childRefunds.reduce((sum, t) => sum + t.amount, 0);
+
+    let status: 'pending' | 'reimbursed' | 'partial' | null = selectedTransaction.reimbursementStatus;
+    if (selectedTransaction.reimbursementStatus === 'pending' && total > 0 && total < selectedTransaction.amount) {
+      status = 'partial';
+    }
+    return { childRefundsTotal: total, reimbursementBadgeStatus: status };
+  }, [selectedTransaction, transactions]);
+
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
+  const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
 
   const getAccountName = (accountId: string) => {
     return accounts?.find(a => a.id === accountId)?.name || accountId;
@@ -36,15 +62,46 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
   const getCategoryName = (categoryId: string) => {
     if (categoryId === 'transfer') return t('add.transfer');
+    if (selectedTransaction?.isWriteOff) {
+      return t('reimbursements.writeOffCategory', '抹零');
+    }
+    if (categoryId === 'advance' || (selectedTransaction?.type === 'loan' && (selectedTransaction.category === 'advance' || selectedTransaction.reimbursementContactId || selectedTransaction.reimbursementStatus))) {
+      return t('add.reimburse', '代付');
+    }
+    if (categoryId === 'loan') {
+      if (selectedTransaction?.type === 'loan') {
+        const isLent = contacts?.some(c => c.id === selectedTransaction.toAccountId);
+        return isLent ? t('add.lent') : t('add.borrowed');
+      }
+      return t('add.loan');
+    }
     const cat = allCategories?.find(c => c.id === categoryId);
     if (cat?.isSystem) {
       return t('accounts.balanceAdjustment');
+    }
+    if (cat?.name && (cat.name.includes('差額吸收') || cat.name.includes('差额吸收') || cat.name === '抹零' || cat.name.toLowerCase().includes('write-off'))) {
+      return t('reimbursements.writeOffCategory', '抹零');
     }
     return cat?.name || categoryId;
   };
 
   const handleDelete = async () => {
-    if (!transactionId) return;
+    if (!transactionId || !selectedTransaction) return;
+
+    const isReimbursementRefund = selectedTransaction.type === 'income' && !!selectedTransaction.reimbursementContactId;
+    const description = isReimbursementRefund
+      ? t('reimbursements.deleteRefundConfirm')
+      : t('dashboard.deleteTransactionConfirm');
+
+    const confirmed = await confirm({
+      title: t('dashboard.deleteTransaction'),
+      description,
+      confirmText: t('common.delete'),
+      variant: 'destructive',
+    });
+
+    if (!confirmed) return;
+
     await deleteTransaction(transactionId);
     onClose();
   };
@@ -63,15 +120,21 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
             <div className="flex items-center justify-center gap-2 mb-1 flex-wrap">
               <p className="text-sm text-muted-foreground uppercase tracking-widest">{getCategoryName(selectedTransaction.category)}</p>
               <span className="text-[10px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">#{selectedTransaction.displayId || selectedTransaction.id.split('-')[0].toUpperCase()}</span>
-              <ReimbursementBadge transaction={selectedTransaction} />
+              {selectedTransaction.parentId && (
+                <span className="text-[10px] font-mono text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded border border-border">
+                  {t('dashboard.subTransaction')}
+                </span>
+              )}
+              {reimbursementBadgeStatus && (
+                <ReimbursementBadge status={reimbursementBadgeStatus} />
+              )}
             </div>
-            <p className={`text-5xl font-mono tracking-tighter font-medium ${selectedTransaction.type === 'income' ? 'text-primary' : (selectedTransaction.type === 'transfer' || selectedTransaction.type === 'loan') ? 'text-blue-500' : 'text-foreground'}`}>
+            <p className="text-5xl font-mono tracking-tighter font-medium">
               <AmountDisplay 
                 amount={selectedTransaction.amount} 
                 originalCurrency={selectedTransaction.originalCurrency} 
                 baseCurrency={activeLedger?.baseCurrency} 
                 type={selectedTransaction.type as any} 
-                className={selectedTransaction.type === 'expense' ? 'text-foreground' : undefined}
               />
             </p>
           </div>
@@ -98,7 +161,13 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
             
             {(selectedTransaction.type === 'transfer' || selectedTransaction.type === 'loan') ? (
               <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                <span className="text-muted-foreground">{selectedTransaction.type === 'transfer' ? t('dashboard.transferDetail') : t('add.loan')}</span>
+                <span className="text-muted-foreground">
+                  {selectedTransaction.type === 'transfer'
+                    ? t('dashboard.transferDetail')
+                    : selectedTransaction.reimbursementContactId
+                    ? t('add.reimburse', '代付')
+                    : t('add.loan')}
+                </span>
                 <span className="font-medium">
                   {getAccountName(selectedTransaction.accountId)} → {selectedTransaction.toAccountId ? getAccountName(selectedTransaction.toAccountId) : '-'}
                 </span>
@@ -126,12 +195,43 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               );
             })()}
 
+            {selectedTransaction.parentId && (
+              <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
+                <span className="text-muted-foreground">{t('dashboard.parentTransaction')}</span>
+                <span className="font-medium text-right text-xs">
+                  {parentTransaction ? (
+                    <span className="flex items-center gap-1.5 justify-end">
+                      <span>{getCategoryName(parentTransaction.category)}</span>
+                      <span className="font-mono text-muted-foreground">
+                        #{parentTransaction.displayId || parentTransaction.id.split('-')[0].toUpperCase()}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-muted-foreground">
+                      #{selectedTransaction.parentId.split('-')[0].toUpperCase()}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+
             {selectedTransaction.reimbursementStatus && selectedTransaction.reimbursementStatus !== 'none' && (
               <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
-                <span className="text-muted-foreground">{t('reimbursements.title', '報銷')}</span>
+                <span className="text-muted-foreground">{t('reimbursements.title', '收款管理')}</span>
                 <div className="flex items-center gap-2">
-                  <ReimbursementBadge transaction={selectedTransaction} />
+                  {reimbursementBadgeStatus && (
+                    <ReimbursementBadge status={reimbursementBadgeStatus} />
+                  )}
                 </div>
+              </div>
+            )}
+
+            {reimbursementBadgeStatus === 'partial' && (
+              <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
+                <span className="text-muted-foreground">{t('reimbursements.remainingPending')}</span>
+                <span className="font-mono text-xs font-medium text-foreground">
+                  {currencySymbol}{(Math.max(0, Math.round((selectedTransaction.amount - childRefundsTotal) * 100) / 100)).toFixed(2)}
+                </span>
               </div>
             )}
           </div>

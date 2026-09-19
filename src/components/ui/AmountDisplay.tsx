@@ -25,16 +25,21 @@ export function AmountDisplay({
   let sign = '';
 
   if (type === 'income') {
-    colorClass = 'text-primary';
-    sign = showSign ? '+' : '';
+    colorClass = 'text-emerald-500';
+    sign = '';
   } else if (type === 'expense') {
+    colorClass = 'text-rose-500';
     sign = showSign ? '-' : '';
   } else if (type === 'transfer') {
     colorClass = 'text-blue-500';
     sign = '';
   } else if (type === 'loan') {
-    if (showSign) {
-      sign = amount < 0 ? '-' : amount > 0 ? '+' : '';
+    if (amount < 0) {
+      colorClass = 'text-rose-500';
+      sign = showSign ? '-' : '';
+    } else {
+      colorClass = 'text-emerald-500';
+      sign = '';
     }
   } else if (type === 'neutral') {
     if (showSign && amount < 0) sign = '-';

@@ -33,6 +33,17 @@ export default function Contacts() {
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
 
+  // 建立 parentId -> 子回款總額 map
+  const childRefundsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions?.forEach(t => {
+      if (!t.deleted && t.parentId && t.type === 'income') {
+        map[t.parentId] = (map[t.parentId] || 0) + t.amount;
+      }
+    });
+    return map;
+  }, [transactions]);
+
   // Calculate balances for each contact
   const contactBalances = useMemo(() => {
     const balances: Record<string, number> = {};
@@ -45,6 +56,11 @@ export default function Contacts() {
     });
 
     transactions.forEach(tx => {
+      if (tx.deleted) return;
+      // 代付交易（帶有 reimbursementStatus）由下方 contactReimbursements 統計待收款項，排除以避免重複計算
+      const isAdvance = (tx.reimbursementContactId || tx.toAccountId) && !!tx.reimbursementStatus;
+      if (isAdvance) return;
+
       // If money flows TO the contact account, the contact balance INCREASES
       // (This means they hold our money, i.e., Owes you)
       if (tx.type === 'transfer' || tx.type === 'loan') {
@@ -67,13 +83,18 @@ export default function Contacts() {
     });
 
     transactions.forEach(tx => {
-      if (!tx.deleted && tx.reimbursementStatus === 'pending' && tx.reimbursementContactId && reimbursements[tx.reimbursementContactId] !== undefined) {
-        reimbursements[tx.reimbursementContactId] += tx.amount;
+      if (!tx.deleted && tx.reimbursementStatus === 'pending') {
+        const contactId = tx.reimbursementContactId || (tx.type === 'loan' ? tx.toAccountId : undefined);
+        if (contactId && reimbursements[contactId] !== undefined) {
+          const refunded = childRefundsMap[tx.id] || 0;
+          const remaining = Math.max(0, Math.round((tx.amount - refunded) * 100) / 100);
+          reimbursements[contactId] += remaining;
+        }
       }
     });
 
     return reimbursements;
-  }, [contacts, archivedContacts, transactions]);
+  }, [contacts, archivedContacts, transactions, childRefundsMap]);
 
   const filteredAndSortedContacts = useMemo(() => {
     let source = currentView === 'archived' ? (archivedContacts || []) : (contacts || []);

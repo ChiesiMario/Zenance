@@ -28,7 +28,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { cn } from '@/lib/utils';
+import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { type Budget } from '@/services/db/db';
 
 export default function BudgetDetails() {
@@ -101,29 +101,28 @@ export default function BudgetDetails() {
     if (!transactions || !budget || !startDate || !endDate) return [];
 
     const categorySet = new Set(budget.categoryIds || []);
-    return transactions
-      .filter(tx => {
-        if (tx.deleted) return false;
-        if (tx.budgetId === 'none') return false;
+    const filtered = transactions.filter(tx => {
+      if (tx.deleted) return false;
+      if (tx.budgetId === 'none') return false;
 
-        // Explicitly bound to this budget
-        if (tx.budgetId === budget.id) {
-          return tx.type === 'expense' || tx.type === 'income';
-        }
+      // Explicitly bound to this budget
+      if (tx.budgetId === budget.id) {
+        return tx.type === 'expense' || tx.type === 'income';
+      }
 
-        // If explicitly bound to another budget, exclude
-        if (tx.budgetId && tx.budgetId !== 'auto') return false;
+      // If explicitly bound to another budget, exclude
+      if (tx.budgetId && tx.budgetId !== 'auto') return false;
 
-        // Auto-match for expenses: within date range and matching categories
-        return (
-          tx.type === 'expense' &&
-          categorySet.size > 0 &&
-          categorySet.has(tx.category) &&
-          tx.date >= startDate &&
-          tx.date <= endDate
-        );
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // Auto-match for expenses: within date range and matching categories
+      return (
+        tx.type === 'expense' &&
+        categorySet.size > 0 &&
+        categorySet.has(tx.category) &&
+        tx.date >= startDate &&
+        tx.date <= endDate
+      );
+    });
+    return sortTransactionsDesc(filtered);
   }, [transactions, budget, startDate, endDate]);
 
   // Total spent in active period
@@ -154,7 +153,7 @@ export default function BudgetDetails() {
     return Object.keys(groups)
       .sort((a, b) => b.localeCompare(a))
       .map(dateStr => {
-        const dayTxs = groups[dateStr];
+        const dayTxs = sortTransactionsDesc(groups[dateStr]);
         const dayTotal = dayTxs.reduce((acc, t) => {
           if (t.type === 'income') {
             return acc - t.amount;
@@ -437,17 +436,19 @@ export default function BudgetDetails() {
                         <button
                           key={tx.id}
                           onClick={() => setSelectedTransactionId(tx.id)}
-                          className="w-full flex items-center justify-between p-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
+                          className="w-full h-16 flex items-center justify-between px-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
                         >
-                          <div className="flex flex-col gap-1 min-w-0 pr-4">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-sm font-medium leading-none truncate">
-                                {category?.name || t('common.uncategorized')}
-                              </span>
+                          <div className="flex flex-col justify-center min-w-0 pr-4 overflow-hidden">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-medium leading-none truncate">
+                                  {tx.isWriteOff || (category?.name && (category.name.includes('差額吸收') || category.name.includes('差额吸收') || category.name === '抹零'))
+                                    ? t('reimbursements.writeOffCategory', '抹零')
+                                    : (category?.name || t('common.uncategorized'))}
+                                </span>
                               <ReimbursementBadge transaction={tx} />
                             </div>
                             {tx.note && (
-                              <div className="text-xs text-muted-foreground truncate">
+                              <div className="text-xs text-muted-foreground truncate mt-1">
                                 {tx.note}
                               </div>
                             )}
@@ -458,7 +459,7 @@ export default function BudgetDetails() {
                               originalCurrency={tx.originalCurrency}
                               baseCurrency={activeLedger?.baseCurrency}
                               type={tx.type === 'income' ? 'income' : 'expense'}
-                              className="text-base text-muted-foreground font-mono"
+                              className="text-base font-mono"
                             />
                           </div>
                         </button>

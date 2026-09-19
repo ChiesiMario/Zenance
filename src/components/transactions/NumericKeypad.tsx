@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { 
   Delete, 
   CalendarDays, 
@@ -10,17 +9,16 @@ import {
   Target, 
   ChevronDown, 
   Sparkles, 
-  Ban, 
   Receipt, 
-  Building2, 
-  User, 
-  X, 
-  Plus 
+  Users,
+  Ban
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
+import { toast } from '@/components/ui/toast';
+import { SplitAdvanceDialog, type SplitItem } from './SplitAdvanceDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,8 +42,10 @@ interface Props {
   budgets?: Budget[];
   reimbursementContactId?: string;
   onReimbursementContactChange?: (contactId: string | undefined) => void;
+  splits?: SplitItem[];
+  onSplitsChange?: (splits: SplitItem[]) => void;
+  currencySymbol?: string;
   contacts?: Account[];
-  onAddContact?: (name: string, type?: 'wallet' | 'contact', initialBalance?: number, currency?: string, group?: string) => Promise<Account | null>;
 }
 
 const safeEvaluate = (expr: string): string => {
@@ -75,17 +75,17 @@ export function NumericKeypad({
   type = 'expense',
   budgetId,
   onBudgetChange,
-  budgets,
+  budgets = [],
   reimbursementContactId,
   onReimbursementContactChange,
-  contacts,
-  onAddContact,
+  splits,
+  onSplitsChange,
+  currencySymbol = '¥',
+  contacts = [],
 }: Props) {
   const { t } = useTranslation();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isAddContactDialogOpen, setIsAddContactDialogOpen] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactGroup, setNewContactGroup] = useState<'organization' | 'personal'>('organization');
+  const [isSplitDialogOpen, setIsSplitDialogOpen] = useState(false);
 
   const isExpression = useMemo(() => {
     return /[+\-*/]/.test(value) && !/^[+-]?\d+(\.\d+)?$/.test(value);
@@ -142,12 +142,6 @@ export function NumericKeypad({
     return budgets?.find(b => b.id === budgetId) || null;
   }, [budgets, budgetId]);
 
-  // Match current selected reimbursement contact
-  const matchingContact = useMemo(() => {
-    if (!reimbursementContactId) return null;
-    return contacts?.find(c => c.id === reimbursementContactId) || null;
-  }, [contacts, reimbursementContactId]);
-
   // Label to display on the budget button
   const budgetDisplayLabel = useMemo(() => {
     if (matchingBudget) {
@@ -162,13 +156,29 @@ export function NumericKeypad({
     return t('add.budgetAuto', '預算：自動');
   }, [matchingBudget, type, budgetId, t]);
 
-  // Label to display on the reimbursement button
-  const reimburseDisplayLabel = useMemo(() => {
-    if (matchingContact) {
-      return matchingContact.name;
+  // 當前代付/分攤清單
+  const currentSplits = useMemo(() => {
+    if (splits && splits.length > 0) return splits;
+    if (reimbursementContactId) {
+      const amt = parseFloat(safeEvaluate(value)) || 0;
+      return [{ contactId: reimbursementContactId, amount: amt }];
     }
-    return t('add.reimburse', '報銷');
-  }, [matchingContact, t]);
+    return [];
+  }, [splits, reimbursementContactId, value]);
+
+  const isSplitActive = currentSplits.length > 0;
+
+  // 按鈕呈現的標籤
+  const reimburseDisplayLabel = useMemo(() => {
+    if (currentSplits.length === 0) {
+      return t('add.reimburse', '代付');
+    }
+    if (currentSplits.length === 1) {
+      const contact = contacts?.find(c => c.id === currentSplits[0].contactId);
+      return contact?.name || t('add.reimburse', '代付');
+    }
+    return t('add.splitCount', { count: currentSplits.length, defaultValue: `分攤（${currentSplits.length} 人）` });
+  }, [currentSplits, contacts, t]);
 
   // Available budgets filtered by selected transaction date (fallback to ongoing)
   const availableBudgets = useMemo(() => {
@@ -196,16 +206,6 @@ export function NumericKeypad({
     return budgets.filter(b => !b.deleted);
   }, [budgets, date]);
 
-  const handleCreateContact = async () => {
-    if (!newContactName.trim() || !onAddContact) return;
-    const created = await onAddContact(newContactName.trim(), 'contact', 0, undefined, newContactGroup);
-    if (created) {
-      onReimbursementContactChange?.(created.id);
-    }
-    setNewContactName('');
-    setIsAddContactDialogOpen(false);
-  };
-
   return (
     <div className="grid grid-cols-4 gap-2 w-full mx-auto max-w-[350px] h-64">
       
@@ -231,7 +231,7 @@ export function NumericKeypad({
               <div className="fixed inset-0 z-[100] flex items-center justify-center isolate">
                 {/* Full-screen Backdrop */}
                 <div 
-                  className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-200 animate-in fade-in-0" 
+                  className="absolute inset-0 bg-background/40 backdrop-blur-md transition-opacity duration-200 animate-in fade-in-0" 
                   onClick={() => setIsCalendarOpen(false)}
                   aria-hidden="true" 
                 />
@@ -392,171 +392,61 @@ export function NumericKeypad({
           </div>
         )}
 
-        {/* Button 3: Reimbursement Selector */}
-        {showReimburseButton && (
-          <div className="relative w-full h-full">
-            <DropdownMenu>
-              <DropdownMenuTrigger
+        {/* Button 3: Reimbursement / Split Selector */}
+        {showReimburseButton && (() => {
+          const currentTotalAmount = parseFloat(safeEvaluate(value)) || 0;
+          const isAmountValid = currentTotalAmount > 0;
+
+          return (
+            <div className="relative w-full h-full">
+              <button
                 type="button"
+                onClick={() => {
+                  if (!isAmountValid) {
+                    toast.show(t('alerts.enterAmountFirstForAdvance'));
+                    return;
+                  }
+                  setIsSplitDialogOpen(true);
+                }}
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl transition-colors outline-none cursor-pointer group border",
-                  matchingContact
-                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
-                    : "bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white border-transparent"
+                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl transition-all outline-none border",
+                  !isAmountValid
+                    ? "bg-white/5 text-zinc-500 opacity-40 cursor-not-allowed border-transparent"
+                    : isSplitActive
+                    ? "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer"
+                    : "bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white border-transparent cursor-pointer"
                 )}
               >
-                <Receipt className={cn("size-3.5 shrink-0 transition-colors", matchingContact ? "text-amber-400" : "text-zinc-400 group-hover:text-white")} />
+                {currentSplits.length > 1 ? (
+                  <Users className={cn("size-3.5 shrink-0", !isAmountValid ? "text-zinc-500" : "text-amber-400")} />
+                ) : (
+                  <Receipt className={cn("size-3.5 shrink-0 transition-colors", !isAmountValid ? "text-zinc-500" : isSplitActive ? "text-amber-400" : "text-zinc-400 group-hover:text-white")} />
+                )}
                 <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[65px]">
                   {reimburseDisplayLabel}
                 </span>
                 <ChevronDown className="size-3 opacity-60 shrink-0" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-56 max-h-64 overflow-y-auto">
-                <DropdownMenuItem
-                  onClick={() => onReimbursementContactChange?.(undefined)}
-                  className="flex items-center justify-between cursor-pointer py-2"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Ban className="size-4 text-zinc-400 shrink-0" />
-                    <span className="font-medium text-xs">{t('add.reimburseNone', '不需報銷')}</span>
-                  </div>
-                  {!reimbursementContactId && <Check className="size-4 shrink-0 text-foreground" />}
-                </DropdownMenuItem>
+              </button>
 
-                <DropdownMenuSeparator />
-
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-2 py-1">
-                    {t('add.reimburseTarget', '報銷對象')}
-                  </DropdownMenuLabel>
-
-                  {contacts && contacts.length > 0 ? (
-                    contacts.map(c => {
-                      const isSelected = reimbursementContactId === c.id;
-                      const isOrg = c.group === 'organization';
-                      return (
-                        <DropdownMenuItem
-                          key={c.id}
-                          onClick={() => onReimbursementContactChange?.(c.id)}
-                          className="flex items-center justify-between cursor-pointer py-2"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            {isOrg ? (
-                              <Building2 className="size-4 text-zinc-400 shrink-0" />
-                            ) : (
-                              <User className="size-4 text-zinc-400 shrink-0" />
-                            )}
-                            <div className="flex flex-col text-left min-w-0">
-                              <span className="font-medium text-xs truncate max-w-[130px]">{c.name}</span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {isOrg ? t('add.contactTypeOrganization') : t('add.contactTypePersonal')}
-                              </span>
-                            </div>
-                          </div>
-                          {isSelected && <Check className="size-4 shrink-0 text-foreground" />}
-                        </DropdownMenuItem>
-                      );
-                    })
-                  ) : (
-                    <div className="px-3 py-2 text-xs text-muted-foreground text-center">
-                      {t('contacts.noContacts', '暫無對象')}
-                    </div>
-                  )}
-                </DropdownMenuGroup>
-
-                {onAddContact && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setIsAddContactDialogOpen(true)}
-                      className="flex items-center gap-2 cursor-pointer py-2 text-primary focus:text-primary"
-                    >
-                      <Plus className="size-4 shrink-0" />
-                      <span className="font-medium text-xs">{t('add.addReimburseContact', '新增報銷對象')}</span>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Quick Add Contact Modal */}
-            {isAddContactDialogOpen && typeof document !== 'undefined' && createPortal(
-              <div className="fixed inset-0 z-[100] flex items-center justify-center isolate p-4">
-                <div
-                  className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-200 animate-in fade-in-0"
-                  onClick={() => setIsAddContactDialogOpen(false)}
-                  aria-hidden="true"
-                />
-                <div className="relative z-10 w-full max-w-xs p-5 rounded-2xl bg-card border border-border shadow-none flex flex-col gap-4 animate-in zoom-in-95 duration-200 text-card-foreground">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold tracking-tight">{t('add.addReimburseContact')}</h3>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddContactDialogOpen(false)}
-                      className="text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      <X className="size-4" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Input
-                      autoFocus
-                      placeholder={t('add.newContactPlaceholder')}
-                      value={newContactName}
-                      onChange={(e) => setNewContactName(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCreateContact()}
-                      className="text-sm"
-                    />
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={newContactGroup === 'organization' ? 'default' : 'outline'}
-                        className="flex-1 text-xs"
-                        onClick={() => setNewContactGroup('organization')}
-                      >
-                        <Building2 className="size-3.5 mr-1" />
-                        {t('add.contactTypeOrganization')}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={newContactGroup === 'personal' ? 'default' : 'outline'}
-                        className="flex-1 text-xs"
-                        onClick={() => setNewContactGroup('personal')}
-                      >
-                        <User className="size-3.5 mr-1" />
-                        {t('add.contactTypePersonal')}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAddContactDialogOpen(false)}
-                    >
-                      {t('add.cancel')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleCreateContact}
-                      disabled={!newContactName.trim()}
-                    >
-                      {t('common.confirm')}
-                    </Button>
-                  </div>
-                </div>
-              </div>,
-              document.body
-            )}
-          </div>
-        )}
+              <SplitAdvanceDialog
+                open={isSplitDialogOpen}
+                onOpenChange={setIsSplitDialogOpen}
+                totalAmount={currentTotalAmount}
+                currencySymbol={currencySymbol}
+                splits={currentSplits}
+                onConfirm={(newSplits) => {
+                  onSplitsChange?.(newSplits);
+                  if (newSplits.length === 1) {
+                    onReimbursementContactChange?.(newSplits[0].contactId);
+                  } else {
+                    onReimbursementContactChange?.(undefined);
+                  }
+                }}
+                contacts={contacts}
+              />
+            </div>
+          );
+        })()}
       </div>
 
       {/* Row 2 */}

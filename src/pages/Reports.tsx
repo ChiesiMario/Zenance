@@ -36,7 +36,8 @@ import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 
 type PeriodType = 'week' | 'month' | 'quarter' | 'year';
@@ -181,7 +182,7 @@ export default function Reports() {
       .map(item => ({
         ...item,
         percentage: total > 0 ? (item.amount / total) * 100 : 0,
-        transactions: item.transactions.sort((a, b) => b.date.localeCompare(a.date)),
+        transactions: sortTransactionsDesc(item.transactions),
       }))
       .sort((a, b) => b.amount - a.amount);
   };
@@ -379,8 +380,8 @@ export default function Reports() {
             "text-4xl sm:text-5xl font-mono tracking-tighter font-medium",
             netBalance === 0 ? "text-muted-foreground" : netBalance > 0 ? "text-emerald-500" : "text-destructive"
           )}>
-            {netBalance > 0 ? '+' : ''}
-            {currencySymbol}{netBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {netBalance < 0 ? '-' : ''}
+            {currencySymbol}{Math.abs(netBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
 
@@ -564,9 +565,13 @@ export default function Reports() {
                                   {tx.date} • {wallet?.name || ''}
                                 </span>
                               </div>
-                              <span className="text-xs font-mono text-muted-foreground shrink-0 group-hover:text-foreground font-medium">
-                                -{currencySymbol}{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </span>
+                              <AmountDisplay
+                                amount={tx.amount}
+                                originalCurrency={tx.originalCurrency}
+                                baseCurrency={baseCurrency}
+                                type="expense"
+                                className="text-xs font-mono font-medium shrink-0"
+                              />
                             </button>
                           );
                         })}
@@ -646,7 +651,7 @@ export default function Reports() {
                           {cat.percentage.toFixed(1)}%
                         </span>
                         <span className="text-sm font-mono font-medium text-emerald-500">
-                          +{currencySymbol}{cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {currencySymbol}{cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <ChevronDown className={cn(
                           "w-4 h-4 text-muted-foreground transition-transform duration-200",
@@ -686,9 +691,13 @@ export default function Reports() {
                                   {tx.date} • {wallet?.name || ''}
                                 </span>
                               </div>
-                              <span className="text-xs font-mono text-emerald-500 shrink-0 font-medium">
-                                +{currencySymbol}{tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </span>
+                              <AmountDisplay
+                                amount={tx.amount}
+                                originalCurrency={tx.originalCurrency}
+                                baseCurrency={baseCurrency}
+                                type="income"
+                                className="text-xs font-mono font-medium shrink-0"
+                              />
                             </button>
                           );
                         })}

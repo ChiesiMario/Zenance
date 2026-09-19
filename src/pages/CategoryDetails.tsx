@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useCategories } from '@/hooks/useCategories';
 import { useTransactions } from '@/hooks/useTransactions';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
+import { sortTransactionsDesc } from '@/lib/utils';
 
 export default function CategoryDetails() {
   const { id } = useParams<{ id: string }>();
@@ -23,9 +24,9 @@ export default function CategoryDetails() {
   const category = allCategories.find(c => c.id === id);
   if (!category) return <Navigate to="/settings/categories" />;
 
-  const categoryTransactions = transactions
-    ?.filter(t => !t.deleted && t.category === id)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
+  const categoryTransactions = sortTransactionsDesc(
+    transactions?.filter(t => !t.deleted && t.category === id) || []
+  );
 
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-4">

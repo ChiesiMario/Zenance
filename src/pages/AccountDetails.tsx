@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
@@ -60,7 +60,8 @@ export default function AccountDetails() {
   }
 
   const accountTransactions = useMemo(() => {
-    return transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
+    const list = transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id) || [];
+    return sortTransactionsDesc(list);
   }, [transactions, id]);
 
   const hasTransactions = accountTransactions.length > 0;

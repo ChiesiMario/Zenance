@@ -5,12 +5,11 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft, Receipt } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { SettleReimbursementDialog } from '@/components/contacts/SettleReimbursementDialog';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
@@ -55,10 +54,22 @@ export default function ContactDetails() {
   // 1. Where accountId or toAccountId is the contact (loans & transfers)
   // 2. Where reimbursementContactId is the contact (reimbursements & refunds)
   const contactTransactions = useMemo(() => {
-    return transactions?.filter(tx => 
+    const list = transactions?.filter(tx => 
       !tx.deleted && (tx.accountId === id || tx.toAccountId === id || tx.reimbursementContactId === id)
-    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) || [];
+    ) || [];
+    return sortTransactionsDesc(list);
   }, [transactions, id]);
+
+  // 建立 parentId -> 子回款總額 map
+  const childRefundsMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions?.forEach(t => {
+      if (!t.deleted && t.parentId && t.type === 'income') {
+        map[t.parentId] = (map[t.parentId] || 0) + t.amount;
+      }
+    });
+    return map;
+  }, [transactions]);
 
   const {
     totalLent,
@@ -72,10 +83,29 @@ export default function ContactDetails() {
     let borrowed = 0;
     let pendingReimb = 0;
     let settledReimb = 0;
-    const pendingList: typeof contactTransactions = [];
+    const pendingList: (typeof contactTransactions[0] & { remainingAmount?: number })[] = [];
     
     contactTransactions.forEach(tx => {
-      if (tx.type === 'transfer' || tx.type === 'loan') {
+      const isAdvance = (tx.reimbursementContactId === id || tx.toAccountId === id) && !!tx.reimbursementStatus;
+
+      if (isAdvance) {
+        lent += tx.amount;
+        const refunded = childRefundsMap[tx.id] || 0;
+        const remaining = Math.max(0, Math.round((tx.amount - refunded) * 100) / 100);
+
+        if (tx.reimbursementStatus === 'pending') {
+          if (remaining > 0) {
+            pendingReimb += remaining;
+            pendingList.push({
+              ...tx,
+              remainingAmount: remaining,
+            });
+          }
+          settledReimb += refunded;
+        } else if (tx.reimbursementStatus === 'reimbursed') {
+          settledReimb += tx.amount;
+        }
+      } else if (tx.type === 'transfer' || tx.type === 'loan') {
         if (tx.accountId === id) { // transfer FROM contact
           bal -= tx.amount;
           borrowed += tx.amount;
@@ -84,13 +114,6 @@ export default function ContactDetails() {
           bal += tx.amount;
           lent += tx.amount;
         }
-      } else if (tx.reimbursementContactId === id && tx.type === 'expense') {
-        if (tx.reimbursementStatus === 'pending') {
-          pendingReimb += tx.amount;
-          pendingList.push(tx);
-        } else if (tx.reimbursementStatus === 'reimbursed') {
-          settledReimb += tx.amount;
-        }
       }
     });
 
@@ -98,12 +121,12 @@ export default function ContactDetails() {
       loanBalance: bal,
       totalLent: lent,
       totalBorrowed: borrowed,
-      pendingReimbursement: pendingReimb,
-      totalReimbursed: settledReimb,
-      netBalance: bal + pendingReimb,
+      pendingReimbursement: Math.round(pendingReimb * 100) / 100,
+      totalReimbursed: Math.round(settledReimb * 100) / 100,
+      netBalance: Math.round((bal + pendingReimb) * 100) / 100,
       pendingTxs: pendingList,
     };
-  }, [contactTransactions, id]);
+  }, [contactTransactions, childRefundsMap, id]);
 
   const handleUpdate = async () => {
     if (!editName.trim() || !id) return;
@@ -139,7 +162,15 @@ export default function ContactDetails() {
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2 className="text-xl font-semibold tracking-tight truncate px-2">{contact?.name}</h2>
-        <div className="w-8"></div>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setIsEditDialogOpen(true)} 
+          className="h-8 w-8 -mr-2 text-muted-foreground hover:text-foreground cursor-pointer"
+          title={t('contacts.editContact', 'Edit Contact')}
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Net Balance & Metrics Card */}
@@ -148,29 +179,23 @@ export default function ContactDetails() {
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
             {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
           </p>
-          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", netBalance === 0 ? 'text-muted-foreground' : netBalance > 0 ? 'text-emerald-500' : 'text-destructive')}>
+          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", netBalance === 0 ? 'text-muted-foreground/50' : netBalance > 0 ? 'text-foreground' : 'text-muted-foreground')}>
             <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
           </div>
         </div>
 
-        {/* 3-Column Metrics Breakdown */}
-        <div className="grid grid-cols-3 gap-px bg-border">
+        {/* 2-Column Metrics Breakdown */}
+        <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
-            <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground truncate">
+            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalLent === 0 ? "text-muted-foreground/50" : "text-foreground")}>
               <AmountDisplay amount={totalLent} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
             </p>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
-            <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground truncate">
+            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalBorrowed === 0 ? "text-muted-foreground/50" : "text-foreground")}>
               <AmountDisplay amount={totalBorrowed} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
-            </p>
-          </div>
-          <div className="bg-card p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.pendingReimbursement', '待報銷')}</p>
-            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", pendingReimbursement > 0 ? "text-amber-500" : "text-foreground")}>
-              <AmountDisplay amount={pendingReimbursement} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
             </p>
           </div>
         </div>
@@ -178,13 +203,6 @@ export default function ContactDetails() {
 
       {/* Quick Action Toolbar */}
       <div className="flex border border-border rounded-lg overflow-hidden bg-card text-card-foreground divide-x divide-border shadow-none">
-        <button 
-          onClick={() => setIsEditDialogOpen(true)}
-          className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
-        >
-          <Edit className="h-4 w-4 text-muted-foreground" />
-          <span>{t('contacts.editContact', 'Edit Contact')}</span>
-        </button>
         <button 
           onClick={() => id && openAddModal('loan', 'lend', id)}
           className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
@@ -202,9 +220,9 @@ export default function ContactDetails() {
         {pendingReimbursement > 0 && (
           <button 
             onClick={() => setIsSettleOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors text-amber-500 hover:text-amber-400 cursor-pointer"
+            className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
           >
-            <Receipt className="h-4 w-4 text-amber-500" />
+            <Receipt className="h-4 w-4 text-muted-foreground" />
             <span>{t('reimbursements.settleReimbursement', '結算回款')}</span>
           </button>
         )}
@@ -228,59 +246,86 @@ export default function ContactDetails() {
 
       {/* Edit Contact Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[350px] overflow-hidden">
+        <DialogContent className="sm:max-w-[350px]">
           <DialogHeader>
             <DialogTitle className="text-center">{t('contacts.editContact', 'Edit Contact')}</DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-6">
-            <div className="space-y-1">
-              <label className="block text-sm font-medium">{t('contacts.contactName')}</label>
-              <Input 
+
+          <div className="py-2 space-y-5">
+            {/* 無邊界大字體名稱輸入區 */}
+            <div className="flex flex-col items-center justify-center pt-2 pb-1">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
+                {t('contacts.contactName')}
+              </span>
+              <input 
+                type="text"
+                autoFocus
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUpdate()}
+                onKeyDown={(e) => e.key === 'Enter' && editName.trim() && handleUpdate()}
+                placeholder={t('contacts.namePlaceholder')}
+                className="w-full text-center text-3xl font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/40"
               />
             </div>
             
-            <div className="space-y-1">
-              <label className="block text-sm font-medium">{t('contacts.category')}</label>
-              <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="personal">{t('contacts.groupPersonal')}</SelectItem>
-                  <SelectItem value="organization">{t('contacts.groupOrganization')}</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Vercel Usage 風格屬性清單卡片 */}
+            <div className="rounded-lg border border-border divide-y divide-border bg-card overflow-hidden">
+              <div className="flex items-center justify-between p-3">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                  {t('contacts.category')}
+                </span>
+                <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
+                  <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-medium justify-end gap-1.5 cursor-pointer">
+                    <SelectValue className="flex-none text-right">
+                      {editGroup === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="personal">{t('contacts.groupPersonal')}</SelectItem>
+                    <SelectItem value="organization">{t('contacts.groupOrganization')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {deleteError && (
-              <div className="text-xs text-destructive bg-destructive/10 p-3 rounded-md">
+              <div className="text-xs text-destructive bg-destructive/10 p-2.5 rounded-md text-center">
                 {deleteError}
               </div>
             )}
             
-            <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full justify-center text-muted-foreground hover:text-foreground cursor-pointer" onClick={handleArchive}>
-                <ArchiveRestore className="mr-2 h-4 w-4" />
-                {t('contacts.archiveContact', 'Archive Contact')}
-              </Button>
-              <Button disabled={contactTransactions.length > 0} variant="outline" className="w-full justify-center text-destructive hover:text-destructive hover:bg-destructive/10 cursor-pointer" onClick={handleDelete}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('contacts.deleteContact', 'Delete Contact')}
-              </Button>
+            {/* 幽靈輔助操作（歸檔 · 刪除） */}
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleArchive}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <ArchiveRestore className="h-3.5 w-3.5" />
+                <span>{contact?.archived ? t('contacts.unarchiveContact') : t('contacts.archiveContact')}</span>
+              </button>
+              
+              <span className="text-border select-none">·</span>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={contactTransactions.length > 0}
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>{t('contacts.deleteContact')}</span>
+              </button>
             </div>
             
             {contactTransactions.length > 0 && (
-              <div className="text-center !mt-3">
-                <p className="text-[11px] text-muted-foreground leading-tight">
-                  {t('contacts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.')}
-                </p>
-              </div>
+              <p className="text-[11px] text-muted-foreground text-center leading-normal px-2">
+                {t('contacts.cannotDeleteHasTransactions')}
+              </p>
             )}
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="grid grid-cols-2 gap-2 sm:gap-2 pt-2">
             <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
               {t('common.cancel')}
             </DialogClose>

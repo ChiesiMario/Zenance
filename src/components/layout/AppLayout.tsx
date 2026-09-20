@@ -103,7 +103,7 @@ export function AppLayout() {
                   >
                     <Icon className="size-6 transition-transform duration-300" strokeWidth={1.5} />
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="center" className="mb-4 w-max bg-card text-card-foreground border border-border ring-0 shadow-none rounded-lg p-1.5">
+                  <DropdownMenuContent align="center" className="mb-4 w-max bg-card text-card-foreground border border-border shadow-none rounded-xl p-1.5">
                     <div className="flex flex-row items-center gap-1">
                       <DropdownMenuItem onClick={() => handleOpenAddModal('expense')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
                         <ArrowUpRight className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />

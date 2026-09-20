@@ -8,7 +8,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, X, ArrowRight, ArrowRightLeft, Wallet, Zap } from 'lucide-react';
+import { Plus, X, ArrowRight, ArrowRightLeft, Zap } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
@@ -582,87 +582,89 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
       <DialogContent
         commandDeck
         showCloseButton={false}
-        className="gap-3 sm:gap-3.5 flex flex-col justify-between select-none"
+        className="select-none min-h-0"
         aria-describedby={undefined}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{transactionToEditId ? t('dashboard.edit', '編輯') : t('nav.add')}</DialogTitle>
         </DialogHeader>
 
-        {/* 1. Top Bar: Segmented Control & Close Button */}
-        <div className="w-full flex items-center justify-between gap-2 shrink-0">
-          <div className="flex-1 bg-muted/80 border border-border p-1 rounded-full flex items-center justify-between text-xs font-medium">
-            <button 
+        {/* Scrollable Content Wrapper to prevent squashing and ensure scrolling below minimum threshold */}
+        <div className="w-full min-h-full flex flex-col justify-between gap-3 sm:gap-3.5">
+          {/* 1. Top Bar: Segmented Control & Close Button */}
+          <div className="w-full flex items-center justify-between gap-2 shrink-0">
+            <div className="flex-1 bg-muted/80 border border-border p-1 rounded-full flex items-center justify-between text-[13px] font-medium">
+              <button 
+                type="button"
+                onClick={() => handleTypeChange('expense')}
+                className={cn(
+                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  type === 'expense' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t('add.expense')}
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleTypeChange('income')}
+                className={cn(
+                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  type === 'income' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t('add.income')}
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  if (walletCount < 2) {
+                    toast.show(t('alerts.transferNeedsTwoAccounts'));
+                    return;
+                  }
+                  handleTypeChange('transfer');
+                }}
+                className={cn(
+                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed",
+                  type === 'transfer' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t('add.transfer')}
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleTypeChange('loan', 'lend')}
+                className={cn(
+                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  type === 'loan' && loanType === 'lend' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t('add.lend')}
+              </button>
+              <button 
+                type="button"
+                onClick={() => handleTypeChange('loan', 'borrow')}
+                className={cn(
+                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  type === 'loan' && loanType === 'borrow' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t('add.borrow')}
+              </button>
+            </div>
+
+            <button
               type="button"
-              onClick={() => handleTypeChange('expense')}
-              className={cn(
-                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
-                type === 'expense' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
-              )}
+              onClick={onClose}
+              className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
+              aria-label="Close"
             >
-              {t('add.expense')}
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleTypeChange('income')}
-              className={cn(
-                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
-                type === 'income' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t('add.income')}
-            </button>
-            <button 
-              type="button"
-              onClick={() => {
-                if (walletCount < 2) {
-                  toast.show(t('alerts.transferNeedsTwoAccounts'));
-                  return;
-                }
-                handleTypeChange('transfer');
-              }}
-              className={cn(
-                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
-                walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed",
-                type === 'transfer' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t('add.transfer')}
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleTypeChange('loan', 'lend')}
-              className={cn(
-                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
-                type === 'loan' && loanType === 'lend' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t('add.lend')}
-            </button>
-            <button 
-              type="button"
-              onClick={() => handleTypeChange('loan', 'borrow')}
-              className={cn(
-                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
-                type === 'loan' && loanType === 'borrow' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t('add.borrow')}
+              <X className="w-4.5 h-4.5" />
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 2. Hero Section: Account Badge / Flow Bar + Monospace Amount */}
-        <div className="w-full flex flex-col items-center justify-center py-1">
+          {/* 2. Hero Section: Account Badge / Flow Bar + Monospace Amount */}
+          <div className="w-full flex-1 min-h-[96px] shrink-0 flex flex-col items-center justify-center py-2 sm:py-3">
           {/* Account Badge for Expense / Income */}
           {(type === 'expense' || type === 'income') && (
             <div className="mb-1.5 flex justify-center">
@@ -682,27 +684,30 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
             </div>
           )}
 
-          {/* Dual-Node Flow Deck for Transfer */}
+          {/* Dual Standalone Cards with Overlapping Swap Button for Transfer */}
           {type === 'transfer' && (
-            <div className="w-full rounded-2xl bg-muted/40 border border-border p-2.5 flex items-center justify-between gap-2 mb-2">
+            <div className="relative w-full flex items-stretch gap-2 mb-2">
+              {/* Left Card: 轉出 (FROM) */}
               <div className="flex-1 min-w-0">
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
-                  {t('add.fromAccount', '轉出帳戶')}
-                </span>
-                <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
-                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-start shadow-none">
-                    <div className="flex items-center justify-start gap-2 min-w-0 pl-1">
-                      <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                        <Wallet className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="flex flex-col items-start text-left min-w-0">
-                        <span className="text-xs font-semibold truncate max-w-[85px]">
-                          {accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account')}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground font-normal">
-                          {selectedCurrency}
-                        </span>
-                      </div>
+                <Select
+                  value={selectedFromAccountId || undefined}
+                  onValueChange={(val) => setValue('fromAccountId', val as string)}
+                >
+                  <SelectTrigger
+                    size="custom"
+                    hideIcon
+                    className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+                  >
+                    <div className="w-full flex items-center justify-between gap-1 mb-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('add.transferFrom', '轉出 (FROM)')}
+                      </span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    </div>
+                    <div className="w-full min-w-0 pr-3">
+                      <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
+                        {accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account')}
+                      </span>
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-popover border border-border text-popover-foreground">
@@ -715,35 +720,41 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                 </Select>
               </div>
 
-              <div className="relative shrink-0 flex items-center justify-center pt-3.5">
+              {/* Center Overlap Swap Button */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
                 <button
                   type="button"
-                  onClick={handleSwapTransferAccounts}
-                  className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSwapTransferAccounts();
+                  }}
+                  className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
                   title={t('add.swapAccounts', '對調帳戶')}
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              <div className="flex-1 min-w-0 text-right">
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
-                  {t('add.toAccount', '轉入帳戶')}
-                </span>
-                <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
-                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-end shadow-none">
-                    <div className="flex items-center justify-end gap-2 min-w-0 pr-1">
-                      <div className="flex flex-col items-end text-right min-w-0">
-                        <span className="text-xs font-semibold truncate max-w-[85px]">
-                          {accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account')}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground font-normal">
-                          {selectedToCurrency}
-                        </span>
-                      </div>
-                      <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-                        <Wallet className="w-3.5 h-3.5" />
-                      </div>
+              {/* Right Card: 轉入 (TO) */}
+              <div className="flex-1 min-w-0">
+                <Select
+                  value={selectedToAccountId || undefined}
+                  onValueChange={(val) => setValue('toAccountId', val as string)}
+                >
+                  <SelectTrigger
+                    size="custom"
+                    hideIcon
+                    className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+                  >
+                    <div className="w-full flex items-center justify-end gap-1 mb-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {t('add.transferTo', '轉入 (TO)')}
+                      </span>
+                    </div>
+                    <div className="w-full min-w-0 pl-3">
+                      <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
+                        {accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account')}
+                      </span>
                     </div>
                   </SelectTrigger>
                   <SelectContent className="bg-popover border border-border text-popover-foreground">
@@ -758,154 +769,160 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
             </div>
           )}
 
-          {/* Dual-Node Flow Deck for Loan (Lend / Borrow) */}
+          {/* Dual Standalone Cards with Overlapping Toggle Button for Loan */}
           {type === 'loan' && (
-            <div className="w-full rounded-2xl bg-muted/40 border border-border p-2.5 flex items-center justify-between gap-2 mb-2">
-              
-              {/* Left Node: Wallet (if lend) OR Contact Avatar (if borrow) */}
-              <div className="flex-1 min-w-0">
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
-                  {loanType === 'lend' ? t('add.fromWallet', '出款錢包') : t('add.lender', '借款來源')}
-                </span>
-                <Select
-                  value={selectedFromAccountId || undefined}
-                  onValueChange={(val) => setValue('fromAccountId', val as string)}
-                >
-                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-start shadow-none">
-                    <div className="flex items-center justify-start gap-2 min-w-0 pl-1">
-                      {loanType === 'lend' ? (
-                        <>
-                          <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-                            <Wallet className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="flex flex-col items-start text-left min-w-0">
-                            <span className="text-xs font-semibold truncate max-w-[85px]">
-                              {accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account')}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-normal">
-                              {selectedCurrency}
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-7 h-7 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-600 dark:text-purple-400 shrink-0 select-none">
-                            {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
-                          </div>
-                          <div className="flex flex-col items-start text-left min-w-0">
-                            <span className="text-xs font-semibold truncate max-w-[85px]">
-                              {loanContact?.name || t('add.contact')}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-normal">
-                              {loanContact?.group === 'organization' ? t('contacts.groupOrganization', '機構') : t('contacts.groupPersonal', '個人')}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border border-border text-popover-foreground">
-                    {(loanType === 'lend' ? accounts : contacts)?.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id} className="py-2 cursor-pointer">
-                        {loanType === 'lend' ? (
-                          <span>{acc.name} ({acc.currency || baseCurrency})</span>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-[10px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
-                              {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
-                            </div>
-                            <div className="flex flex-col text-left">
-                              <span className="text-xs font-semibold">{acc.name}</span>
-                              <span className="text-[9px] text-muted-foreground">
-                                {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="w-full flex flex-col gap-1.5 mb-2">
+              {/* Top Avatars Row: "Me" vs "Contact" */}
+              <div className="w-full flex items-center justify-between px-0.5">
+                {/* Left Avatar: "Me" if lend, "Contact" if borrow */}
+                {loanType === 'lend' ? (
+                  <div 
+                    className="w-9 h-9 rounded-full bg-foreground text-background border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                    title={t('add.me')}
+                  >
+                    {t('add.me')}
+                  </div>
+                ) : (
+                  <div 
+                    className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                    title={loanContact?.name || t('add.contact')}
+                  >
+                    {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
+                  </div>
+                )}
+
+                {/* Right Avatar: "Contact" if lend, "Me" if borrow */}
+                {loanType === 'lend' ? (
+                  <div 
+                    className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                    title={loanContact?.name || t('add.contact')}
+                  >
+                    {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
+                  </div>
+                ) : (
+                  <div 
+                    className="w-9 h-9 rounded-full bg-foreground text-background border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                    title={t('add.me')}
+                  >
+                    {t('add.me')}
+                  </div>
+                )}
               </div>
 
-              {/* Center Interchange Anchor */}
-              <div className="relative shrink-0 flex items-center justify-center pt-3.5">
-                <button
-                  type="button"
-                  onClick={toggleLoanType}
-                  className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
-                  title={loanType === 'lend' ? t('add.lend') : t('add.borrow')}
-                >
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Right Node: Contact Avatar (if lend) OR Wallet (if borrow) */}
-              <div className="flex-1 min-w-0 text-right">
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
-                  {loanType === 'lend' ? t('add.borrower', '借款對象') : t('add.toWallet', '入款錢包')}
-                </span>
-                <Select
-                  value={selectedToAccountId || undefined}
-                  onValueChange={(val) => setValue('toAccountId', val as string)}
-                >
-                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-end shadow-none">
-                    <div className="flex items-center justify-end gap-2 min-w-0 pr-1">
-                      {loanType === 'lend' ? (
-                        <>
-                          <div className="flex flex-col items-end text-right min-w-0">
-                            <span className="text-xs font-semibold truncate max-w-[85px]">
-                              {loanContact?.name || t('add.contact')}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-normal">
-                              {loanContact?.group === 'organization' ? t('contacts.groupOrganization', '機構') : t('contacts.groupPersonal', '個人')}
-                            </span>
-                          </div>
-                          <div className="w-7 h-7 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0 select-none">
-                            {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex flex-col items-end text-right min-w-0">
-                            <span className="text-xs font-semibold truncate max-w-[85px]">
-                              {accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account')}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-normal">
-                              {selectedToCurrency}
-                            </span>
-                          </div>
-                          <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-                            <Wallet className="w-3.5 h-3.5" />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border border-border text-popover-foreground">
-                    {(loanType === 'lend' ? contacts : accounts)?.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id} className="py-2 cursor-pointer">
-                        {loanType === 'lend' ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
-                              {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
+              {/* Overlapping Dual Cards */}
+              <div className="relative w-full flex items-stretch gap-2">
+                {/* Left Card: Wallet (if lend) OR Contact (if borrow) */}
+                <div className="flex-1 min-w-0">
+                  <Select
+                    value={selectedFromAccountId || undefined}
+                    onValueChange={(val) => setValue('fromAccountId', val as string)}
+                  >
+                    <SelectTrigger
+                      size="custom"
+                      hideIcon
+                      className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+                    >
+                      <div className="w-full flex items-center justify-between gap-1 mb-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {loanType === 'lend' ? t('add.lendFrom', '出款 (FROM)') : t('add.borrowFrom', '借款來源 (FROM)')}
+                        </span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      </div>
+                      <div className="w-full min-w-0 pr-3">
+                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
+                          {loanType === 'lend'
+                            ? (accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account'))
+                            : (loanContact?.name || t('add.contact'))}
+                        </span>
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border border-border text-popover-foreground">
+                      {(loanType === 'lend' ? accounts : contacts)?.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id} className="py-2 cursor-pointer">
+                          {loanType === 'lend' ? (
+                            <span>{acc.name} ({acc.currency || baseCurrency})</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-[10px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
+                                {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
+                              </div>
+                              <div className="flex flex-col text-left">
+                                <span className="text-xs font-semibold">{acc.name}</span>
+                                <span className="text-[9px] text-muted-foreground">
+                                  {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex flex-col text-left">
-                              <span className="text-xs font-semibold">{acc.name}</span>
-                              <span className="text-[9px] text-muted-foreground">
-                                {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span>{acc.name} ({acc.currency || baseCurrency})</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
+                {/* Center Overlap Toggle Button */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleLoanType();
+                    }}
+                    className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                    title={loanType === 'lend' ? t('add.lend') : t('add.borrow')}
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Right Card: Contact (if lend) OR Wallet (if borrow) */}
+                <div className="flex-1 min-w-0">
+                  <Select
+                    value={selectedToAccountId || undefined}
+                    onValueChange={(val) => setValue('toAccountId', val as string)}
+                  >
+                    <SelectTrigger
+                      size="custom"
+                      hideIcon
+                      className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+                    >
+                      <div className="w-full flex items-center justify-end gap-1 mb-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {loanType === 'lend' ? t('add.lendTo', '借款對象 (TO)') : t('add.borrowTo', '入款 (TO)')}
+                        </span>
+                      </div>
+                      <div className="w-full min-w-0 pl-3">
+                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
+                          {loanType === 'lend'
+                            ? (loanContact?.name || t('add.contact'))
+                            : (accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account'))}
+                        </span>
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border border-border text-popover-foreground">
+                      {(loanType === 'lend' ? contacts : accounts)?.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id} className="py-2 cursor-pointer">
+                          {loanType === 'lend' ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
+                                {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
+                              </div>
+                              <div className="flex flex-col text-left">
+                                <span className="text-xs font-semibold">{acc.name}</span>
+                                <span className="text-[9px] text-muted-foreground">
+                                  {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span>{acc.name} ({acc.currency || baseCurrency})</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
           )}
 
@@ -947,15 +964,6 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
             </div>
           )}
 
-          {/* Loan Direction Status Pill */}
-          {type === 'loan' && (
-            <div className="mt-1 flex items-center justify-center gap-2">
-              <div className="px-2.5 py-1 rounded-full bg-muted/80 border border-border text-[11px] text-muted-foreground flex items-center gap-1.5">
-                <span className={cn("w-1.5 h-1.5 rounded-full", loanType === 'lend' ? "bg-amber-500" : "bg-purple-500")} />
-                <span>{loanType === 'lend' ? t('add.loanTypeLendDesc', '借出待收回') : t('add.loanTypeBorrowDesc', '借入待歸還')}</span>
-              </div>
-            </div>
-          )}
 
           {/* Multi-currency Exchange Rate Info */}
           {selectedCurrency !== baseCurrency && (
@@ -975,11 +983,11 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           )}
         </div>
 
-        {/* 3. Mid Section: Category Chips & Note Input */}
-        <div className="w-full flex flex-col gap-2">
+        {/* 3. Lower Control Deck: Categories + Note + Keypad with strictly uniform gap-2 (8px) */}
+        <div className="w-full flex flex-col gap-2 shrink-0 mt-auto">
           {/* Category Pills (for expense / income) */}
           {(type === 'expense' || type === 'income') && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0 w-full">
               {displayedPills.map(cat => {
                 const isSelected = selectedCategoryId === cat.id;
                 return (
@@ -1023,10 +1031,9 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
               className="w-full h-8 px-3 rounded-xl bg-muted/60 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
             />
           </div>
-        </div>
 
-        {/* 4. Bottom Section: Integrated Keypad */}
-        <div className="w-full pt-1">
+          {/* Integrated Keypad */}
+          <div className="w-full">
           <NumericKeypad 
             value={type === 'transfer' && focusedAmount === 'in' ? displayInAmount : displayAmount} 
             onChange={(val) => {
@@ -1077,6 +1084,8 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
             }}
           />
         </div>
+      </div>
+    </div>
 
         {/* Full Category Picker Dialog */}
         <Dialog open={isCatPickerOpen} onOpenChange={setIsCatPickerOpen}>

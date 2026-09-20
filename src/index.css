@@ -93,28 +93,25 @@
 @layer base {
   * {
     @apply border-border;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   html {
     font-size: 90%;
-    scrollbar-gutter: stable;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
   
-  /* Custom slim scrollbar for desktop */
+  /* Globally hide all scrollbars for an app-like experience */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/50;
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
 

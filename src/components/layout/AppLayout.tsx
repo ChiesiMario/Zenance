@@ -143,11 +143,11 @@ export function AppLayout() {
                         </DropdownMenuSubTrigger>
                         <DropdownMenuPortal>
                           <DropdownMenuSubContent sideOffset={8} className="min-w-[120px]">
-                            <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'borrow')} className="cursor-pointer">
-                              {t('add.borrow')}
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'lend')} className="cursor-pointer">
                               {t('add.lend')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'borrow')} className="cursor-pointer">
+                              {t('add.borrow')}
                             </DropdownMenuItem>
                           </DropdownMenuSubContent>
                         </DropdownMenuPortal>

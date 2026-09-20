@@ -6,12 +6,11 @@ import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft, Receipt } from 'lucide-react';
+import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
-import { SettleReimbursementDialog } from '@/components/contacts/SettleReimbursementDialog';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 
 export default function ContactDetails() {
@@ -28,7 +27,6 @@ export default function ContactDetails() {
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isSettleOpen, setIsSettleOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editGroup, setEditGroup] = useState('personal');
   const [deleteError, setDeleteError] = useState('');
@@ -40,15 +38,6 @@ export default function ContactDetails() {
       setDeleteError('');
     }
   }, [contact, isEditDialogOpen]);
-
-  if (!contact && contacts && contacts.length > 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <p>{t('contacts.contactNotFound', 'Contact not found.')}</p>
-        <Button variant="outline" onClick={() => navigate('/contacts')}>{t('common.back')}</Button>
-      </div>
-    );
-  }
 
   // Include transactions associated with this contact:
   // 1. Where accountId or toAccountId is the contact (loans & transfers)
@@ -74,9 +63,7 @@ export default function ContactDetails() {
   const {
     totalLent,
     totalBorrowed,
-    pendingReimbursement,
     netBalance,
-    pendingTxs,
   } = useMemo(() => {
     let bal = 0;
     let lent = 0;
@@ -127,6 +114,15 @@ export default function ContactDetails() {
       pendingTxs: pendingList,
     };
   }, [contactTransactions, childRefundsMap, id]);
+
+  if (!contact && contacts && contacts.length > 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <p>{t('contacts.contactNotFound', 'Contact not found.')}</p>
+        <Button variant="outline" onClick={() => navigate('/contacts')}>{t('common.back')}</Button>
+      </div>
+    );
+  }
 
   const handleUpdate = async () => {
     if (!editName.trim() || !id) return;
@@ -217,15 +213,6 @@ export default function ContactDetails() {
           <ArrowDownLeft className="h-4 w-4 text-muted-foreground" />
           <span>{t('add.borrow')}</span>
         </button>
-        {pendingReimbursement > 0 && (
-          <button 
-            onClick={() => setIsSettleOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center py-4 gap-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer"
-          >
-            <Receipt className="h-4 w-4 text-muted-foreground" />
-            <span>{t('reimbursements.settleReimbursement', '結算回款')}</span>
-          </button>
-        )}
       </div>
 
       {/* Transactions History List */}
@@ -335,20 +322,6 @@ export default function ContactDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-
-
-      {/* Settle Reimbursement Dialog */}
-      <SettleReimbursementDialog
-        open={isSettleOpen}
-        onOpenChange={setIsSettleOpen}
-        target={contact && pendingTxs.length > 0 ? {
-          contactId: contact.id,
-          contactName: contact.name,
-          transactions: pendingTxs,
-          totalAmount: pendingReimbursement,
-        } : null}
-      />
     </div>
   );
 }

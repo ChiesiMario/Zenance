@@ -47,25 +47,33 @@ function DialogContent({
   children,
   showCloseButton = true,
   container,
+  fullscreen = false,
+  commandDeck = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
   overlayClassName?: string
   container?: HTMLElement | null
+  fullscreen?: boolean
+  commandDeck?: boolean
 }) {
   return (
     <DialogPortal container={container}>
-      <DialogOverlay className={overlayClassName} />
+      <DialogOverlay className={cn(commandDeck && "bg-background/70 backdrop-blur-md", overlayClassName)} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-[60] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-xl bg-card p-6 text-sm text-card-foreground border border-border shadow-none duration-150 outline-none sm:max-w-[400px] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          fullscreen
+            ? "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background overflow-hidden outline-none duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+            : commandDeck
+            ? "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background text-foreground outline-none p-4 overflow-y-auto no-scrollbar duration-150 sm:fixed sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-[420px] sm:h-auto sm:max-h-[92vh] sm:rounded-3xl sm:bg-card sm:text-card-foreground sm:border sm:border-border sm:p-4 sm:shadow-none sm:overflow-y-auto no-scrollbar data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+            : "fixed top-1/2 left-1/2 z-[60] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-xl bg-card p-6 text-sm text-card-foreground border border-border shadow-none duration-150 outline-none sm:max-w-[400px] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
       >
         {children}
-        {showCloseButton && (
+        {showCloseButton && !fullscreen && !commandDeck && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
             render={

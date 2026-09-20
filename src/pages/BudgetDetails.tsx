@@ -14,6 +14,7 @@ import { useBudgets } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useLedgers } from '@/hooks/useLedgers';
+import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
@@ -44,6 +45,7 @@ export default function BudgetDetails() {
   }, [allCategories]);
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
+  const { wallets } = useAccounts();
 
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const budget = budgets?.find(b => b.id === id);
@@ -439,28 +441,39 @@ export default function BudgetDetails() {
                           className="w-full h-16 flex items-center justify-between px-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
                         >
                           <div className="flex flex-col justify-center min-w-0 pr-4 overflow-hidden">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-sm font-medium leading-none truncate">
-                                  {tx.isWriteOff || (category?.name && (category.name.includes('差額吸收') || category.name.includes('差额吸收') || category.name === '抹零'))
-                                    ? t('reimbursements.writeOffCategory', '抹零')
-                                    : (category?.name || t('common.uncategorized'))}
-                                </span>
+                            <div className="h-5 flex items-center gap-1.5 min-w-0">
+                              <span className="text-sm font-medium leading-none truncate">
+                                {tx.isWriteOff || (category?.name && (category.name.includes('差額吸收') || category.name.includes('差额吸收') || category.name === '抹零'))
+                                  ? t('reimbursements.writeOffCategory', '抹零')
+                                  : (category?.name || t('common.uncategorized'))}
+                              </span>
                               <ReimbursementBadge transaction={tx} />
                             </div>
                             {tx.note && (
-                              <div className="text-xs text-muted-foreground truncate mt-1">
+                              <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
                                 {tx.note}
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <AmountDisplay
-                              amount={tx.amount}
-                              originalCurrency={tx.originalCurrency}
-                              baseCurrency={activeLedger?.baseCurrency}
-                              type={tx.type === 'income' ? 'income' : 'expense'}
-                              className="text-base font-mono"
-                            />
+                          <div className="flex flex-col items-end justify-center shrink-0">
+                            <div className="h-5 flex items-center justify-end">
+                              <AmountDisplay
+                                amount={tx.amount}
+                                originalCurrency={tx.originalCurrency}
+                                baseCurrency={activeLedger?.baseCurrency}
+                                type={tx.type === 'income' ? 'income' : 'expense'}
+                                className="text-sm font-mono leading-none"
+                              />
+                            </div>
+                            {(() => {
+                              const wallet = wallets?.find(w => w.id === tx.accountId);
+                              if (!wallet?.name) return null;
+                              return (
+                                <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
+                                  {wallet.name}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </button>
                       );

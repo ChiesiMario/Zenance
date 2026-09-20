@@ -7,8 +7,8 @@ import { useCategories } from '@/hooks/useCategories';
 import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Plus, X, ArrowRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Plus, X, ArrowRight, ArrowRightLeft, Wallet, Zap } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
@@ -56,7 +56,10 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   const [loanType, setLoanType] = useState<'borrow' | 'lend'>(initialLoanType);
   const [newCatName, setNewCatName] = useState('');
   const [isCatDialogOpen, setIsCatDialogOpen] = useState(false);
+  const [isCatPickerOpen, setIsCatPickerOpen] = useState(false);
   const [customExchangeRate, setCustomExchangeRate] = useState<number | null>(null);
+  const [isFeeDialogOpen, setIsFeeDialogOpen] = useState(false);
+  const [feeInput, setFeeInput] = useState('');
   const [displayAmount, setDisplayAmount] = useState('');
   const [displayInAmount, setDisplayInAmount] = useState('');
   const [focusedAmount, setFocusedAmount] = useState<'out' | 'in'>('out');
@@ -192,7 +195,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         setLoanType(initialLoanType);
       }
     }
-  }, [isOpen, initialType, initialLoanType, transactionToEdit, baseCurrency, contacts, reset, setValue]);
+  }, [isOpen, initialType, initialLoanType, initialContactId, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue]);
 
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer' | 'loan', newLoanType?: 'borrow' | 'lend') => {
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;
@@ -208,6 +211,17 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     setLoanType(newLoanType || 'borrow');
   };
 
+  const toggleLoanType = () => {
+    const nextLoanType = loanType === 'lend' ? 'borrow' : 'lend';
+    setLoanType(nextLoanType);
+    const currentFrom = watch('fromAccountId');
+    const currentTo = watch('toAccountId');
+    if (currentFrom && currentTo) {
+      setValue('fromAccountId', currentTo);
+      setValue('toAccountId', currentFrom);
+    }
+  };
+
   const selectedCategoryId = watch('categoryId');
   const selectedAccountId = watch('accountId');
   const selectedFromAccountId = watch('fromAccountId');
@@ -217,8 +231,42 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   const selectedAccount = useMemo(() => accounts?.find(a => a.id === selectedAccountId), [accounts, selectedAccountId]);
   const selectedFromAccount = useMemo(() => accounts?.find(a => a.id === selectedFromAccountId), [accounts, selectedFromAccountId]);
   
-  const selectedCurrency = (type === 'transfer' || type === 'loan') 
-    ? (selectedFromAccount?.currency || baseCurrency) 
+  const loanWallet = useMemo(() => {
+    if (type !== 'loan') return null;
+    const walletId = loanType === 'lend' ? selectedFromAccountId : selectedToAccountId;
+    return accounts?.find(a => a.id === walletId);
+  }, [type, loanType, selectedFromAccountId, selectedToAccountId, accounts]);
+
+  const loanContact = useMemo(() => {
+    if (type !== 'loan') return null;
+    const contactId = loanType === 'lend' ? selectedToAccountId : selectedFromAccountId;
+    return contacts?.find(c => c.id === contactId) || null;
+  }, [type, loanType, selectedFromAccountId, selectedToAccountId, contacts]);
+
+  const handleConfirmFee = () => {
+    const feeVal = parseFloat(feeInput) || 0;
+    if (feeVal > 0) {
+      const parsed = parseFloat(displayAmount) || 0;
+      setDisplayInAmount(Math.max(0, parsed - feeVal).toString());
+      setIsLinked(false);
+      if (!watch('feeCategoryId')) {
+        const feeCat = categories?.find(c => c.type === 'expense' && (c.name.includes('手續費') || c.name.includes('手续费') || c.name.toLowerCase().includes('fee'))) || categories?.find(c => c.type === 'expense');
+        if (feeCat) {
+          setValue('feeCategoryId', feeCat.id);
+        }
+      }
+    } else {
+      setDisplayInAmount(displayAmount);
+      setIsLinked(true);
+      setValue('feeCategoryId', undefined);
+    }
+    setIsFeeDialogOpen(false);
+  };
+
+  const selectedCurrency = type === 'transfer'
+    ? (selectedFromAccount?.currency || baseCurrency)
+    : type === 'loan'
+    ? (loanWallet?.currency || baseCurrency)
     : (selectedAccount?.currency || baseCurrency);
   
   const selectedToCurrency = (type === 'transfer' || type === 'loan')
@@ -229,7 +277,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     setCustomExchangeRate(null);
   }, [selectedCurrency]);
 
-  const filteredCategories = categories?.filter(c => c.type === type) || [];
+  const filteredCategories = useMemo(() => categories?.filter(c => c.type === type) || [], [categories, type]);
   
   const categoryMonthlyTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -251,17 +299,40 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   }, [transactions]);
   
   const compactFormatter = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 });
-  const amountCompactFormatter = new Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 });
-
-  const typeTotal = useMemo(() => {
-    return filteredCategories.reduce((sum, cat) => sum + (categoryMonthlyTotals[cat.id] || 0), 0);
-  }, [filteredCategories, categoryMonthlyTotals]);
 
   const parsedAmount = parseFloat(displayAmount) || 0;
   const parsedInAmount = parseFloat(displayInAmount);
   const diffAmount = (type === 'transfer' && selectedCurrency === selectedToCurrency && !isNaN(parsedInAmount) && parsedInAmount > 0) 
     ? parsedAmount - parsedInAmount 
     : 0;
+
+  const frequentCategories = useMemo(() => {
+    return [...filteredCategories].sort((a, b) => {
+      const totalA = categoryMonthlyTotals[a.id] || 0;
+      const totalB = categoryMonthlyTotals[b.id] || 0;
+      return totalB - totalA;
+    });
+  }, [filteredCategories, categoryMonthlyTotals]);
+
+  const displayedPills = useMemo(() => {
+    const top = frequentCategories.slice(0, 6);
+    if (selectedCategoryId && !top.some(c => c.id === selectedCategoryId)) {
+      const activeCat = filteredCategories.find(c => c.id === selectedCategoryId);
+      if (activeCat) {
+        return [activeCat, ...top.slice(0, 5)];
+      }
+    }
+    return top;
+  }, [frequentCategories, selectedCategoryId, filteredCategories]);
+
+  const handleSwapTransferAccounts = () => {
+    const currentFrom = watch('fromAccountId');
+    const currentTo = watch('toAccountId');
+    if (currentFrom && currentTo) {
+      setValue('fromAccountId', currentTo);
+      setValue('toAccountId', currentFrom);
+    }
+  };
 
 
 
@@ -495,585 +566,674 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog 
+      open={isOpen} 
+      onOpenChange={(open, details) => {
+        if (!open) {
+          if (details?.reason === 'outside-press') {
+            return; // Prevent outside click from closing
+          }
+          onClose();
+        }
+      }} 
+      disablePointerDismissal={true}
+      modal="trap-focus"
+    >
       <DialogContent
+        commandDeck
         showCloseButton={false}
-        className="m-0 p-0 gap-0 overflow-hidden flex flex-col bg-background border border-border rounded-2xl w-full sm:max-w-[350px] sm:h-[700px] sm:max-h-[90vh] max-sm:w-screen max-sm:h-[100dvh] max-sm:max-w-none max-sm:rounded-none max-sm:border-none"
+        className="gap-3 sm:gap-3.5 flex flex-col justify-between select-none"
         aria-describedby={undefined}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{transactionToEditId ? t('dashboard.edit', '編輯') : t('nav.add')}</DialogTitle>
         </DialogHeader>
-        
-        {/* Sticky Top Bar with Title and Close Button */}
-        <div className="flex items-center justify-between pl-4 pr-3 py-3 sticky top-0 bg-background/80 backdrop-blur-md z-10 border-b border-border">
-          <div className="flex justify-start flex-1 overflow-hidden mr-2">
-            <div className="flex gap-1.5 overflow-x-auto no-scrollbar w-full">
-              <Button 
-                type="button"
-                variant={type === 'expense' ? 'default' : 'outline'} 
-                onClick={() => handleTypeChange('expense')}
-                size="sm"
-                className="rounded-full shrink-0"
-              >
-                {t('add.expense')}
-              </Button>
-              <Button 
-                type="button"
-                variant={type === 'income' ? 'default' : 'outline'} 
-                onClick={() => handleTypeChange('income')}
-                size="sm"
-                className="rounded-full shrink-0"
-              >
-                {t('add.income')}
-              </Button>
-              <Button 
-                type="button"
-                variant={type === 'transfer' ? 'default' : 'outline'} 
-                onClick={() => {
-                  if (walletCount < 2) {
-                    toast.show(t('alerts.transferNeedsTwoAccounts'));
-                    return;
-                  }
-                  handleTypeChange('transfer');
-                }}
-                size="sm"
-                className={cn(
-                  "rounded-full shrink-0",
-                  walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed"
-                )}
-              >
-                {t('add.transfer')}
-              </Button>
-              <Button 
-                type="button"
-                variant={type === 'loan' && loanType === 'borrow' ? 'default' : 'outline'} 
-                onClick={() => handleTypeChange('loan', 'borrow')}
-                size="sm"
-                className="rounded-full shrink-0"
-              >
-                {t('add.borrow')}
-              </Button>
-              <Button 
-                type="button"
-                variant={type === 'loan' && loanType === 'lend' ? 'default' : 'outline'} 
-                onClick={() => handleTypeChange('loan', 'lend')}
-                size="sm"
-                className="rounded-full shrink-0"
-              >
-                {t('add.lend')}
-              </Button>
-            </div>
+
+        {/* 1. Top Bar: Segmented Control & Close Button */}
+        <div className="w-full flex items-center justify-between gap-2 shrink-0">
+          <div className="flex-1 bg-muted/80 border border-border p-1 rounded-full flex items-center justify-between text-xs font-medium">
+            <button 
+              type="button"
+              onClick={() => handleTypeChange('expense')}
+              className={cn(
+                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
+                type === 'expense' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t('add.expense')}
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleTypeChange('income')}
+              className={cn(
+                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
+                type === 'income' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t('add.income')}
+            </button>
+            <button 
+              type="button"
+              onClick={() => {
+                if (walletCount < 2) {
+                  toast.show(t('alerts.transferNeedsTwoAccounts'));
+                  return;
+                }
+                handleTypeChange('transfer');
+              }}
+              className={cn(
+                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
+                walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed",
+                type === 'transfer' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t('add.transfer')}
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleTypeChange('loan', 'lend')}
+              className={cn(
+                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
+                type === 'loan' && loanType === 'lend' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t('add.lend')}
+            </button>
+            <button 
+              type="button"
+              onClick={() => handleTypeChange('loan', 'borrow')}
+              className={cn(
+                "flex-1 py-1 rounded-full text-center transition-all cursor-pointer",
+                type === 'loan' && loanType === 'borrow' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {t('add.borrow')}
+            </button>
           </div>
-          
-          <DialogClose className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
-            <X className="w-5 h-5" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Main scrollable area */}
-        <div className="flex-1 w-full max-w-xl mx-auto px-5 pt-2 pb-4 overflow-y-auto no-scrollbar flex flex-col animate-in fade-in duration-500">
-
-
-
-      <form onSubmit={handleSubmit(onSubmit)} className="my-auto w-full space-y-8 flex flex-col items-center">
-        
-
-
-        {/* List-style Settings */}
-        <div className="w-full rounded-lg bg-card text-card-foreground overflow-hidden">
-          
+        {/* 2. Hero Section: Account Badge / Flow Bar + Monospace Amount */}
+        <div className="w-full flex flex-col items-center justify-center py-1">
+          {/* Account Badge for Expense / Income */}
           {(type === 'expense' || type === 'income') && (
-            <>
-
-              {/* Category Selection */}
-              <div className="p-4">
-                <div className="grid grid-cols-4 grid-flow-row-dense gap-2 sm:gap-3">
-                  {filteredCategories.map(cat => {
-                    const isSelected = selectedCategoryId === cat.id;
-                    const total = categoryMonthlyTotals[cat.id] || 0;
-                    
-                    let colSpanClass = "col-span-1";
-                    if (typeTotal > 0) {
-                      const percentage = total / typeTotal;
-                      if (percentage >= 0.5) colSpanClass = "col-span-3";
-                      else if (percentage >= 0.1) colSpanClass = "col-span-2";
-                    }
-
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        className={cn(
-                          colSpanClass,
-                          "w-full flex flex-col items-center justify-center gap-0.5 h-[50px] py-1.5 px-1 rounded-2xl border transition-all duration-200",
-                          isSelected 
-                            ? "bg-primary text-primary-foreground border-primary scale-95 shadow-sm" 
-                            : "bg-transparent border-border hover:bg-muted text-muted-foreground hover:text-foreground"
-                        )}
-                        onClick={() => setValue('categoryId', cat.id)}
-                      >
-                        <div className="animate-marquee-pause text-center w-full">
-                          <span className="text-[10px] sm:text-xs font-medium">
-                            {cat.name}
-                          </span>
-                        </div>
-                        <div className={cn("px-2 py-0.5 h-5 rounded-full flex items-center justify-center overflow-hidden", isSelected ? "bg-primary-foreground/20" : "bg-muted")}>
-                           <span className="text-[9px] font-mono font-medium truncate">
-                             {total > 0 ? `${currencySymbol}${compactFormatter.format(total)}` : '-'}
-                           </span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                  <Dialog open={isCatDialogOpen} onOpenChange={setIsCatDialogOpen}>
-                    <DialogTrigger render={<button type="button" className="w-full flex flex-col items-center justify-center gap-0.5 h-[50px] py-1.5 px-1 rounded-2xl border border-dashed border-border hover:bg-muted text-muted-foreground transition-all duration-200" />}>
-                      <span className="text-[10px] sm:text-xs font-medium truncate w-full text-center">
-                        {t('add.addCategory')}
-                      </span>
-                      <div className="px-2 py-0.5 h-5 rounded-full flex items-center justify-center overflow-hidden bg-muted">
-                        <Plus className="w-3 h-3" />
-                      </div>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[300px]">
-                      <DialogHeader>
-                        <DialogTitle>{type === 'expense' ? t('add.addExpenseCategory') : t('add.addIncomeCategory')}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-1">
-                        <Input 
-                          placeholder={t('add.newCategoryPlaceholder')}
-                          value={newCatName}
-                          onChange={(e) => setNewCatName(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                          autoFocus
-                        />
-                      </div>
-                      <DialogFooter>
-                        <DialogClose render={<Button variant="outline" type="button" />}>
-                          {t('add.cancel')}
-                        </DialogClose>
-                        <Button type="button" onClick={handleAddCategory} disabled={!newCatName.trim()}>
-                          {t('add.addCategory')}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                {errors.categoryId && <p className="text-sm font-medium text-destructive mt-3">{errors.categoryId.message}</p>}
-              </div>
-            </>
+            <div className="mb-1.5 flex justify-center">
+              <Select value={selectedAccountId ?? undefined} onValueChange={(val) => setValue('accountId', val ?? undefined)}>
+                <SelectTrigger className="h-7 px-3 py-0 rounded-full bg-muted/80 border border-border text-xs text-foreground hover:bg-muted transition-colors cursor-pointer inline-flex items-center gap-1.5 w-auto">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  <SelectValue placeholder={t('add.account')}>
+                    {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-popover border border-border text-popover-foreground">
+                  {accounts?.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
+          {/* Dual-Node Flow Deck for Transfer */}
           {type === 'transfer' && (
-            <>
-              <div className="py-4 px-2">
-                <div className="flex gap-6 relative items-center justify-center">
-                  
-                  {/* Middle Arrow */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-border z-10 pointer-events-none">
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                  
-                  {/* Transfer Out Card */}
-                  <div 
-                    className={cn(
-                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
-                      focusedAmount === 'out' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
-                    )}
-                    onClick={() => setFocusedAmount('out')}
-                  >
-                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground")}>
-                      {t('add.fromAccount')}
-                    </div>
-                    
-                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
-                      <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
-                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'out' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
-                          <SelectValue placeholder={t('add.fromAccount')}>
-                            {accounts?.find(a => a.id === selectedFromAccountId)?.name}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts?.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="mt-auto w-full relative flex items-baseline justify-start">
-                      {parseFloat(displayAmount) >= 1000 && (
-                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
-                          ({amountCompactFormatter.format(parseFloat(displayAmount)).toLowerCase()})
+            <div className="w-full rounded-2xl bg-muted/40 border border-border p-2.5 flex items-center justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
+                  {t('add.fromAccount', '轉出帳戶')}
+                </span>
+                <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
+                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-start shadow-none">
+                    <div className="flex items-center justify-start gap-2 min-w-0 pl-1">
+                      <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                        <Wallet className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex flex-col items-start text-left min-w-0">
+                        <span className="text-xs font-semibold truncate max-w-[85px]">
+                          {accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account')}
                         </span>
-                      )}
-                      <span className={cn(
-                        "font-medium transition-all shrink-0", 
-                        focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground",
-                        (displayAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
-                      )}>
-                        {selectedCurrency}
-                      </span>
-                      <div className="animate-marquee-right w-full flex-1">
-                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
-                          {formatDisplayAmount(displayAmount)}
+                        <span className="text-[10px] text-muted-foreground font-normal">
+                          {selectedCurrency}
                         </span>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Transfer In Card */}
-                  <div 
-                    className={cn(
-                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
-                      focusedAmount === 'in' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
-                    )}
-                    onClick={() => {
-                      setFocusedAmount('in');
-                      setIsLinked(false);
-                    }}
-                  >
-                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground")}>
-                      {t('add.toAccount')}
-                    </div>
-                    
-                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
-                      <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
-                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'in' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
-                          <SelectValue placeholder={t('add.toAccount')}>
-                            {accounts?.find(a => a.id === selectedToAccountId)?.name}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accounts?.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="mt-auto w-full relative flex items-baseline justify-start">
-                      {parseFloat(displayInAmount) >= 1000 && (
-                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
-                          ({amountCompactFormatter.format(parseFloat(displayInAmount)).toLowerCase()})
-                        </span>
-                      )}
-                      <span className={cn(
-                        "font-medium transition-all shrink-0", 
-                        focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground",
-                        (displayInAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
-                      )}>
-                        {selectedToCurrency}
-                      </span>
-                      <div className="animate-marquee-right w-full flex-1">
-                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
-                          {formatDisplayAmount(displayInAmount)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Difference Handling for same currency transfer */}
-                {diffAmount !== 0 && (
-                  <div className="mt-4 p-3 bg-muted/30 rounded-xl border border-border animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                        {diffAmount > 0 ? t('add.transferFee', 'Transfer Fee') : t('add.transferInterest', 'Transfer Interest')}
-                      </span>
-                      <span className="text-sm font-mono font-bold text-foreground">
-                        {Math.abs(diffAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCurrency}
-                      </span>
-                    </div>
-                    <Select value={watch('feeCategoryId') || undefined} onValueChange={(val) => setValue('feeCategoryId', val ?? undefined)}>
-                      <SelectTrigger className="w-full text-xs h-9 bg-transparent border-border">
-                        <SelectValue placeholder={diffAmount > 0 ? t('add.selectExpenseCategory', 'Select Expense Category') : t('add.selectIncomeCategory', 'Select Income Category')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories?.filter(c => c.type === (diffAmount > 0 ? 'expense' : 'income')).map(cat => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.feeCategoryId && <p className="text-xs font-medium text-destructive mt-1">{errors.feeCategoryId.message}</p>}
-                  </div>
-                )}
-
-                {/* Errors */}
-                {(errors.fromAccountId || errors.toAccountId) && (
-                  <div className="flex items-start mt-4">
-                    <div className="flex-1 min-w-0">
-                      {errors.fromAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.fromAccountId.message}</p>}
-                    </div>
-                    <div className="w-10 shrink-0"></div>
-                    <div className="flex-1 min-w-0">
-                      {errors.toAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.toAccountId.message}</p>}
-                    </div>
-                  </div>
-                )}
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border text-popover-foreground">
+                    {accounts?.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
+                        {acc.name} ({acc.currency || baseCurrency})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </>
+
+              <div className="relative shrink-0 flex items-center justify-center pt-3.5">
+                <button
+                  type="button"
+                  onClick={handleSwapTransferAccounts}
+                  className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                  title={t('add.swapAccounts', '對調帳戶')}
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex-1 min-w-0 text-right">
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
+                  {t('add.toAccount', '轉入帳戶')}
+                </span>
+                <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
+                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-end shadow-none">
+                    <div className="flex items-center justify-end gap-2 min-w-0 pr-1">
+                      <div className="flex flex-col items-end text-right min-w-0">
+                        <span className="text-xs font-semibold truncate max-w-[85px]">
+                          {accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account')}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground font-normal">
+                          {selectedToCurrency}
+                        </span>
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                        <Wallet className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border text-popover-foreground">
+                    {accounts?.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
+                        {acc.name} ({acc.currency || baseCurrency})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           )}
 
+          {/* Dual-Node Flow Deck for Loan (Lend / Borrow) */}
           {type === 'loan' && (
-             <>
-              <div className="py-4 px-2">
-                <div className="flex gap-6 relative items-center justify-center">
-                  
-                  {/* Middle Arrow */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-border z-10 pointer-events-none">
-                    <ArrowRight className="w-4 h-4" />
-                  </div>
-                  
-                  {/* Loan Out Card (From) */}
-                  <div 
-                    className={cn(
-                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
-                      focusedAmount === 'out' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
-                    )}
-                    onClick={() => setFocusedAmount('out')}
-                  >
-                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground")}>
-                      {loanType === 'borrow' ? t('add.contact') : t('add.account')}
-                    </div>
-                    
-                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
-                      <Select value={selectedFromAccountId || undefined} onValueChange={(val) => setValue('fromAccountId', val as string)}>
-                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'out' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
-                          <SelectValue placeholder={loanType === 'borrow' ? t('add.contact') : t('add.account')}>
-                            {[...(contacts || []), ...(accounts || [])].find(a => a.id === selectedFromAccountId)?.name}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(loanType === 'borrow' ? contacts : accounts)?.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="mt-auto w-full relative flex items-baseline justify-start">
-                      {parseFloat(displayAmount) >= 1000 && (
-                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
-                          ({amountCompactFormatter.format(parseFloat(displayAmount)).toLowerCase()})
-                        </span>
+            <div className="w-full rounded-2xl bg-muted/40 border border-border p-2.5 flex items-center justify-between gap-2 mb-2">
+              
+              {/* Left Node: Wallet (if lend) OR Contact Avatar (if borrow) */}
+              <div className="flex-1 min-w-0">
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
+                  {loanType === 'lend' ? t('add.fromWallet', '出款錢包') : t('add.lender', '借款來源')}
+                </span>
+                <Select
+                  value={selectedFromAccountId || undefined}
+                  onValueChange={(val) => setValue('fromAccountId', val as string)}
+                >
+                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-start shadow-none">
+                    <div className="flex items-center justify-start gap-2 min-w-0 pl-1">
+                      {loanType === 'lend' ? (
+                        <>
+                          <div className="w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                            <Wallet className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex flex-col items-start text-left min-w-0">
+                            <span className="text-xs font-semibold truncate max-w-[85px]">
+                              {accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account')}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              {selectedCurrency}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-7 h-7 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-xs font-bold text-purple-600 dark:text-purple-400 shrink-0 select-none">
+                            {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <div className="flex flex-col items-start text-left min-w-0">
+                            <span className="text-xs font-semibold truncate max-w-[85px]">
+                              {loanContact?.name || t('add.contact')}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              {loanContact?.group === 'organization' ? t('contacts.groupOrganization', '機構') : t('contacts.groupPersonal', '個人')}
+                            </span>
+                          </div>
+                        </>
                       )}
-                      <span className={cn(
-                        "font-medium transition-all shrink-0", 
-                        focusedAmount === 'out' ? "text-background/70" : "text-muted-foreground",
-                        (displayAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
-                      )}>
-                        {selectedCurrency}
-                      </span>
-                      <div className="animate-marquee-right w-full flex-1">
-                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
-                          {formatDisplayAmount(displayAmount)}
-                        </span>
-                      </div>
                     </div>
-                  </div>
-
-                  {/* Loan In Card (To) */}
-                  <div 
-                    className={cn(
-                      "flex-1 min-w-0 h-36 flex flex-col p-3 rounded-xl border transition-all cursor-pointer",
-                      focusedAmount === 'in' ? "bg-foreground text-background border-foreground shadow-md scale-[1.02]" : "border-border bg-transparent hover:bg-muted/50 text-foreground"
-                    )}
-                    onClick={() => {
-                      setFocusedAmount('in');
-                      setIsLinked(false);
-                    }}
-                  >
-                    <div className={cn("text-[10px] uppercase tracking-widest text-center mb-1", focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground")}>
-                      {loanType === 'borrow' ? t('add.account') : t('add.contact')}
-                    </div>
-                    
-                    <div onClick={(e) => e.stopPropagation()} className="mb-4">
-                      <Select value={selectedToAccountId || undefined} onValueChange={(val) => setValue('toAccountId', val as string)}>
-                        <SelectTrigger className={cn("w-full text-xs h-9 border", focusedAmount === 'in' ? "bg-background/10 text-background border-background/20" : "bg-background text-foreground border-border")}>
-                          <SelectValue placeholder={loanType === 'borrow' ? t('add.account') : t('add.contact')}>
-                            {[...(contacts || []), ...(accounts || [])].find(a => a.id === selectedToAccountId)?.name}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(loanType === 'borrow' ? accounts : contacts)?.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="mt-auto w-full relative flex items-baseline justify-start">
-                      {parseFloat(displayInAmount) >= 1000 && (
-                        <span className="absolute -top-4 right-0 text-[10px] text-muted-foreground font-medium">
-                          ({amountCompactFormatter.format(parseFloat(displayInAmount)).toLowerCase()})
-                        </span>
-                      )}
-                      <span className={cn(
-                        "font-medium transition-all shrink-0", 
-                        focusedAmount === 'in' ? "text-background/70" : "text-muted-foreground",
-                        (displayInAmount || '0').length >= 7 ? "absolute -top-2.5 left-0 text-[10px] leading-none" : "static text-[10px] mr-1"
-                      )}>
-                        {selectedToCurrency}
-                      </span>
-                      <div className="animate-marquee-right w-full flex-1">
-                        <span className="font-mono font-bold tracking-tighter pr-1 transition-all text-lg sm:text-xl">
-                          {formatDisplayAmount(displayInAmount)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Errors */}
-                {(errors.fromAccountId || errors.toAccountId) && (
-                  <div className="flex items-start mt-4">
-                    <div className="flex-1 min-w-0">
-                      {errors.fromAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.fromAccountId.message}</p>}
-                    </div>
-                    <div className="w-10 shrink-0"></div>
-                    <div className="flex-1 min-w-0">
-                      {errors.toAccountId && <p className="text-xs font-medium text-destructive text-center">{errors.toAccountId.message}</p>}
-                    </div>
-                  </div>
-                )}
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border text-popover-foreground">
+                    {(loanType === 'lend' ? accounts : contacts)?.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id} className="py-2 cursor-pointer">
+                        {loanType === 'lend' ? (
+                          <span>{acc.name} ({acc.currency || baseCurrency})</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-[10px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
+                              {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div className="flex flex-col text-left">
+                              <span className="text-xs font-semibold">{acc.name}</span>
+                              <span className="text-[9px] text-muted-foreground">
+                                {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-             </>
+
+              {/* Center Interchange Anchor */}
+              <div className="relative shrink-0 flex items-center justify-center pt-3.5">
+                <button
+                  type="button"
+                  onClick={toggleLoanType}
+                  className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                  title={loanType === 'lend' ? t('add.lend') : t('add.borrow')}
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Right Node: Contact Avatar (if lend) OR Wallet (if borrow) */}
+              <div className="flex-1 min-w-0 text-right">
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground font-semibold block mb-1">
+                  {loanType === 'lend' ? t('add.borrower', '借款對象') : t('add.toWallet', '入款錢包')}
+                </span>
+                <Select
+                  value={selectedToAccountId || undefined}
+                  onValueChange={(val) => setValue('toAccountId', val as string)}
+                >
+                  <SelectTrigger className="w-full h-11 px-2.5 py-1 bg-card border-border text-foreground hover:bg-muted/50 rounded-2xl text-xs font-semibold cursor-pointer justify-end shadow-none">
+                    <div className="flex items-center justify-end gap-2 min-w-0 pr-1">
+                      {loanType === 'lend' ? (
+                        <>
+                          <div className="flex flex-col items-end text-right min-w-0">
+                            <span className="text-xs font-semibold truncate max-w-[85px]">
+                              {loanContact?.name || t('add.contact')}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              {loanContact?.group === 'organization' ? t('contacts.groupOrganization', '機構') : t('contacts.groupPersonal', '個人')}
+                            </span>
+                          </div>
+                          <div className="w-7 h-7 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-600 dark:text-amber-400 shrink-0 select-none">
+                            {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex flex-col items-end text-right min-w-0">
+                            <span className="text-xs font-semibold truncate max-w-[85px]">
+                              {accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account')}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              {selectedToCurrency}
+                            </span>
+                          </div>
+                          <div className="w-7 h-7 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                            <Wallet className="w-3.5 h-3.5" />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border border-border text-popover-foreground">
+                    {(loanType === 'lend' ? contacts : accounts)?.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id} className="py-2 cursor-pointer">
+                        {loanType === 'lend' ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
+                              {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div className="flex flex-col text-left">
+                              <span className="text-xs font-semibold">{acc.name}</span>
+                              <span className="text-[9px] text-muted-foreground">
+                                {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span>{acc.name} ({acc.currency || baseCurrency})</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+            </div>
           )}
 
+          {/* Massive Monospace Amount Display */}
+          <div className="flex items-baseline justify-center gap-1.5 w-full py-1">
+            <span className="text-xl font-medium text-muted-foreground tracking-tight">{selectedCurrency}</span>
+            <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+              {formatDisplayAmount(displayAmount)}
+            </span>
+          </div>
 
+          {errors.amount && <p className="text-xs font-medium text-destructive mt-1">{errors.amount.message}</p>}
+          {errors.accountId && (type !== 'transfer' && type !== 'loan') && <p className="text-xs font-medium text-destructive mt-1">{errors.accountId.message}</p>}
 
-        </div>
-      </form>
-        </div>
-        
-        {/* Fixed bottom area: Amount + Keypad */}
-        <div className="w-full bg-zinc-950 p-3 pb-safe sm:rounded-b-lg sm:border-none shadow-2xl">
-          <div className="w-full mx-auto max-w-[350px] flex flex-col gap-3">
-            
-            {/* Note Row or Transfer Hint */}
-            <div className="w-full px-1">
-              {(type === 'transfer' || type === 'loan') ? (
-                <div className="w-full px-3 py-1 flex items-center justify-center text-base uppercase text-zinc-500 font-medium">
-                  {type === 'transfer' 
-                    ? (focusedAmount === 'out' ? t('add.transferOutAmount') : t('add.transferInAmount'))
-                    : (focusedAmount === 'out' ? t('add.loanOutAmount') : t('add.loanInAmount'))}
+          {/* Transfer Fee & Multi-currency Info Pills */}
+          {type === 'transfer' && (
+            <div className="mt-1 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFeeInput(diffAmount > 0 ? diffAmount.toString() : '');
+                  setIsFeeDialogOpen(true);
+                }}
+                className="px-2.5 py-1 rounded-full bg-muted/80 border border-border text-[11px] text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Zap className="w-3 h-3 text-amber-500" />
+                <span>{t('add.fee', '手續費')}：</span>
+                <span className="font-mono font-semibold text-foreground">
+                  {diffAmount > 0 ? `${diffAmount.toLocaleString()} ${selectedCurrency}` : t('add.noFee', '無手續費')}
+                </span>
+                <span className="text-[9px] opacity-60">▾</span>
+              </button>
+
+              {selectedCurrency !== selectedToCurrency && (
+                <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1">
+                  <span>1 {selectedCurrency} ≈ {getRate(selectedCurrency, selectedToCurrency).toFixed(4)} {selectedToCurrency}</span>
                 </div>
-              ) : (
-                <Input 
-                  id="note" 
-                  placeholder={t('add.note')} 
-                  value={watch('note') || ''}
-                  onChange={(e) => setValue('note', e.target.value, { shouldDirty: true })}
-                  className="w-full h-8 px-3 border border-white/10 bg-white/5 text-white shadow-none focus:outline-none focus:border-white/20 text-xs font-medium rounded-lg placeholder:text-zinc-500"
-                />
               )}
             </div>
+          )}
 
-            {/* Account, Currency & Amount Row */}
-            {(type !== 'transfer' && type !== 'loan') && (
-              <div className="w-full flex justify-between items-center px-1 mt-1 gap-2">
-                {(type === 'expense' || type === 'income') && (
-                  <div className="flex-[0.35] min-w-[80px]">
-                    <Select value={selectedAccountId ?? undefined} onValueChange={(val) => setValue('accountId', val ?? undefined)}>
-                      <SelectTrigger className="w-full h-auto px-2 py-1 border-none bg-transparent hover:bg-white/10 text-zinc-400 hover:text-white shadow-none text-xl font-medium focus:ring-0 rounded cursor-pointer transition-colors">
-                        <SelectValue placeholder={t('add.account')}>
-                          {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : undefined}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts?.map(acc => (
-                          <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="flex items-end gap-1 flex-1 overflow-hidden justify-end">
-                  <span className="text-xl font-medium text-zinc-400 pb-1">{selectedCurrency}</span>
-                  <div className="overflow-hidden whitespace-nowrap text-4xl sm:text-5xl font-mono font-bold tracking-tighter text-right text-white pr-1">
-                    {formatDisplayAmount(displayAmount)}
-                  </div>
-                </div>
+          {/* Loan Direction Status Pill */}
+          {type === 'loan' && (
+            <div className="mt-1 flex items-center justify-center gap-2">
+              <div className="px-2.5 py-1 rounded-full bg-muted/80 border border-border text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <span className={cn("w-1.5 h-1.5 rounded-full", loanType === 'lend' ? "bg-amber-500" : "bg-purple-500")} />
+                <span>{loanType === 'lend' ? t('add.loanTypeLendDesc', '借出待收回') : t('add.loanTypeBorrowDesc', '借入待歸還')}</span>
               </div>
-            )}
-            {errors.accountId && (type !== 'transfer' && type !== 'loan') && <p className="text-xs font-medium text-destructive px-2 mt-[-8px]">{errors.accountId.message}</p>}
-            
-            {errors.amount && <p className="text-sm font-medium text-destructive text-right px-2">{errors.amount.message}</p>}
+            </div>
+          )}
 
-            {/* Exchange Rate Info Area */}
-            {selectedCurrency !== baseCurrency && (
-              <div className="w-full p-3 border border-white/10 rounded-xl bg-white/5 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium uppercase tracking-widest text-zinc-400">Exchange Rate</span>
-                  <Input 
-                    type="number" 
-                    className="w-24 h-6 text-right font-mono text-sm px-1 bg-transparent border-white/10 text-white" 
-                    value={customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency).toFixed(4)}
-                    onChange={(e) => setCustomExchangeRate(parseFloat(e.target.value) || 1)}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-medium uppercase tracking-widest text-zinc-400">Base Amount ({baseCurrency})</span>
-                  <span className="font-mono font-medium text-white">
-                    {((parseFloat(displayAmount) || 0) * (customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency))).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            )}
+          {/* Multi-currency Exchange Rate Info */}
+          {selectedCurrency !== baseCurrency && (
+            <div className="w-full mt-2 p-2 border border-border rounded-xl bg-muted/40 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground text-[11px]">1 {selectedCurrency} =</span>
+              <Input 
+                type="number" 
+                className="w-20 h-6 text-right font-mono text-xs px-1 bg-transparent border-border text-foreground" 
+                value={customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency).toFixed(4)}
+                onChange={(e) => setCustomExchangeRate(parseFloat(e.target.value) || 1)}
+              />
+              <span className="text-muted-foreground text-[11px]">{baseCurrency}</span>
+              <span className="font-mono text-foreground ml-2">
+                ≈ {((parseFloat(displayAmount) || 0) * (customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency))).toLocaleString(undefined, { maximumFractionDigits: 2 })} {baseCurrency}
+              </span>
+            </div>
+          )}
+        </div>
 
-            <NumericKeypad 
-              value={(type === 'transfer' || type === 'loan') && focusedAmount === 'in' ? displayInAmount : displayAmount} 
-              onChange={(val) => {
-                if (type === 'transfer' || type === 'loan') {
-                  if (focusedAmount === 'in') {
-                    setDisplayInAmount(val);
-                    setIsLinked(false);
-                  } else {
-                    setDisplayAmount(val);
-                    if (isLinked && selectedCurrency === selectedToCurrency) {
-                      setDisplayInAmount(val);
-                    }
-                  }
-                } else {
-                  setDisplayAmount(val);
-                }
-              }} 
-              onSubmit={handleKeypadSubmit} 
-              date={selectedDate}
-              onDateChange={(val) => setValue('date', val)}
-              type={type}
-              budgetId={watch('budgetId')}
-              onBudgetChange={(bId) => setValue('budgetId', bId)}
-              budgets={budgets}
-              splits={splits}
-              onSplitsChange={(newSplits) => {
-                setSplits(newSplits);
-                setValue('reimbursementContactId', newSplits.length === 1 ? newSplits[0].contactId : undefined);
-              }}
-              currencySymbol={getCurrencySymbol(selectedCurrency)}
-              reimbursementContactId={splits.length === 1 ? splits[0].contactId : undefined}
-              onReimbursementContactChange={(cId) => {
-                setValue('reimbursementContactId', cId);
-              }}
-              contacts={contacts}
+        {/* 3. Mid Section: Category Chips & Note Input */}
+        <div className="w-full flex flex-col gap-2">
+          {/* Category Pills (for expense / income) */}
+          {(type === 'expense' || type === 'income') && (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full">
+              {displayedPills.map(cat => {
+                const isSelected = selectedCategoryId === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setValue('categoryId', cat.id)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-all cursor-pointer border",
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
+                        : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    )}
+                  >
+                    {cat.name}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setIsCatPickerOpen(true)}
+                className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 shrink-0 transition-all cursor-pointer flex items-center gap-1"
+                title={t('add.moreCategories', '更多分類')}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="text-[11px]">{t('common.more', '更多')}</span>
+              </button>
+            </div>
+          )}
+
+          {errors.categoryId && <p className="text-xs font-medium text-destructive">{errors.categoryId.message}</p>}
+
+          {/* Inline Note Input */}
+          <div className="w-full">
+            <input 
+              id="note" 
+              type="text" 
+              placeholder={t('add.note', '填寫備註...')} 
+              value={watch('note') || ''} 
+              onChange={(e) => setValue('note', e.target.value, { shouldDirty: true })} 
+              className="w-full h-8 px-3 rounded-xl bg-muted/60 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
             />
           </div>
         </div>
+
+        {/* 4. Bottom Section: Integrated Keypad */}
+        <div className="w-full pt-1">
+          <NumericKeypad 
+            value={type === 'transfer' && focusedAmount === 'in' ? displayInAmount : displayAmount} 
+            onChange={(val) => {
+              if (type === 'transfer') {
+                if (focusedAmount === 'in') {
+                  setDisplayInAmount(val);
+                  setIsLinked(false);
+                } else {
+                  setDisplayAmount(val);
+                  if (isLinked && selectedCurrency === selectedToCurrency) {
+                    setDisplayInAmount(val);
+                  }
+                }
+              } else {
+                setDisplayAmount(val);
+              }
+            }} 
+            onSubmit={handleKeypadSubmit} 
+            date={selectedDate}
+            onDateChange={(val) => setValue('date', val)}
+            type={type}
+            budgetId={watch('budgetId')}
+            onBudgetChange={(bId) => setValue('budgetId', bId)}
+            budgets={budgets}
+            splits={splits}
+            onSplitsChange={(newSplits) => {
+              setSplits(newSplits);
+              setValue('reimbursementContactId', newSplits.length === 1 ? newSplits[0].contactId : undefined);
+            }}
+            currencySymbol={getCurrencySymbol(selectedCurrency)}
+            reimbursementContactId={splits.length === 1 ? splits[0].contactId : undefined}
+            onReimbursementContactChange={(cId) => {
+              setValue('reimbursementContactId', cId);
+            }}
+            contacts={contacts}
+            onFeeClick={() => {
+              setFeeInput(diffAmount > 0 ? diffAmount.toString() : '');
+              setIsFeeDialogOpen(true);
+            }}
+            feeAmount={diffAmount}
+            loanContactName={loanContact?.name}
+            onLoanContactSelect={(cId) => {
+              if (loanType === 'lend') {
+                setValue('toAccountId', cId);
+              } else {
+                setValue('fromAccountId', cId);
+              }
+            }}
+          />
+        </div>
+
+        {/* Full Category Picker Dialog */}
+        <Dialog open={isCatPickerOpen} onOpenChange={setIsCatPickerOpen}>
+          <DialogContent className="sm:max-w-[380px] bg-card border border-border text-card-foreground p-4">
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground text-base font-semibold">
+                {type === 'expense' ? t('add.expenseCategories', '支出分類') : t('add.incomeCategories', '收入分類')}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto no-scrollbar py-2">
+              {filteredCategories.map(cat => {
+                const isSelected = selectedCategoryId === cat.id;
+                const total = categoryMonthlyTotals[cat.id] || 0;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setValue('categoryId', cat.id);
+                      setIsCatPickerOpen(false);
+                    }}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1 h-14 p-1.5 rounded-xl border text-center transition-all cursor-pointer",
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary font-semibold"
+                        : "bg-muted/60 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    )}
+                  >
+                    <span className="text-xs truncate w-full">{cat.name}</span>
+                    <span className="text-[9px] font-mono opacity-60 truncate">
+                      {total > 0 ? `${currencySymbol}${compactFormatter.format(total)}` : '-'}
+                    </span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCatPickerOpen(false);
+                  setIsCatDialogOpen(true);
+                }}
+                className="flex flex-col items-center justify-center gap-1 h-14 p-1.5 rounded-xl border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-[10px]">{t('add.addCategory')}</span>
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Custom Category Dialog */}
+        <Dialog open={isCatDialogOpen} onOpenChange={setIsCatDialogOpen}>
+          <DialogContent className="sm:max-w-[320px] bg-card border border-border text-card-foreground p-4">
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground text-base">
+                {type === 'expense' ? t('add.addExpenseCategory') : t('add.addIncomeCategory')}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <Input 
+                placeholder={t('add.newCategoryPlaceholder')}
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground"
+                autoFocus
+              />
+            </div>
+            <DialogFooter className="flex gap-2">
+              <Button 
+                variant="outline" 
+                type="button" 
+                onClick={() => setIsCatDialogOpen(false)}
+                className="border-border text-foreground hover:bg-muted"
+              >
+                {t('add.cancel')}
+              </Button>
+              <Button 
+                type="button" 
+                onClick={handleAddCategory} 
+                disabled={!newCatName.trim()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {t('add.addCategory')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Transfer Fee Settings Dialog */}
+        <Dialog open={isFeeDialogOpen} onOpenChange={setIsFeeDialogOpen}>
+          <DialogContent className="sm:max-w-[340px] bg-card border border-border text-card-foreground p-4">
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground text-base font-semibold flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span>{t('add.feeSetting', '手續費設定')}</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">
+                  {t('add.fee', '手續費')} ({selectedCurrency})
+                </label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="0.00"
+                  value={feeInput}
+                  onChange={(e) => setFeeInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmFee()}
+                  className="bg-muted/60 border-border text-foreground font-mono"
+                  autoFocus
+                />
+              </div>
+
+              {categories && (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    {t('add.category', '分類')}
+                  </label>
+                  <Select
+                    value={watch('feeCategoryId') || ''}
+                    onValueChange={(val) => setValue('feeCategoryId', val || undefined)}
+                  >
+                    <SelectTrigger className="w-full bg-muted/60 border-border text-foreground text-xs">
+                      <SelectValue placeholder={t('add.category', '分類')} />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border border-border text-popover-foreground max-h-48">
+                      {categories.filter(c => c.type === 'expense').map(cat => (
+                        <SelectItem key={cat.id} value={cat.id} className="text-xs cursor-pointer">
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setIsFeeDialogOpen(false)}
+                className="border-border text-foreground hover:bg-muted"
+              >
+                {t('common.cancel', '取消')}
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmFee}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {t('common.confirm', '確認')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

@@ -384,7 +384,7 @@ export function GroupedTransactionList({
                           renderItemLeft(tx)
                         ) : (
                           <div className="flex flex-col justify-center min-w-0 pr-3 overflow-hidden">
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="h-5 flex items-center gap-1.5 min-w-0">
                               <span className="text-sm font-medium leading-none truncate">
                                 {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income'
                                   ? t('reimbursements.reimbursementRefund', '代付回款')
@@ -414,7 +414,7 @@ export function GroupedTransactionList({
                               if (isAdj && isDefaultNote) return null;
                               if (!tx.note) return null;
                               return (
-                                <div className="text-xs text-muted-foreground truncate mt-1">
+                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
                                   {tx.note}
                                 </div>
                               );
@@ -426,94 +426,106 @@ export function GroupedTransactionList({
                         {renderItemRight ? (
                           renderItemRight(tx)
                         ) : (
-                          <div className="flex items-center gap-3 shrink-0">
-                            {contextAccountId ? (
-                              <AmountDisplay
-                                amount={
-                                  (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextAccountId
-                                    ? -tx.amount
-                                    : ((tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextAccountId
-                                        ? (tx.transferInAmount ?? tx.amount)
-                                        : tx.amount)
-                                }
-                                originalCurrency={tx.originalCurrency}
-                                baseCurrency={activeLedger?.baseCurrency}
-                                type={
-                                  (tx.type === 'transfer' || tx.type === 'loan')
-                                    ? (tx.accountId === contextAccountId ? 'expense' : 'income')
-                                    : (tx.type as any)
-                                }
-                                showSign={true}
-                                className="text-base"
-                              />
-                            ) : contextContactId ? (
-                              (() => {
-                                const isReimbExpense = tx.reimbursementContactId === contextContactId && tx.type === 'expense';
-                                const isReimbIncome = tx.reimbursementContactId === contextContactId && tx.type === 'income';
+                          <div className="flex flex-col items-end justify-center shrink-0">
+                            <div className="h-5 flex items-center justify-end">
+                              {contextAccountId ? (
+                                <AmountDisplay
+                                  amount={
+                                    (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextAccountId
+                                      ? -tx.amount
+                                      : ((tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextAccountId
+                                          ? (tx.transferInAmount ?? tx.amount)
+                                          : tx.amount)
+                                  }
+                                  originalCurrency={tx.originalCurrency}
+                                  baseCurrency={activeLedger?.baseCurrency}
+                                  type={
+                                    (tx.type === 'transfer' || tx.type === 'loan')
+                                      ? (tx.accountId === contextAccountId ? 'expense' : 'income')
+                                      : (tx.type as any)
+                                  }
+                                  showSign={true}
+                                  className="text-sm font-mono leading-none"
+                                />
+                              ) : contextContactId ? (
+                                (() => {
+                                  const isReimbExpense = tx.reimbursementContactId === contextContactId && tx.type === 'expense';
+                                  const isReimbIncome = tx.reimbursementContactId === contextContactId && tx.type === 'income';
 
-                                if (isReimbExpense) {
+                                  if (isReimbExpense) {
+                                    return (
+                                      <AmountDisplay
+                                        amount={tx.amount}
+                                        originalCurrency={tx.originalCurrency}
+                                        baseCurrency={activeLedger?.baseCurrency}
+                                        type="expense"
+                                        className="text-sm font-mono leading-none"
+                                        showSign={true}
+                                      />
+                                    );
+                                  }
+
+                                  if (isReimbIncome) {
+                                    return (
+                                      <AmountDisplay
+                                        amount={tx.amount}
+                                        originalCurrency={tx.originalCurrency}
+                                        baseCurrency={activeLedger?.baseCurrency}
+                                        type="income"
+                                        className="text-sm font-mono leading-none"
+                                        showSign={true}
+                                      />
+                                    );
+                                  }
+
+                                  const isLending = (tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextContactId;
+                                  const isBorrowing = (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextContactId;
+
                                   return (
                                     <AmountDisplay
-                                      amount={tx.amount}
+                                      amount={isLending ? -tx.amount : tx.amount}
                                       originalCurrency={tx.originalCurrency}
                                       baseCurrency={activeLedger?.baseCurrency}
-                                      type="expense"
-                                      className="text-base font-mono"
+                                      type={
+                                        isLending
+                                          ? 'expense'
+                                          : isBorrowing
+                                          ? 'income'
+                                          : (tx.type as any)
+                                      }
+                                      className="text-sm font-mono leading-none"
                                       showSign={true}
                                     />
                                   );
-                                }
+                                })()
+                              ) : (
+                                <AmountDisplay
+                                  amount={
+                                    tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId)
+                                      ? -tx.amount
+                                      : tx.amount
+                                  }
+                                  originalCurrency={tx.originalCurrency}
+                                  baseCurrency={activeLedger?.baseCurrency}
+                                  type={
+                                    tx.type === 'loan'
+                                      ? (contacts?.some(c => c.id === tx.toAccountId) ? 'expense' : 'income')
+                                      : (tx.type as any)
+                                  }
+                                  className="text-sm font-mono leading-none"
+                                />
+                              )}
+                            </div>
 
-                                if (isReimbIncome) {
-                                  return (
-                                    <AmountDisplay
-                                      amount={tx.amount}
-                                      originalCurrency={tx.originalCurrency}
-                                      baseCurrency={activeLedger?.baseCurrency}
-                                      type="income"
-                                      className="text-base font-mono"
-                                      showSign={true}
-                                    />
-                                  );
-                                }
-
-                                const isLending = (tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextContactId;
-                                const isBorrowing = (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextContactId;
-
-                                return (
-                                  <AmountDisplay
-                                    amount={isLending ? -tx.amount : tx.amount}
-                                    originalCurrency={tx.originalCurrency}
-                                    baseCurrency={activeLedger?.baseCurrency}
-                                    type={
-                                      isLending
-                                        ? 'expense'
-                                        : isBorrowing
-                                        ? 'income'
-                                        : (tx.type as any)
-                                    }
-                                    className="text-base font-mono"
-                                    showSign={true}
-                                  />
-                                );
-                              })()
-                            ) : (
-                              <AmountDisplay
-                                amount={
-                                  tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId)
-                                    ? -tx.amount
-                                    : tx.amount
-                                }
-                                originalCurrency={tx.originalCurrency}
-                                baseCurrency={activeLedger?.baseCurrency}
-                                type={
-                                  tx.type === 'loan'
-                                    ? (contacts?.some(c => c.id === tx.toAccountId) ? 'expense' : 'income')
-                                    : (tx.type as any)
-                                }
-                                className="text-base"
-                              />
-                            )}
+                            {!contextAccountId && (tx.type === 'expense' || tx.type === 'income') && (() => {
+                              const wallet = wallets?.find(w => w.id === tx.accountId);
+                              if (!wallet?.name) return null;
+                              return (
+                                <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
+                                  {wallet.name}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </button>
@@ -539,31 +551,49 @@ export function GroupedTransactionList({
                             </div>
 
                             <div className="flex flex-col justify-center min-w-0 overflow-hidden">
-                              <span className="text-sm font-medium leading-none truncate">
-                                {item.categoryName}
-                              </span>
+                              <div className="h-5 flex items-center min-w-0">
+                                <span className="text-sm font-medium leading-none truncate">
+                                  {item.categoryName}
+                                </span>
+                              </div>
 
-                              <div className="text-xs text-muted-foreground truncate mt-1">
-                                {item.note ? (
-                                  item.note
-                                ) : item.hasSelf ? (
-                                  t('add.splitSummary', { count: item.contactNames.length, defaultValue: `我和 ${item.contactNames.length} 位對象` })
-                                ) : (
-                                  t('add.splitSummaryNoSelf', { count: item.contactNames.length, defaultValue: `${item.contactNames.length} 位對象代付` })
-                                )}
-                                {item.contactNames.length > 0 && ` (${item.contactNames.join('、')})`}
+                              <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
+                                {(() => {
+                                  const participants = [
+                                    ...(item.hasSelf ? [t('add.me', '我')] : []),
+                                    ...item.contactNames,
+                                  ];
+                                  const participantsText = participants.join(t('common.listSeparator', '、'));
+
+                                  if (item.note) {
+                                    return participantsText ? `${item.note} (${participantsText})` : item.note;
+                                  }
+                                  return participantsText;
+                                })()}
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex items-center shrink-0">
-                            <AmountDisplay
-                              amount={item.totalAmount}
-                              baseCurrency={activeLedger?.baseCurrency}
-                              type="expense"
-                              showSign={true}
-                              className="text-base font-mono"
-                            />
+                          <div className="flex flex-col items-end justify-center shrink-0">
+                            <div className="h-5 flex items-center justify-end">
+                              <AmountDisplay
+                                amount={item.totalAmount}
+                                baseCurrency={activeLedger?.baseCurrency}
+                                type="expense"
+                                showSign={true}
+                                className="text-sm font-mono leading-none"
+                              />
+                            </div>
+                            {!contextAccountId && (() => {
+                              const mainTx = item.transactions.find(t => t.type === 'expense') || item.transactions[0];
+                              const wallet = wallets?.find(w => w.id === mainTx?.accountId);
+                              if (!wallet?.name) return null;
+                              return (
+                                <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
+                                  {wallet.name}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </button>
 
@@ -572,7 +602,6 @@ export function GroupedTransactionList({
                             {item.transactions.map(subTx => {
                               const isSelf = subTx.type === 'expense';
                               const targetContact = contacts?.find(c => c.id === subTx.toAccountId);
-                              const subWallet = wallets?.find(w => w.id === subTx.accountId);
 
                               return (
                                 <button
@@ -582,22 +611,11 @@ export function GroupedTransactionList({
                                   className="w-full h-12 flex items-center justify-between pl-12 pr-4 transition-colors hover:bg-muted/40 text-left group cursor-pointer"
                                 >
                                   <div className="flex items-center gap-2 min-w-0 pr-3">
-                                    <span className={cn(
-                                      "text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono shrink-0",
-                                      isSelf
-                                        ? "bg-muted text-foreground border-border"
-                                        : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                    )}>
-                                      {isSelf ? t('add.myExpense', '我的支出') : (targetContact?.name || t('add.reimburse', '代付'))}
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono shrink-0 bg-muted text-foreground border-border">
+                                      {isSelf ? t('add.myExpense', '支出') : (targetContact?.name || t('add.reimburse', '代付'))}
                                     </span>
 
                                     {!isSelf && <ReimbursementBadge transaction={subTx} />}
-
-                                    {subWallet?.name && (
-                                      <span className="text-xs text-muted-foreground truncate">
-                                        {subWallet.name}
-                                      </span>
-                                    )}
 
                                     <span className="text-[10px] font-mono text-muted-foreground/60">
                                       #{subTx.displayId || subTx.id.split('-')[0].toUpperCase()}
@@ -642,7 +660,7 @@ export function GroupedTransactionList({
                           </div>
 
                           <div className="flex flex-col justify-center min-w-0 overflow-hidden">
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="h-5 flex items-center gap-1.5 min-w-0">
                               <span className="text-sm font-medium leading-none truncate">
                                 {t('reimbursements.settlementGroupTitle', '代付回款')}
                               </span>
@@ -661,7 +679,7 @@ export function GroupedTransactionList({
                             </div>
 
                             {/* 次行備註或明細說明 */}
-                            <div className="text-xs text-muted-foreground truncate mt-1">
+                            <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
                               {item.note ? (
                                 item.note
                               ) : item.contactName ? (
@@ -674,14 +692,26 @@ export function GroupedTransactionList({
                         </div>
 
                         {/* 右側：實收回款與抹零淨額（完全右對齊） */}
-                        <div className="flex items-center shrink-0">
-                          <AmountDisplay
-                            amount={item.netAmount}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="income"
-                            showSign={true}
-                            className="text-base font-mono"
-                          />
+                        <div className="flex flex-col items-end justify-center shrink-0">
+                          <div className="h-5 flex items-center justify-end">
+                            <AmountDisplay
+                              amount={item.netAmount}
+                              baseCurrency={activeLedger?.baseCurrency}
+                              type="income"
+                              showSign={true}
+                              className="text-sm font-mono leading-none"
+                            />
+                          </div>
+                          {!contextAccountId && (() => {
+                            const incomeTx = item.transactions.find(t => t.type === 'income') || item.transactions[0];
+                            const wallet = wallets?.find(w => w.id === incomeTx?.accountId);
+                            if (!wallet?.name) return null;
+                            return (
+                              <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
+                                {wallet.name}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </button>
 
@@ -690,7 +720,6 @@ export function GroupedTransactionList({
                         <div className="bg-muted/20 border-t border-border divide-y divide-border/50 animate-in slide-in-from-top-1 duration-150">
                           {item.transactions.map(subTx => {
                             const isWriteOff = subTx.isWriteOff;
-                            const subWallet = wallets?.find(w => w.id === subTx.accountId);
                             return (
                               <button
                                 key={subTx.id}
@@ -708,12 +737,6 @@ export function GroupedTransactionList({
                                   )}>
                                     {isWriteOff ? t('reimbursements.writeOffItem', '抹零') : t('reimbursements.refundItem', '回款入帳')}
                                   </span>
-
-                                  {subWallet?.name && (
-                                    <span className="text-xs text-muted-foreground truncate">
-                                      {subWallet.name}
-                                    </span>
-                                  )}
 
                                   <span className="text-[10px] font-mono text-muted-foreground/60">
                                     #{subTx.displayId || subTx.id.split('-')[0].toUpperCase()}

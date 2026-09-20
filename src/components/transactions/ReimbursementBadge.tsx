@@ -36,7 +36,7 @@ export function ReimbursementBadge({
     ? t('reimbursements.statusSettled', '已收款')
     : isPartial
     ? t('reimbursements.statusPartial', '部分收款')
-    : t('reimbursements.statusPending', '待收款');
+    : t('reimbursements.statusPending', '代付');
 
   return (
     <span

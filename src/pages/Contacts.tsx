@@ -57,6 +57,8 @@ export default function Contacts() {
 
     transactions.forEach(tx => {
       if (tx.deleted) return;
+      // 贈與交易不計入應收與應還
+      if (tx.isGift) return;
       // 代付交易（帶有 reimbursementStatus）由下方 contactReimbursements 統計待收款項，排除以避免重複計算
       const isAdvance = (tx.reimbursementContactId || tx.toAccountId) && !!tx.reimbursementStatus;
       if (isAdvance) return;
@@ -65,7 +67,7 @@ export default function Contacts() {
       // (This means they hold our money, i.e., Owes you)
       if (tx.type === 'transfer' || tx.type === 'loan') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount; // transfer FROM contact
-        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += tx.amount; // transfer TO contact
+        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount); // transfer TO contact
       }
     });
 

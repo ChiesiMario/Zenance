@@ -50,15 +50,6 @@ export default function AccountDetails() {
     }
   }, [account, isEditDialogOpen]);
 
-  if (!account && accounts && accounts.length > 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <p>{t('accounts.accountNotFound', 'Account not found.')}</p>
-        <Button variant="outline" onClick={() => navigate('/accounts')}>{t('common.back')}</Button>
-      </div>
-    );
-  }
-
   const accountTransactions = useMemo(() => {
     const list = transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id) || [];
     return sortTransactionsDesc(list);
@@ -109,6 +100,15 @@ export default function AccountDetails() {
       }, 50);
     }
   }, [isAdjustBalanceDialogOpen, balance]);
+
+  if (!account && accounts && accounts.length > 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
+        <p>{t('accounts.accountNotFound', 'Account not found.')}</p>
+        <Button variant="outline" onClick={() => navigate('/accounts')}>{t('common.back')}</Button>
+      </div>
+    );
+  }
 
   const parsedNewBalance = parseFloat(newBalanceStr) || 0;
   const balanceDiff = parsedNewBalance - balance;

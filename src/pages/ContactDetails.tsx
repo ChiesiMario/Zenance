@@ -93,13 +93,18 @@ export default function ContactDetails() {
           settledReimb += tx.amount;
         }
       } else if (tx.type === 'transfer' || tx.type === 'loan') {
+        if (tx.isGift) {
+          // 贈與不計入應收與應還
+          return;
+        }
         if (tx.accountId === id) { // transfer FROM contact
           bal -= tx.amount;
           borrowed += tx.amount;
         }
         if (tx.toAccountId === id) { // transfer TO contact
-          bal += tx.amount;
-          lent += tx.amount;
+          const inAmt = tx.transferInAmount ?? tx.amount;
+          bal += inAmt;
+          lent += inAmt;
         }
       }
     });

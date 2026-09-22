@@ -125,6 +125,11 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                   {t('dashboard.subTransaction')}
                 </span>
               )}
+              {selectedTransaction.isGift && (
+                <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded">
+                  {t('add.gift', '贈與')}
+                </span>
+              )}
               {reimbursementBadgeStatus && (
                 <ReimbursementBadge status={reimbursementBadgeStatus} />
               )}
@@ -153,6 +158,20 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 <span className="font-mono">{selectedTransaction.exchangeRate?.toFixed(4)}</span>
               </div>
             )}
+            {selectedTransaction.transferInAmount !== undefined && selectedTransaction.transferInAmount > 0 && (
+              <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2 bg-muted/10">
+                <span className="text-muted-foreground">{t('add.inflow', '到款')}</span>
+                <span className="font-mono">
+                  {selectedTransaction.transferInAmount?.toLocaleString()} {
+                    selectedTransaction.type === 'transfer'
+                      ? (accounts?.find(a => a.id === selectedTransaction.toAccountId)?.currency || activeLedger?.baseCurrency)
+                      : (selectedTransaction.originalCurrency === activeLedger?.baseCurrency
+                          ? (accounts?.find(a => a.id === selectedTransaction.toAccountId)?.currency || activeLedger?.baseCurrency)
+                          : activeLedger?.baseCurrency)
+                  }
+                </span>
+              </div>
+            )}
 
             <div className="flex min-h-12 justify-between items-center px-4 py-2">
               <span className="text-muted-foreground">{t('add.date')}</span>
@@ -164,6 +183,8 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 <span className="text-muted-foreground">
                   {selectedTransaction.type === 'transfer'
                     ? t('dashboard.transferDetail')
+                    : selectedTransaction.isGift
+                    ? t('add.gift', '贈與')
                     : selectedTransaction.reimbursementContactId
                     ? t('add.reimburse', '代付')
                     : t('add.loan')}

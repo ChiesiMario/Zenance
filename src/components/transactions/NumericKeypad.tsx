@@ -12,7 +12,8 @@ import {
   Receipt, 
   Users,
   Ban,
-  Zap
+  Zap,
+  Gift
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -49,9 +50,15 @@ interface Props {
   contacts?: Account[];
   onFeeClick?: () => void;
   feeAmount?: number;
-  loanContactName?: string;
-  onLoanContactClick?: () => void;
-  onLoanContactSelect?: (contactId: string) => void;
+  isFeeActive?: boolean;
+  onToggleFeeMode?: () => void;
+  isCrossCurrency?: boolean;
+  activeAmountField?: 'out' | 'in' | null;
+  onSelectAmountField?: (field: 'out' | 'in') => void;
+  fromCurrency?: string;
+  toCurrency?: string;
+  isGift?: boolean;
+  onToggleGift?: () => void;
 }
 
 const safeEvaluate = (expr: string): string => {
@@ -90,9 +97,15 @@ export function NumericKeypad({
   contacts = [],
   onFeeClick,
   feeAmount,
-  loanContactName,
-  onLoanContactClick,
-  onLoanContactSelect,
+  isFeeActive = false,
+  onToggleFeeMode,
+  isCrossCurrency = false,
+  activeAmountField = 'out',
+  onSelectAmountField,
+  fromCurrency,
+  toCurrency,
+  isGift = false,
+  onToggleGift,
 }: Props) {
   const { t } = useTranslation();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -218,19 +231,23 @@ export function NumericKeypad({
   }, [budgets, date]);
 
   return (
-    <div className="grid grid-cols-4 gap-2 w-full select-none touch-manipulation">
+    <div className="grid grid-cols-4 gap-1.5 w-full select-none touch-manipulation">
       
-      {/* Row 1: Action Buttons (Date, Budget, Reimbursement, Fee, Contact) */}
+      {/* Row 1: Action Buttons (Date, Budget, Reimbursement, Fee, Rate, Contact) */}
       <div className={cn(
-        "col-span-4 w-full h-8 sm:h-9",
-        showReimburseButton ? "grid grid-cols-3 gap-1.5" : "grid grid-cols-2 gap-2"
+        "col-span-4 w-full h-8",
+        showReimburseButton
+          ? "grid grid-cols-3 gap-1.5"
+          : isCrossCurrency && (type === 'transfer' || type === 'loan')
+            ? "grid grid-cols-4 gap-1.5"
+            : "grid grid-cols-2 gap-1.5"
       )}>
         
         {/* Button 1: Date Picker */}
         <div className="relative w-full h-full">
           <button 
             type="button" 
-            className="w-full h-full flex gap-1.5 items-center justify-center p-0 rounded-xl bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors cursor-pointer" 
+            className="w-full h-full flex gap-1.5 items-center justify-center p-0 rounded-lg bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors cursor-pointer" 
             onClick={() => setIsCalendarOpen(true)}
           >
             <CalendarDays className="size-3.5 shrink-0" />
@@ -263,6 +280,69 @@ export function NumericKeypad({
           )}
         </div>
 
+        {/* Buttons (Cross-Currency): Outflow & Inflow */}
+        {isCrossCurrency && (type === 'transfer' || type === 'loan') && (
+          <>
+            {/* Outflow Button */}
+            <div className="relative w-full h-full">
+              <button
+                type="button"
+                onClick={() => onSelectAmountField?.('out')}
+                className={cn(
+                  "w-full h-full flex gap-1 items-center justify-center px-1 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                  activeAmountField === 'out' && !isFeeActive
+                    ? "bg-foreground text-background border-foreground font-semibold"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
+                )}
+              >
+                <span className="text-[11px] uppercase tracking-wider font-semibold truncate">
+                  {t('add.outflowCurrency', { currency: fromCurrency || '', defaultValue: `出款 ${fromCurrency || ''}` })}
+                </span>
+              </button>
+            </div>
+
+            {/* Inflow Button */}
+            <div className="relative w-full h-full">
+              <button
+                type="button"
+                onClick={() => onSelectAmountField?.('in')}
+                className={cn(
+                  "w-full h-full flex gap-1 items-center justify-center px-1 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                  activeAmountField === 'in' && !isFeeActive
+                    ? "bg-foreground text-background border-foreground font-semibold"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
+                )}
+              >
+                <span className="text-[11px] uppercase tracking-wider font-semibold truncate">
+                  {t('add.inflowCurrency', { currency: toCurrency || '', defaultValue: `到款 ${toCurrency || ''}` })}
+                </span>
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Button 2 (Loan): Gift Action */}
+        {type === 'loan' && (
+          <div className="relative w-full h-full">
+            <button
+              type="button"
+              onClick={onToggleGift}
+              title={t('add.giftHint', '標記為贈與，不計入應收與應還')}
+              className={cn(
+                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                isGift
+                  ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/40 hover:bg-purple-500/25 font-semibold"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
+              )}
+            >
+              <Gift className={cn("size-3.5 shrink-0 transition-colors", isGift ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground group-hover:text-foreground")} />
+              <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
+                {t('add.gift', '贈與')}
+              </span>
+            </button>
+          </div>
+        )}
+
         {/* Button 2: Budget Selector */}
         {showBudgetButton && (
           <div className="relative w-full h-full">
@@ -270,7 +350,7 @@ export function NumericKeypad({
               <DropdownMenuTrigger
                 type="button"
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl transition-colors outline-none cursor-pointer group border",
+                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-lg transition-colors outline-none cursor-pointer group border",
                   matchingBudget
                     ? "bg-muted text-foreground border-border font-medium"
                     : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
@@ -408,80 +488,38 @@ export function NumericKeypad({
           <div className="relative w-full h-full">
             <button
               type="button"
-              onClick={onFeeClick}
+              onClick={onToggleFeeMode || onFeeClick}
               className={cn(
-                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-xl transition-colors outline-none cursor-pointer group border",
-                feeAmount && feeAmount > 0
-                  ? "bg-muted text-foreground border-border font-medium"
-                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
+                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                isFeeActive
+                  ? "bg-foreground text-background border-foreground font-semibold"
+                  : feeAmount && feeAmount > 0
+                    ? "bg-muted text-foreground border-border font-medium"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
               )}
             >
-              <Zap className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
-                {feeAmount && feeAmount > 0 ? `${t('add.fee', '手續費')} ${currencySymbol}${feeAmount}` : t('add.feeSetting', '設定手續費')}
-              </span>
+              {isFeeActive ? (
+                <>
+                  <Check className="size-3.5 shrink-0" />
+                  <span className="text-xs uppercase tracking-wider font-semibold truncate max-w-[95px]">
+                    {t('add.feeDone', '完成')}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Zap className={cn("size-3.5 shrink-0 transition-colors", feeAmount && feeAmount > 0 ? "text-amber-500" : "text-muted-foreground group-hover:text-foreground")} />
+                  <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
+                    {feeAmount && feeAmount > 0 ? `${t('add.fee', '手續費')} ${currencySymbol}${feeAmount}` : t('add.feeSetting', '手續費')}
+                  </span>
+                </>
+              )}
             </button>
           </div>
         )}
 
-        {/* Button 2 (Loan): Contact Selector */}
-        {type === 'loan' && (
-          <div className="relative w-full h-full">
-            {onLoanContactSelect && contacts.length > 0 ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  type="button"
-                  className={cn(
-                    "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-xl transition-colors outline-none cursor-pointer group border",
-                    loanContactName
-                      ? "bg-muted text-foreground border-border font-medium"
-                      : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
-                  )}
-                >
-                  <Users className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
-                    {loanContactName || t('add.contact', '選擇對象')}
-                  </span>
-                  <ChevronDown className="size-3 opacity-60 shrink-0" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" side="top" sideOffset={8} className="w-56 max-h-64 overflow-y-auto">
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold px-2 py-1">
-                    {t('add.contact', '選擇對象')}
-                  </DropdownMenuLabel>
-                  {contacts.map(c => {
-                    const isSelected = loanContactName === c.name;
-                    return (
-                      <DropdownMenuItem
-                        key={c.id}
-                        onClick={() => onLoanContactSelect(c.id)}
-                        className="flex items-center justify-between cursor-pointer py-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-primary shrink-0">
-                            {c.name ? c.name.trim().charAt(0).toUpperCase() : '?'}
-                          </div>
-                          <span className="font-medium text-xs truncate max-w-[130px]">{c.name}</span>
-                        </div>
-                        {isSelected && <Check className="size-4 shrink-0 text-foreground" />}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <button
-                type="button"
-                onClick={onLoanContactClick}
-                className="w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-xl bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors cursor-pointer group"
-              >
-                <Users className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
-                <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
-                  {loanContactName || t('add.contact', '對象')}
-                </span>
-              </button>
-            )}
-          </div>
-        )}
+
+
+
 
         {/* Button 3: Reimbursement / Split Selector */}
         {showReimburseButton && (() => {
@@ -500,7 +538,7 @@ export function NumericKeypad({
                   setIsSplitDialogOpen(true);
                 }}
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl transition-all outline-none border",
+                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-lg transition-all outline-none border",
                   !isAmountValid
                     ? "bg-muted/30 text-muted-foreground/40 opacity-40 cursor-not-allowed border-border/20"
                     : isSplitActive
@@ -541,39 +579,39 @@ export function NumericKeypad({
       </div>
 
       {/* Row 2 */}
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('1')}>1</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('2')}>2</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('3')}>3</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 rounded-xl bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('DEL')}>
-        <Delete className="size-5" />
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('1')}>1</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('2')}>2</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('3')}>3</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 rounded-lg bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('DEL')}>
+        <Delete className="size-4.5" />
       </Button>
 
       {/* Row 3 */}
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('4')}>4</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('5')}>5</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('6')}>6</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('-')}>-</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('4')}>4</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('5')}>5</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('6')}>6</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('-')}>-</Button>
 
       {/* Row 4 */}
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('7')}>7</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('8')}>8</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('9')}>9</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('+')}>+</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('7')}>7</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('8')}>8</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('9')}>9</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('+')}>+</Button>
       
       {/* Row 5 */}
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('.')}>.</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-xl font-mono rounded-xl bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('0')}>0</Button>
-      <Button variant="ghost" className="w-full h-11 sm:h-12 text-base font-mono rounded-xl bg-muted/60 tracking-widest text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('00')}>00</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('.')}>.</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('0')}>0</Button>
+      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-xs sm:text-sm font-mono rounded-lg bg-muted/60 tracking-wider text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('00')}>00</Button>
       <Button 
         variant="ghost" 
-        className={cn("w-full h-11 sm:h-12 rounded-xl flex gap-1 items-center justify-center transition-all active:scale-95 border", 
+        className={cn("w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-all active:scale-95 border", 
           isExpression
             ? "bg-muted/60 text-foreground hover:bg-muted border-border/40"
             : "bg-primary text-primary-foreground hover:bg-primary/90 border-primary font-bold shadow-none"
         )} 
         onClick={() => handleKeyPress('=')}
       >
-        {isExpression ? <Equal className="size-6" /> : <Check className="size-6" />}
+        {isExpression ? <Equal className="size-5" /> : <Check className="size-5" />}
       </Button>
       
     </div>

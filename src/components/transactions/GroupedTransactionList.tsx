@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isToday, isYesterday, parseISO, format } from 'date-fns';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
@@ -133,13 +133,16 @@ export function GroupedTransactionList({
     return str;
   };
 
-  const isBalanceAdjustment = (tx: Transaction) => {
+  const isBalanceAdjustment = useCallback((tx: Transaction) => {
     if (tx.type !== 'income' && tx.type !== 'expense') return false;
     const cat = allCategories?.find(c => c.id === tx.category);
     return !!cat?.isSystem;
-  };
+  }, [allCategories]);
 
-  const getCategoryName = (tx: Transaction) => {
+  const getCategoryName = useCallback((tx: Transaction) => {
+    if (tx.isGift) {
+      return t('add.gift', '贈與');
+    }
     if (tx.type === 'transfer') return t('add.transfer');
     if (tx.type === 'loan') {
       if (tx.category === 'advance' || tx.reimbursementContactId || tx.reimbursementStatus) {
@@ -159,7 +162,7 @@ export function GroupedTransactionList({
       return t('reimbursements.writeOffCategory', '抹零');
     }
     return cat?.name || tx.category;
-  };
+  }, [t, contacts, allCategories]);
 
   // Group transactions by YYYY-MM-DD
   const groupedTransactions = useMemo(() => {
@@ -182,6 +185,10 @@ export function GroupedTransactionList({
             if (tx.type === 'income' && tx.accountId === contextAccountId) balance += tx.amount;
             else if (tx.type === 'expense' && tx.accountId === contextAccountId) balance -= tx.amount;
             else if (tx.type === 'transfer' || tx.type === 'loan') {
+              if (tx.type === 'loan' && tx.isGift) {
+                const isContact = contacts?.some(c => c.id === contextAccountId);
+                if (isContact) return;
+              }
               if (tx.accountId === contextAccountId) balance -= tx.amount;
               if (tx.toAccountId === contextAccountId) balance += (tx.transferInAmount ?? tx.amount);
             }
@@ -189,6 +196,7 @@ export function GroupedTransactionList({
         } else if (contextContactId) {
           // Contact context: Contact-specific flows
           groups[date].forEach(tx => {
+            if (tx.isGift) return; // 贈與交易不計入聯絡人借貸變動
             const isLent = tx.toAccountId === contextContactId;
             const isReimbExpense = tx.reimbursementContactId === contextContactId && tx.type === 'expense';
             const isReimbIncome = tx.reimbursementContactId === contextContactId && tx.type === 'income';
@@ -323,7 +331,7 @@ export function GroupedTransactionList({
           dailyBalance: balance,
         };
       });
-  }, [transactions, calcDailyBalance, contextAccountId, contextContactId, contextCategoryId, allCategories, contacts]);
+  }, [transactions, calcDailyBalance, contextAccountId, contextContactId, contextCategoryId, contacts, getCategoryName, isBalanceAdjustment]);
 
   const handleRowClick = (tx: Transaction) => {
     if (onTransactionClick) {
@@ -432,7 +440,7 @@ export function GroupedTransactionList({
                                 <AmountDisplay
                                   amount={
                                     (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextAccountId
-                                      ? -tx.amount
+                                      ? -(tx.originalAmount ?? tx.amount)
                                       : ((tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextAccountId
                                           ? (tx.transferInAmount ?? tx.amount)
                                           : tx.amount)
@@ -480,10 +488,11 @@ export function GroupedTransactionList({
 
                                   const isLending = (tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextContactId;
                                   const isBorrowing = (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextContactId;
+                                  const contactAmt = isLending ? (tx.transferInAmount ?? tx.amount) : tx.amount;
 
                                   return (
                                     <AmountDisplay
-                                      amount={isLending ? -tx.amount : tx.amount}
+                                      amount={isLending ? -contactAmt : contactAmt}
                                       originalCurrency={tx.originalCurrency}
                                       baseCurrency={activeLedger?.baseCurrency}
                                       type={

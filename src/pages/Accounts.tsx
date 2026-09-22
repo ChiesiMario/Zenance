@@ -46,6 +46,8 @@ export default function Accounts() {
       balances[a.id] = a.initialBalance || 0;
     });
 
+    const contactIdSet = new Set(accounts.filter(a => a.type === 'contact').map(a => a.id));
+
     transactions.forEach(tx => {
       if (tx.deleted) return;
       if (tx.type === 'income') {
@@ -57,8 +59,18 @@ export default function Accounts() {
           balances[tx.reimbursementContactId] += tx.amount;
         }
       } else if (tx.type === 'transfer' || tx.type === 'loan') {
-        if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
-        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount);
+        if (tx.type === 'loan' && tx.isGift) {
+          // 贈與交易：只變動錢包餘額，不計入聯絡人應收應還
+          if (!contactIdSet.has(tx.accountId) && balances[tx.accountId] !== undefined) {
+            balances[tx.accountId] -= tx.amount;
+          }
+          if (tx.toAccountId && !contactIdSet.has(tx.toAccountId) && balances[tx.toAccountId] !== undefined) {
+            balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount);
+          }
+        } else {
+          if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
+          if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount);
+        }
       }
     });
 

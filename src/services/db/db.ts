@@ -19,6 +19,7 @@ export interface Transaction {
   settlementId?: string; // Optional batch identifier for a reimbursement settlement session
   splitGroupId?: string; // Optional identifier for a multi-person advance / split expense group
   isWriteOff?: boolean; // True if this is a write-off / absorption child transaction (does not affect account balance)
+  isGift?: boolean; // True if this loan transaction is a gift / grant (does not create debt / receivable / payable)
   budgetId?: string; // Optional manual budget assignment ('none' or budget id)
   reimbursementStatus?: 'pending' | 'reimbursed' | 'none'; // Reimbursement status
   reimbursementContactId?: string; // Target contact ID for reimbursement

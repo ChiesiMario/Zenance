@@ -8,7 +8,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, X, ArrowRight, ArrowRightLeft, Zap } from 'lucide-react';
+import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
@@ -16,14 +16,9 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { NumericKeypad } from './NumericKeypad';
+import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
+import type { Account } from '@/services/db/db';
 import type { SplitItem } from './SplitAdvanceDialog';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -54,16 +49,27 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
 
   const [type, setType] = useState<'expense' | 'income' | 'transfer' | 'loan'>(initialType);
   const [loanType, setLoanType] = useState<'borrow' | 'lend'>(initialLoanType);
+  const [isGift, setIsGift] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [isCatDialogOpen, setIsCatDialogOpen] = useState(false);
   const [isCatPickerOpen, setIsCatPickerOpen] = useState(false);
-  const [customExchangeRate, setCustomExchangeRate] = useState<number | null>(null);
-  const [isFeeDialogOpen, setIsFeeDialogOpen] = useState(false);
-  const [feeInput, setFeeInput] = useState('');
   const [displayAmount, setDisplayAmount] = useState('');
-  const [displayInAmount, setDisplayInAmount] = useState('');
-  const [focusedAmount, setFocusedAmount] = useState<'out' | 'in'>('out');
-  const [isLinked, setIsLinked] = useState(true);
+  const [displayAmountIn, setDisplayAmountIn] = useState('');
+  const [displayFeeAmount, setDisplayFeeAmount] = useState('');
+  const [focusedField, setFocusedField] = useState<'out' | 'in' | 'fee'>('out');
+  const [previousAmountField, setPreviousAmountField] = useState<'out' | 'in'>('out');
+  const [accountSelectConfig, setAccountSelectConfig] = useState<{
+    open: boolean;
+    title?: string;
+    selectedAccountId?: string;
+    disabledAccountIds?: string[];
+    disabledReason?: string;
+    filterType?: 'wallet' | 'contact' | 'all';
+    onSelect: (acc: Account) => void;
+  }>({
+    open: false,
+    onSelect: () => {},
+  });
 
   const formSchema = z.object({
     amount: z.number({ message: t('add.errors.amountRequired') }).positive(t('add.errors.amountPositive')),
@@ -94,7 +100,6 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     setValue,
     watch,
     reset,
-    setError,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -144,27 +149,38 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         }
         const isLend = transactionToEdit.type === 'loan' && contacts?.some(c => c.id === transactionToEdit.toAccountId);
         setLoanType(isLend ? 'lend' : 'borrow');
+        setIsGift(!!transactionToEdit.isGift);
         
-        // Handle currencies
-        const originalCurrency = transactionToEdit.originalCurrency;
-        if (originalCurrency !== baseCurrency) {
-          setCustomExchangeRate(transactionToEdit.exchangeRate);
-        } else {
-          setCustomExchangeRate(null);
-        }
-
         // Set amount display correctly if not already set by splitGroup
         if (!transactionToEdit.splitGroupId) {
           setDisplayAmount(transactionToEdit.originalAmount.toString());
         }
-        
-        // If transfer, handle transferInAmount
-        if (transactionToEdit.type === 'transfer' && transactionToEdit.transferInAmount !== undefined) {
-          setDisplayInAmount(transactionToEdit.transferInAmount.toString());
-          setIsLinked(false);
+        if (transactionToEdit.transferInAmount !== undefined && transactionToEdit.transferInAmount > 0) {
+          setDisplayAmountIn(transactionToEdit.transferInAmount.toString());
         } else {
-          setDisplayInAmount('');
-          setIsLinked(true);
+          setDisplayAmountIn('');
+        }
+        
+        // If transfer, handle fee
+        if (transactionToEdit.type === 'transfer') {
+          if (transactionToEdit.splitGroupId) {
+            const feeTx = transactions?.find(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.type === 'expense' && t.id !== transactionToEdit.id);
+            if (feeTx) {
+              setDisplayFeeAmount(feeTx.originalAmount.toString());
+            } else if (transactionToEdit.transferInAmount !== undefined && transactionToEdit.originalAmount > transactionToEdit.transferInAmount) {
+              setDisplayFeeAmount((transactionToEdit.originalAmount - transactionToEdit.transferInAmount).toString());
+            } else {
+              setDisplayFeeAmount('');
+            }
+          } else if (transactionToEdit.transferInAmount !== undefined && transactionToEdit.originalAmount > transactionToEdit.transferInAmount) {
+            setDisplayFeeAmount((transactionToEdit.originalAmount - transactionToEdit.transferInAmount).toString());
+          } else {
+            setDisplayFeeAmount('');
+          }
+          setFocusedField('out');
+        } else {
+          setDisplayFeeAmount('');
+          setFocusedField('out');
         }
 
         reset({
@@ -179,7 +195,6 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           date: transactionToEdit.date,
           note: transactionToEdit.note || '',
         });
-        setFocusedAmount('out');
       } else {
         // Add mode
         setType(initialType);
@@ -188,11 +203,13 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
         setValue('reimbursementContactId', initialContactId || undefined);
         setDisplayAmount('');
-        setDisplayInAmount('');
-        setFocusedAmount('out');
-        setIsLinked(true);
+        setDisplayAmountIn('');
+        setDisplayFeeAmount('');
+        setFocusedField('out');
+        setPreviousAmountField('out');
         setValue('feeCategoryId', undefined);
         setLoanType(initialLoanType);
+        setIsGift(false);
       }
     }
   }, [isOpen, initialType, initialLoanType, initialContactId, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue]);
@@ -204,22 +221,29 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     setValue('budgetId', newType === 'income' ? 'none' : 'auto');
     setValue('reimbursementContactId', undefined);
     setDisplayAmount('');
-    setDisplayInAmount('');
-    setFocusedAmount('out');
-    setIsLinked(true);
+    setDisplayAmountIn('');
+    setDisplayFeeAmount('');
+    setFocusedField('out');
+    setPreviousAmountField('out');
     setValue('feeCategoryId', undefined);
-    setLoanType(newLoanType || 'borrow');
+    const targetLoanType = newLoanType || 'borrow';
+    setLoanType(targetLoanType);
+    setIsGift(false);
   };
 
   const toggleLoanType = () => {
     const nextLoanType = loanType === 'lend' ? 'borrow' : 'lend';
     setLoanType(nextLoanType);
+    setFocusedField('out');
+    setPreviousAmountField('out');
+    const currentOut = displayAmount;
+    const currentIn = displayAmountIn;
+    setDisplayAmount(currentIn);
+    setDisplayAmountIn(currentOut);
     const currentFrom = watch('fromAccountId');
     const currentTo = watch('toAccountId');
-    if (currentFrom && currentTo) {
-      setValue('fromAccountId', currentTo);
-      setValue('toAccountId', currentFrom);
-    }
+    setValue('fromAccountId', currentTo || '');
+    setValue('toAccountId', currentFrom || '');
   };
 
   const selectedCategoryId = watch('categoryId');
@@ -243,39 +267,35 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     return contacts?.find(c => c.id === contactId) || null;
   }, [type, loanType, selectedFromAccountId, selectedToAccountId, contacts]);
 
-  const handleConfirmFee = () => {
-    const feeVal = parseFloat(feeInput) || 0;
-    if (feeVal > 0) {
-      const parsed = parseFloat(displayAmount) || 0;
-      setDisplayInAmount(Math.max(0, parsed - feeVal).toString());
-      setIsLinked(false);
-      if (!watch('feeCategoryId')) {
-        const feeCat = categories?.find(c => c.type === 'expense' && (c.name.includes('手續費') || c.name.includes('手续费') || c.name.toLowerCase().includes('fee'))) || categories?.find(c => c.type === 'expense');
-        if (feeCat) {
-          setValue('feeCategoryId', feeCat.id);
-        }
-      }
-    } else {
-      setDisplayInAmount(displayAmount);
-      setIsLinked(true);
-      setValue('feeCategoryId', undefined);
+  const fromCurrency = useMemo(() => {
+    if (type === 'transfer') {
+      return selectedFromAccount?.currency || baseCurrency;
     }
-    setIsFeeDialogOpen(false);
-  };
+    if (type === 'loan') {
+      return loanType === 'lend' ? (loanWallet?.currency || baseCurrency) : baseCurrency;
+    }
+    return selectedAccount?.currency || baseCurrency;
+  }, [type, loanType, selectedFromAccount, loanWallet, selectedAccount, baseCurrency]);
 
-  const selectedCurrency = type === 'transfer'
-    ? (selectedFromAccount?.currency || baseCurrency)
-    : type === 'loan'
-    ? (loanWallet?.currency || baseCurrency)
-    : (selectedAccount?.currency || baseCurrency);
-  
-  const selectedToCurrency = (type === 'transfer' || type === 'loan')
-    ? (accounts?.find(a => a.id === selectedToAccountId)?.currency || baseCurrency)
-    : baseCurrency;
-  
-  useEffect(() => {
-    setCustomExchangeRate(null);
-  }, [selectedCurrency]);
+  const toCurrency = useMemo(() => {
+    if (type === 'transfer') {
+      return accounts?.find(a => a.id === selectedToAccountId)?.currency || baseCurrency;
+    }
+    if (type === 'loan') {
+      return loanType === 'lend' ? baseCurrency : (loanWallet?.currency || baseCurrency);
+    }
+    return baseCurrency;
+  }, [type, loanType, selectedToAccountId, accounts, loanWallet, baseCurrency]);
+
+  const isCrossCurrency = useMemo(() => {
+    if (type === 'transfer' || type === 'loan') {
+      return fromCurrency !== toCurrency;
+    }
+    return false;
+  }, [type, fromCurrency, toCurrency]);
+
+  const selectedCurrency = fromCurrency;
+  const selectedToCurrency = toCurrency;
 
   const filteredCategories = useMemo(() => categories?.filter(c => c.type === type) || [], [categories, type]);
   
@@ -300,11 +320,22 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   
   const compactFormatter = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 });
 
+  const parsedFeeAmount = (type === 'transfer' && displayFeeAmount) ? (parseFloat(displayFeeAmount) || 0) : 0;
   const parsedAmount = parseFloat(displayAmount) || 0;
-  const parsedInAmount = parseFloat(displayInAmount);
-  const diffAmount = (type === 'transfer' && selectedCurrency === selectedToCurrency && !isNaN(parsedInAmount) && parsedInAmount > 0) 
-    ? parsedAmount - parsedInAmount 
-    : 0;
+  const parsedAmountIn = parseFloat(displayAmountIn) || 0;
+
+  const calculatedRate = useMemo(() => {
+    if (parsedAmount > 0 && parsedAmountIn > 0) {
+      return parsedAmountIn / parsedAmount;
+    }
+    return null;
+  }, [parsedAmount, parsedAmountIn]);
+
+  const transferDeductedAmount = parsedAmount + parsedFeeAmount;
+  const transferReceivedAmount = isCrossCurrency
+    ? parsedAmountIn
+    : parsedAmount;
+  const showTransferBubbles = type === 'transfer' && (parsedFeeAmount > 0 || isCrossCurrency);
 
   const frequentCategories = useMemo(() => {
     return [...filteredCategories].sort((a, b) => {
@@ -331,96 +362,204 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     if (currentFrom && currentTo) {
       setValue('fromAccountId', currentTo);
       setValue('toAccountId', currentFrom);
+      const currentOut = displayAmount;
+      const currentIn = displayAmountIn;
+      setDisplayAmount(currentIn);
+      setDisplayAmountIn(currentOut);
+      setFocusedField('out');
+      setPreviousAmountField('out');
     }
   };
 
 
 
   useEffect(() => {
-    if (accounts && accounts.length > 0) {
-      const defaultAcc = accounts.find(a => a.isDefault) || accounts[0];
-      if (type !== 'transfer' && type !== 'loan' && !selectedAccountId) {
+    if (!accounts || accounts.length === 0) return;
+    const defaultAcc = accounts.find(a => a.isDefault) || accounts[0];
+
+    if (type !== 'transfer' && type !== 'loan') {
+      if (!selectedAccountId) {
         setValue('accountId', defaultAcc.id);
       }
-      if ((type === 'transfer' || type === 'loan') && !selectedFromAccountId) {
-        setValue('fromAccountId', defaultAcc.id);
-      }
-    }
-  }, [accounts, type, setValue, selectedAccountId, selectedFromAccountId]);
-
-  useEffect(() => {
-    if (type === 'loan' && accounts && accounts.length > 0 && contacts && contacts.length > 0) {
-      const defaultWallet = accounts.find(a => a.isDefault) || accounts[0];
-      const defaultContact = initialContactId 
-        ? (contacts.find(c => c.id === initialContactId) || contacts[0]) 
-        : contacts[0];
-        
-      if (loanType === 'borrow') {
-        setValue('fromAccountId', defaultContact.id);
-        setValue('toAccountId', defaultWallet.id);
-      } else {
-        setValue('fromAccountId', defaultWallet.id);
-        setValue('toAccountId', defaultContact.id);
-      }
-    }
-  }, [type, loanType, accounts, contacts, setValue, initialContactId]);
-
-  const onSubmit = async (data: FormValues) => {
-    const isSameCurrency = selectedCurrency === selectedToCurrency;
-    const transferIn = data.transferInAmount;
-    const diff = (type === 'transfer' && isSameCurrency && transferIn !== undefined) ? data.amount - transferIn : 0;
-    
-    if (diff !== 0 && !data.feeCategoryId) {
-      setError('feeCategoryId', { type: 'manual', message: t('add.errors.categoryRequired', 'Category is required') });
       return;
     }
 
-    const exchangeRate = customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency);
+    if (type === 'transfer') {
+      if (!selectedFromAccountId) {
+        setValue('fromAccountId', defaultAcc.id);
+      }
+      return;
+    }
 
-    if (type === 'transfer' && isSameCurrency && diff !== 0) {
-      // Split transaction
-      const transferActualAmount = diff > 0 ? transferIn! : data.amount;
-      
-      // Transaction 1: Transfer
-      await addTransaction({
-        originalAmount: transferActualAmount,
-        originalCurrency: selectedCurrency,
-        exchangeRate: exchangeRate,
-        amount: transferActualAmount * exchangeRate,
-        type: 'transfer',
-        category: 'transfer',
-        accountId: data.fromAccountId!,
-        toAccountId: data.toAccountId,
-        note: data.note,
-        date: data.date,
-      });
-
-      // Transaction 2: Fee/Interest
-      const feeAmount = Math.abs(diff);
-      
-      if (transactionToEdit) {
-        // For simplicity, in MVP we don't handle editing multi-currency fees properly.
-        // It's a complex edge case for a basic edit mode.
-        // We'll just update the main transaction.
+    if (type === 'loan') {
+      const specificContact = initialContactId ? contacts?.find(c => c.id === initialContactId) : undefined;
+      if (loanType === 'lend') {
+        if (!selectedFromAccountId) {
+          setValue('fromAccountId', defaultAcc.id);
+        }
+        if (specificContact && !selectedToAccountId) {
+          setValue('toAccountId', specificContact.id);
+        }
       } else {
-        await addTransaction({
-          originalAmount: feeAmount,
-          originalCurrency: selectedCurrency,
-          exchangeRate: exchangeRate,
-          amount: feeAmount * exchangeRate,
-          type: diff > 0 ? 'expense' : 'income',
-          category: data.feeCategoryId!,
-          accountId: diff > 0 ? data.fromAccountId! : data.toAccountId!,
-          note: data.note ? `${data.note} (${diff > 0 ? 'Fee' : 'Interest'})` : t(diff > 0 ? 'add.transferFee' : 'add.transferInterest', diff > 0 ? 'Transfer Fee' : 'Transfer Interest'),
+        if (specificContact && !selectedFromAccountId) {
+          setValue('fromAccountId', specificContact.id);
+        }
+        if (!selectedToAccountId) {
+          setValue('toAccountId', defaultAcc.id);
+        }
+      }
+    }
+  }, [accounts, type, loanType, contacts, setValue, initialContactId, selectedAccountId, selectedFromAccountId, selectedToAccountId]);
+
+  const onSubmit = async (data: FormValues) => {
+    const rateToBase = getRate(fromCurrency, baseCurrency);
+    const exchangeRate = rateToBase;
+
+    if (type === 'transfer') {
+      const feeAmount = parseFloat(displayFeeAmount) || 0;
+      const transferAmount = data.amount;
+      const transferInAmount = isCrossCurrency
+        ? (data.transferInAmount ?? transferAmount)
+        : transferAmount;
+      const transferRate = (isCrossCurrency && transferAmount > 0)
+        ? (transferInAmount / transferAmount)
+        : 1;
+      const baseAmount = transferAmount * rateToBase;
+
+      let feeCategoryId: string | undefined;
+      if (feeAmount > 0) {
+        let feeCat = categories?.find(c => c.type === 'expense' && (c.name === '手續費' || c.name === '手续费' || c.name.toLowerCase() === 'fee'));
+        if (!feeCat) {
+          feeCat = categories?.find(c => c.type === 'expense' && (c.name.includes('手續費') || c.name.includes('手续费') || c.name.toLowerCase().includes('fee')));
+        }
+        if (!feeCat) {
+          const newCat = await addCategory('手續費', 'expense');
+          feeCategoryId = newCat.id;
+        } else {
+          feeCategoryId = feeCat.id;
+        }
+      }
+
+      const splitGroupId = (feeAmount > 0) ? (transactionToEdit?.splitGroupId || uuidv4()) : undefined;
+
+      if (transactionToEdit) {
+        if (transactionToEdit.splitGroupId) {
+          const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+          for (const otherTx of otherGroupTxs) {
+            await deleteTransaction(otherTx.id);
+          }
+        }
+        await updateTransaction(transactionToEdit.id, {
+          originalAmount: transferAmount,
+          originalCurrency: fromCurrency,
+          exchangeRate: transferRate,
+          amount: baseAmount,
+          type: 'transfer',
+          category: 'transfer',
+          accountId: data.fromAccountId!,
+          toAccountId: data.toAccountId,
+          transferInAmount: transferInAmount,
+          splitGroupId,
+          note: data.note,
           date: data.date,
         });
+
+        if (feeAmount > 0 && feeCategoryId) {
+          await addTransaction({
+            originalAmount: feeAmount,
+            originalCurrency: fromCurrency,
+            exchangeRate: transferRate,
+            amount: feeAmount * rateToBase,
+            type: 'expense',
+            category: feeCategoryId,
+            accountId: data.fromAccountId!,
+            splitGroupId,
+            note: data.note ? `${data.note} (${t('add.fee', '手續費')})` : t('add.fee', '手續費'),
+            date: data.date,
+          });
+        }
+      } else {
+        await addTransaction({
+          originalAmount: transferAmount,
+          originalCurrency: fromCurrency,
+          exchangeRate: transferRate,
+          amount: baseAmount,
+          type: 'transfer',
+          category: 'transfer',
+          accountId: data.fromAccountId!,
+          toAccountId: data.toAccountId,
+          transferInAmount: transferInAmount,
+          splitGroupId,
+          note: data.note,
+          date: data.date,
+        });
+
+        if (feeAmount > 0 && feeCategoryId) {
+          await addTransaction({
+            originalAmount: feeAmount,
+            originalCurrency: fromCurrency,
+            exchangeRate: transferRate,
+            amount: feeAmount * rateToBase,
+            type: 'expense',
+            category: feeCategoryId,
+            accountId: data.fromAccountId!,
+            splitGroupId,
+            note: data.note ? `${data.note} (${t('add.fee', '手續費')})` : t('add.fee', '手續費'),
+            date: data.date,
+          });
+        }
       }
-      
+
       onClose();
       return;
     }
 
-    const calculatedBaseAmount = data.amount * exchangeRate;
+    if (type === 'loan') {
+      const loanAmount = data.amount;
+      const targetInAmount = isCrossCurrency
+        ? (data.transferInAmount ?? loanAmount)
+        : loanAmount;
+      const loanRate = (isCrossCurrency && loanAmount > 0)
+        ? (targetInAmount / loanAmount)
+        : 1;
+
+      const loanBaseAmount = isCrossCurrency
+        ? (loanType === 'lend' ? targetInAmount : loanAmount)
+        : (loanAmount * rateToBase);
+
+      if (transactionToEdit && transactionToEdit.splitGroupId) {
+        const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+        for (const otherTx of otherGroupTxs) {
+          await deleteTransaction(otherTx.id);
+        }
+      }
+
+      const mainTx = {
+        originalAmount: loanAmount,
+        originalCurrency: fromCurrency,
+        exchangeRate: loanRate,
+        transferInAmount: isCrossCurrency ? targetInAmount : undefined,
+        amount: loanBaseAmount,
+        type: 'loan' as const,
+        category: 'loan',
+        accountId: data.fromAccountId!,
+        toAccountId: data.toAccountId!,
+        note: data.note,
+        date: data.date,
+        isGift: isGift,
+      };
+
+      if (transactionToEdit) {
+        await updateTransaction(transactionToEdit.id, mainTx);
+      } else {
+        await addTransaction(mainTx);
+      }
+
+      onClose();
+      return;
+    }
+
+    const calculatedBaseAmount = data.amount * rateToBase;
     const hasSplits = type === 'expense' && splits.length > 0;
     const isAdvance = type === 'expense' && (hasSplits || !!data.reimbursementContactId);
 
@@ -488,7 +627,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
       }
     }
 
-    const effectiveType = isAdvance ? 'loan' : type;
+    const effectiveType = (isAdvance ? 'loan' : type) as 'expense' | 'income' | 'loan';
     const singleContactId = splits.length === 1 ? splits[0].contactId : data.reimbursementContactId;
     
     const txData = {
@@ -499,23 +638,17 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
       type: effectiveType,
       category: isAdvance 
         ? 'advance' 
-        : ((type === 'transfer' || type === 'loan') ? (type === 'loan' ? 'loan' : 'transfer') : data.categoryId!),
-      accountId: isAdvance 
-        ? data.accountId! 
-        : ((type === 'transfer' || type === 'loan') ? data.fromAccountId! : data.accountId!),
+        : data.categoryId!,
+      accountId: data.accountId!,
       toAccountId: isAdvance 
         ? singleContactId 
-        : ((type === 'transfer' || type === 'loan') ? data.toAccountId : undefined),
-      transferInAmount: !isAdvance && (type === 'transfer' || type === 'loan') && data.transferInAmount !== undefined ? data.transferInAmount : undefined,
-      budgetId: isAdvance ? undefined : ((type === 'expense' || type === 'income') ? data.budgetId : undefined),
-      reimbursementStatus: isAdvance
+        : undefined,
+      transferInAmount: undefined,
+      budgetId: isAdvance ? undefined : data.budgetId,
+      reimbursementStatus: (isAdvance || (type === 'expense' && singleContactId))
         ? (transactionToEdit?.reimbursementStatus || 'pending')
-        : (type === 'expense' && singleContactId
-          ? (transactionToEdit?.reimbursementStatus || 'pending')
-          : undefined),
-      reimbursementContactId: isAdvance
-        ? singleContactId
-        : (type === 'expense' ? singleContactId : undefined),
+        : undefined,
+      reimbursementContactId: singleContactId,
       note: data.note,
       date: data.date,
     };
@@ -547,18 +680,32 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
   };
 
   const handleKeypadSubmit = () => {
-    const val = parseFloat(displayAmount);
-    if (isNaN(val) || val <= 0) return;
-    setValue('amount', val);
-    
-    if (type === 'transfer') {
-      const inVal = parseFloat(displayInAmount);
-      if (!isNaN(inVal) && inVal > 0) {
-        setValue('transferInAmount', inVal);
-      } else if (selectedCurrency === selectedToCurrency) {
+    if (isCrossCurrency) {
+      const outVal = parseFloat(displayAmount) || 0;
+      const inVal = parseFloat(displayAmountIn) || 0;
+      if (outVal <= 0) {
+        toast.show(t('add.errors.outflowRequired', '請輸入出款金額'));
+        setFocusedField('out');
+        return;
+      }
+      if (inVal <= 0) {
+        toast.show(t('add.errors.inflowRequired', '請輸入到款金額'));
+        setFocusedField('in');
+        return;
+      }
+      setValue('amount', outVal);
+      setValue('transferInAmount', inVal);
+    } else {
+      const val = parseFloat(displayAmount);
+      if (isNaN(val) || val <= 0) {
+        if (type === 'transfer' && focusedField === 'fee') {
+          setFocusedField('out');
+        }
+        return;
+      }
+      setValue('amount', val);
+      if (type === 'transfer') {
         setValue('transferInAmount', val);
-      } else {
-        setValue('transferInAmount', undefined);
       }
     }
     
@@ -582,7 +729,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
       <DialogContent
         commandDeck
         showCloseButton={false}
-        className="select-none min-h-0"
+        className="select-none min-h-0 sm:overflow-visible"
         aria-describedby={undefined}
       >
         <DialogHeader className="sr-only">
@@ -590,15 +737,15 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         </DialogHeader>
 
         {/* Scrollable Content Wrapper to prevent squashing and ensure scrolling below minimum threshold */}
-        <div className="w-full min-h-full flex flex-col justify-between gap-3 sm:gap-3.5">
-          {/* 1. Top Bar: Segmented Control & Close Button */}
-          <div className="w-full flex items-center justify-between gap-2 shrink-0">
-            <div className="flex-1 bg-muted/80 border border-border p-1 rounded-full flex items-center justify-between text-[13px] font-medium">
+        <div className="w-full min-h-full flex flex-col gap-2.5 sm:gap-3">
+          {/* 1. Top Bar: Segmented Control & Close Button (h-9 / 36px, Sticky Top) */}
+          <div className="sticky top-0 z-20 w-full flex items-center justify-between gap-2 shrink-0 bg-background/95 sm:bg-card/95 backdrop-blur-md py-1 -mt-1">
+            <div className="h-9 flex-1 bg-muted/80 border border-border p-0.5 rounded-full flex items-center justify-between text-xs font-medium">
               <button 
                 type="button"
                 onClick={() => handleTypeChange('expense')}
                 className={cn(
-                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
                   type === 'expense' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -608,7 +755,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                 type="button"
                 onClick={() => handleTypeChange('income')}
                 className={cn(
-                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
                   type === 'income' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -624,7 +771,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                   handleTypeChange('transfer');
                 }}
                 className={cn(
-                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
                   walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed",
                   type === 'transfer' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
                 )}
@@ -635,7 +782,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                 type="button"
                 onClick={() => handleTypeChange('loan', 'lend')}
                 className={cn(
-                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
                   type === 'loan' && loanType === 'lend' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -645,7 +792,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
                 type="button"
                 onClick={() => handleTypeChange('loan', 'borrow')}
                 className={cn(
-                  "flex-1 py-2 rounded-full text-center transition-all cursor-pointer",
+                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
                   type === 'loan' && loanType === 'borrow' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -656,332 +803,510 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
             <button
               type="button"
               onClick={onClose}
-              className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
+              className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
               aria-label="Close"
             >
-              <X className="w-4.5 h-4.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* 2. Hero Section: Account Badge / Flow Bar + Monospace Amount */}
-          <div className="w-full flex-1 min-h-[96px] shrink-0 flex flex-col items-center justify-center py-2 sm:py-3">
-          {/* Account Badge for Expense / Income */}
-          {(type === 'expense' || type === 'income') && (
-            <div className="mb-1.5 flex justify-center">
-              <Select value={selectedAccountId ?? undefined} onValueChange={(val) => setValue('accountId', val ?? undefined)}>
-                <SelectTrigger className="h-7 px-3 py-0 rounded-full bg-muted/80 border border-border text-xs text-foreground hover:bg-muted transition-colors cursor-pointer inline-flex items-center gap-1.5 w-auto">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <SelectValue placeholder={t('add.account')}>
-                    {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="bg-popover border border-border text-popover-foreground">
-                  {accounts?.map(acc => (
-                    <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {/* 2. Hero Section: Amount & Account / Dual Cards */}
+          <div className="w-full flex-1 flex flex-col items-center justify-start sm:justify-center [justify-content:safe_center] my-auto py-1 sm:py-2">
+            {/* Case A: Expense / Income -> [Account Badge] then [Amount] */}
+            {(type === 'expense' || type === 'income') && (
+              <>
+                <div className="mb-1.5 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAccountSelectConfig({
+                        open: true,
+                        title: t('accounts.selectAccountTitle', '選擇帳戶'),
+                        selectedAccountId: selectedAccountId || undefined,
+                        filterType: 'wallet',
+                        onSelect: (acc) => setValue('accountId', acc.id),
+                      });
+                    }}
+                    className="h-7 px-3 py-0 rounded-full bg-muted/80 border border-border text-xs text-foreground hover:bg-muted transition-colors cursor-pointer inline-flex items-center gap-1.5 w-auto shadow-none"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>
+                      {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : t('add.account')}
+                    </span>
+                  </button>
+                </div>
 
-          {/* Dual Standalone Cards with Overlapping Swap Button for Transfer */}
-          {type === 'transfer' && (
-            <div className="relative w-full flex items-stretch gap-2 mb-2">
-              {/* Left Card: 轉出 (FROM) */}
-              <div className="flex-1 min-w-0">
-                <Select
-                  value={selectedFromAccountId || undefined}
-                  onValueChange={(val) => setValue('fromAccountId', val as string)}
-                >
-                  <SelectTrigger
-                    size="custom"
-                    hideIcon
-                    className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
-                  >
-                    <div className="w-full flex items-center justify-between gap-1 mb-1.5">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {t('add.transferFrom', '轉出 (FROM)')}
-                      </span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                    </div>
-                    <div className="w-full min-w-0 pr-3">
-                      <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
-                        {accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account')}
-                      </span>
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border border-border text-popover-foreground">
-                    {accounts?.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id}>
-                        {acc.name} ({acc.currency || baseCurrency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                {/* Massive Monospace Amount Display */}
+                <div className="flex items-baseline justify-center gap-1.5 w-full py-1">
+                  <span className="text-xl font-medium text-muted-foreground tracking-tight">{selectedCurrency}</span>
+                  <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+                    {formatDisplayAmount(displayAmount)}
+                  </span>
+                </div>
 
-              {/* Center Overlap Swap Button */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSwapTransferAccounts();
-                  }}
-                  className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
-                  title={t('add.swapAccounts', '對調帳戶')}
-                >
-                  <ArrowRightLeft className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                {errors.amount && <p className="text-xs font-medium text-destructive mt-1">{errors.amount.message}</p>}
+                {errors.accountId && <p className="text-xs font-medium text-destructive mt-1">{errors.accountId.message}</p>}
+              </>
+            )}
 
-              {/* Right Card: 轉入 (TO) */}
-              <div className="flex-1 min-w-0">
-                <Select
-                  value={selectedToAccountId || undefined}
-                  onValueChange={(val) => setValue('toAccountId', val as string)}
-                >
-                  <SelectTrigger
-                    size="custom"
-                    hideIcon
-                    className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+            {/* Case B: Transfer -> [Amount] then [Fee Pill] then [Dual Cards] */}
+            {type === 'transfer' && (
+              <>
+                {/* Massive Monospace Amount Display (Transfer Field Focus Switchable) */}
+                <div className="w-full flex items-center justify-center py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (focusedField === 'fee') {
+                        setFocusedField(previousAmountField);
+                      } else if (isCrossCurrency) {
+                        const next = focusedField === 'in' ? 'out' : 'in';
+                        setPreviousAmountField(next);
+                        setFocusedField(next);
+                      } else {
+                        setPreviousAmountField('out');
+                        setFocusedField('out');
+                      }
+                    }}
+                    className={cn(
+                      "flex items-baseline justify-center gap-1.5 py-1 px-3 rounded-2xl transition-all cursor-pointer shadow-none",
+                      (focusedField === 'out' || focusedField === 'in')
+                        ? "opacity-100"
+                        : "opacity-40 hover:opacity-80"
+                    )}
+                    title={
+                      isCrossCurrency
+                        ? (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in')
+                            ? t('add.inflow', '到款')
+                            : t('add.outflow', '出款'))
+                        : t('add.transferAmount', '轉帳')
+                    }
                   >
-                    <div className="w-full flex items-center justify-end gap-1 mb-1.5">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {t('add.transferTo', '轉入 (TO)')}
-                      </span>
-                    </div>
-                    <div className="w-full min-w-0 pl-3">
-                      <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
-                        {accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account')}
-                      </span>
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border border-border text-popover-foreground">
-                    {accounts?.map(acc => (
-                      <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id}>
-                        {acc.name} ({acc.currency || baseCurrency})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
+                    <span className="text-xl font-medium text-muted-foreground tracking-tight">
+                      {isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in')) ? toCurrency : fromCurrency}
+                    </span>
+                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+                      {formatDisplayAmount(
+                        isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in'))
+                          ? displayAmountIn
+                          : displayAmount
+                      )}
+                    </span>
+                  </button>
+                </div>
 
-          {/* Dual Standalone Cards with Overlapping Toggle Button for Loan */}
-          {type === 'loan' && (
-            <div className="w-full flex flex-col gap-1.5 mb-2">
-              {/* Top Avatars Row: "Me" vs "Contact" */}
-              <div className="w-full flex items-center justify-between px-0.5">
-                {/* Left Avatar: "Me" if lend, "Contact" if borrow */}
-                {loanType === 'lend' ? (
-                  <div 
-                    className="w-9 h-9 rounded-full bg-foreground text-background border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
-                    title={t('add.me')}
+                {/* Transfer Fee Pill & Cross Currency Rate Pill */}
+                <div className="h-7 flex items-center justify-center gap-2 my-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (focusedField === 'fee') {
+                        setFocusedField(previousAmountField);
+                      } else {
+                        setPreviousAmountField(focusedField === 'in' ? 'in' : 'out');
+                        setFocusedField('fee');
+                      }
+                    }}
+                    className={cn(
+                      "h-7 px-3 rounded-full border text-[11px] inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-none shrink-0",
+                      focusedField === 'fee'
+                        ? "bg-amber-500/15 border-amber-500/70 text-foreground ring-1 ring-amber-500/40 font-semibold"
+                        : parsedFeeAmount > 0
+                          ? "bg-muted/80 border-border text-foreground hover:border-foreground/30"
+                          : "bg-muted/60 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    )}
                   >
-                    {t('add.me')}
-                  </div>
-                ) : (
-                  <div 
-                    className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
-                    title={loanContact?.name || t('add.contact')}
-                  >
-                    {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
-                  </div>
-                )}
+                    <Zap className={cn("w-3 h-3", (focusedField === 'fee' || parsedFeeAmount > 0) ? "text-amber-500" : "text-muted-foreground")} />
+                    <span>{t('add.fee', '手續費')}：</span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {parsedFeeAmount > 0 ? `${parsedFeeAmount.toLocaleString()} ${fromCurrency}` : t('add.noFee', '無手續費')}
+                    </span>
+                  </button>
 
-                {/* Right Avatar: "Contact" if lend, "Me" if borrow */}
-                {loanType === 'lend' ? (
-                  <div 
-                    className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
-                    title={loanContact?.name || t('add.contact')}
-                  >
-                    {loanContact?.name ? loanContact.name.trim().charAt(0).toUpperCase() : '?'}
-                  </div>
-                ) : (
-                  <div 
-                    className="w-9 h-9 rounded-full bg-foreground text-background border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
-                    title={t('add.me')}
-                  >
-                    {t('add.me')}
-                  </div>
-                )}
-              </div>
-
-              {/* Overlapping Dual Cards */}
-              <div className="relative w-full flex items-stretch gap-2">
-                {/* Left Card: Wallet (if lend) OR Contact (if borrow) */}
-                <div className="flex-1 min-w-0">
-                  <Select
-                    value={selectedFromAccountId || undefined}
-                    onValueChange={(val) => setValue('fromAccountId', val as string)}
-                  >
-                    <SelectTrigger
-                      size="custom"
-                      hideIcon
-                      className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+                  {isCrossCurrency && (
+                    <div
+                      className="h-7 px-2.5 rounded-full border border-border bg-muted/60 text-[11px] font-mono inline-flex items-center gap-1 shadow-none text-muted-foreground select-none shrink-0"
                     >
-                      <div className="w-full flex items-center justify-between gap-1 mb-1.5">
+                      <ArrowRightLeft className="w-3 h-3 text-muted-foreground shrink-0" />
+                      {calculatedRate !== null ? (
+                        <span>1 {fromCurrency} ≈ {parseFloat(calculatedRate.toFixed(4)).toString()} {toCurrency}</span>
+                      ) : parsedAmount > 0 ? (
+                        <span>1 {fromCurrency} ≈ {t('add.pendingInflow', '待輸入到款')}</span>
+                      ) : parsedAmountIn > 0 ? (
+                        <span>{t('add.pendingOutflow', '待輸入出款')} ≈ {parsedAmountIn} {toCurrency}</span>
+                      ) : (
+                        <span>1 {fromCurrency} ≈ {t('add.pendingInflow', '待輸入到款')}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {errors.amount && <p className="text-xs font-medium text-destructive mt-1">{errors.amount.message}</p>}
+
+                {/* Dual Standalone Cards with Overlapping Swap Button for Transfer */}
+                <div className="relative w-full flex items-stretch gap-2 mt-6 sm:mt-7 mb-1 overflow-visible">
+                  {/* Left Card: 轉出 (FROM) */}
+                  <div className="relative flex-1 min-w-0 overflow-visible">
+                    {showTransferBubbles && (
+                      <div className="absolute -top-3.5 left-0 sm:-left-4 z-20 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white text-xs font-mono font-bold shadow-none">
+                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-sans font-normal shrink-0">
+                            {t('add.cardDeducted', '實扣')}
+                          </span>
+                          <span className="text-xs font-mono font-bold whitespace-nowrap">
+                            {selectedCurrency} {transferDeductedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountSelectConfig({
+                          open: true,
+                          title: t('add.transferFrom', '轉出 (FROM)'),
+                          selectedAccountId: selectedFromAccountId || undefined,
+                          disabledAccountIds: selectedToAccountId ? [selectedToAccountId] : [],
+                          disabledReason: t('accounts.alreadySelectedTarget', '當前轉入帳戶'),
+                          filterType: 'wallet',
+                          onSelect: (acc) => setValue('fromAccountId', acc.id),
+                        });
+                      }}
+                      className={cn(
+                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        selectedFromAccountId && accounts?.some(a => a.id === selectedFromAccountId)
+                          ? "bg-card border-border hover:bg-muted/30"
+                          : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
+                      )}
+                    >
+                      <div className="w-full flex items-center justify-start gap-1 mb-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {loanType === 'lend' ? t('add.lendFrom', '出款 (FROM)') : t('add.borrowFrom', '借款來源 (FROM)')}
+                          {t('add.transferFrom', '轉出 (FROM)')}
                         </span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      </div>
+                      <div className="w-full min-w-0 pr-3">
+                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
+                          {accounts?.find(a => a.id === selectedFromAccountId)?.name || '\u00A0'}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Center Overlap Swap Button */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSwapTransferAccounts();
+                      }}
+                      className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                      title={t('add.swapAccounts', '對調帳戶')}
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Right Card: 轉入 (TO) */}
+                  <div className="relative flex-1 min-w-0 overflow-visible">
+                    {showTransferBubbles && (
+                      <div className="absolute -top-3.5 right-0 sm:-right-4 z-20 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white text-xs font-mono font-bold shadow-none">
+                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-sans font-normal shrink-0">
+                            {t('add.cardReceived', '實收')}
+                          </span>
+                          <span className="text-xs font-mono font-bold whitespace-nowrap">
+                            {selectedToCurrency} {transferReceivedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountSelectConfig({
+                          open: true,
+                          title: t('add.transferTo', '轉入 (TO)'),
+                          selectedAccountId: selectedToAccountId || undefined,
+                          disabledAccountIds: selectedFromAccountId ? [selectedFromAccountId] : [],
+                          disabledReason: t('accounts.alreadySelectedSource', '當前轉出帳戶'),
+                          filterType: 'wallet',
+                          onSelect: (acc) => setValue('toAccountId', acc.id),
+                        });
+                      }}
+                      className={cn(
+                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        selectedToAccountId && accounts?.some(a => a.id === selectedToAccountId)
+                          ? "bg-card border-border hover:bg-muted/30"
+                          : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
+                      )}
+                    >
+                      <div className="w-full flex items-center justify-end gap-1 mb-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {t('add.transferTo', '轉入 (TO)')}
+                        </span>
+                      </div>
+                      <div className="w-full min-w-0 pl-3">
+                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
+                          {accounts?.find(a => a.id === selectedToAccountId)?.name || '\u00A0'}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {(errors.fromAccountId || errors.toAccountId) && (
+                  <p className="text-xs font-medium text-destructive mt-1">{(errors.fromAccountId || errors.toAccountId)?.message}</p>
+                )}
+              </>
+            )}
+
+            {/* Case C: Loan -> [Amount] then [Avatars Row] then [Dual Cards] */}
+            {type === 'loan' && (
+              <>
+                {/* Massive Monospace Amount Display */}
+                <div className="w-full flex items-center justify-center py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isCrossCurrency) {
+                        setFocusedField(prev => prev === 'in' ? 'out' : 'in');
+                      } else {
+                        setFocusedField('out');
+                      }
+                    }}
+                    className={cn(
+                      "flex items-baseline justify-center gap-1.5 py-1 px-3 rounded-2xl transition-all cursor-pointer shadow-none",
+                      (focusedField === 'out' || focusedField === 'in')
+                        ? "opacity-100"
+                        : "opacity-40 hover:opacity-80"
+                    )}
+                    title={isCrossCurrency ? (focusedField === 'in' ? t('add.inflow', '到款') : t('add.outflow', '出款')) : t('add.loanAmount', '借貸金額')}
+                  >
+                    <span className="text-xl font-medium text-muted-foreground tracking-tight">
+                      {isCrossCurrency && focusedField === 'in' ? toCurrency : fromCurrency}
+                    </span>
+                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+                      {formatDisplayAmount(isCrossCurrency && focusedField === 'in' ? displayAmountIn : displayAmount)}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Loan Info Row: Gift Badge (Left) & Rate Pill (Right) - Same Row, Fixed Height h-7 */}
+                <div className="h-7 flex items-center justify-center gap-2 my-1">
+                  {isGift && (
+                    <div
+                      className="h-7 px-2.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[11px] font-medium inline-flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 select-none shrink-0"
+                    >
+                      <Gift className="w-3 h-3 text-purple-500 shrink-0" />
+                      <span>{t('add.gift', '贈與')}</span>
+                    </div>
+                  )}
+
+                  {isCrossCurrency && (
+                    <div
+                      className="h-7 px-2.5 rounded-full border border-border bg-muted/60 text-[11px] font-mono inline-flex items-center gap-1 shadow-none text-muted-foreground select-none shrink-0"
+                    >
+                      <ArrowRightLeft className="w-3 h-3 text-muted-foreground shrink-0" />
+                      {calculatedRate !== null ? (
+                        <span>1 {fromCurrency} ≈ {parseFloat(calculatedRate.toFixed(4)).toString()} {toCurrency}</span>
+                      ) : parsedAmount > 0 ? (
+                        <span>1 {fromCurrency} ≈ {t('add.pendingInflow', '待輸入到款')}</span>
+                      ) : parsedAmountIn > 0 ? (
+                        <span>{t('add.pendingOutflow', '待輸入出款')} ≈ {parsedAmountIn} {toCurrency}</span>
+                      ) : (
+                        <span>1 {fromCurrency} ≈ {t('add.pendingInflow', '待輸入到款')}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {errors.amount && <p className="text-xs font-medium text-destructive mt-1">{errors.amount.message}</p>}
+
+                {/* Dual Standalone Cards with Overlapping Toggle Button for Loan */}
+                <div className="relative w-full flex items-stretch gap-2 mt-6 sm:mt-7 mb-1 overflow-visible">
+                  {/* Left Card: Wallet (if lend) OR Contact (if borrow) */}
+                  <div className="relative flex-1 min-w-0 overflow-visible">
+                    {/* Left Avatar: Overlapping top-right corner */}
+                    <div className="absolute top-0 -translate-y-1/2 right-3 sm:right-4 z-20 pointer-events-none">
+                      {loanType === 'lend' ? (
+                        <div 
+                          className="w-9 h-9 rounded-full bg-foreground text-background border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                          title={t('add.me')}
+                        >
+                          {t('add.me')}
+                        </div>
+                      ) : loanContact ? (
+                        <div 
+                          className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                          title={loanContact.name}
+                        >
+                          {loanContact.name.trim().charAt(0).toUpperCase()}
+                        </div>
+                      ) : (
+                        <div 
+                          className="w-9 h-9 rounded-full bg-card text-muted-foreground/40 border border-dashed border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                          title={t('add.contact')}
+                        >
+                          ?
+                        </div>
+                      )}
+                    </div>
+
+                    {isCrossCurrency && parsedAmount > 0 && (
+                      <div className="absolute -top-3.5 left-0 sm:-left-4 z-20 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white text-xs font-mono font-bold shadow-none">
+                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-sans font-normal shrink-0">
+                            {t('add.outflow', '出款')}
+                          </span>
+                          <span className="text-xs font-mono font-bold whitespace-nowrap">
+                            {fromCurrency} {parsedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isLend = loanType === 'lend';
+                        setAccountSelectConfig({
+                          open: true,
+                          title: isLend ? t('add.lendFrom', '出款 (FROM)') : t('add.borrowFrom', '收款來源 (FROM)'),
+                          selectedAccountId: selectedFromAccountId || undefined,
+                          filterType: isLend ? 'wallet' : 'contact',
+                          disabledAccountIds: selectedToAccountId ? [selectedToAccountId] : [],
+                          disabledReason: isLend ? t('accounts.alreadySelectedTarget') : undefined,
+                          onSelect: (acc) => setValue('fromAccountId', acc.id),
+                        });
+                      }}
+                      className={cn(
+                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        (loanType === 'lend' ? (selectedFromAccountId && accounts?.some(a => a.id === selectedFromAccountId)) : Boolean(loanContact))
+                          ? "bg-card border-border hover:bg-muted/30"
+                          : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
+                      )}
+                    >
+                      <div className="w-full flex items-center justify-start gap-1 mb-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {loanType === 'lend' ? t('add.lendFrom', '出款 (FROM)') : t('add.borrowFrom', '收款來源 (FROM)')}
+                        </span>
                       </div>
                       <div className="w-full min-w-0 pr-3">
                         <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
                           {loanType === 'lend'
-                            ? (accounts?.find(a => a.id === selectedFromAccountId)?.name || t('add.account'))
-                            : (loanContact?.name || t('add.contact'))}
+                            ? (accounts?.find(a => a.id === selectedFromAccountId)?.name || '\u00A0')
+                            : (loanContact?.name || '\u00A0')}
                         </span>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border border-border text-popover-foreground">
-                      {(loanType === 'lend' ? accounts : contacts)?.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id} disabled={selectedToAccountId === acc.id} className="py-2 cursor-pointer">
-                          {loanType === 'lend' ? (
-                            <span>{acc.name} ({acc.currency || baseCurrency})</span>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-[10px] font-bold text-purple-600 dark:text-purple-400 shrink-0">
-                                {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
-                              </div>
-                              <div className="flex flex-col text-left">
-                                <span className="text-xs font-semibold">{acc.name}</span>
-                                <span className="text-[9px] text-muted-foreground">
-                                  {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    </button>
+                  </div>
 
-                {/* Center Overlap Toggle Button */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleLoanType();
-                    }}
-                    className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
-                    title={loanType === 'lend' ? t('add.lend') : t('add.borrow')}
-                  >
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                  {/* Center Overlap Toggle Button */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleLoanType();
+                      }}
+                      className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                      title={loanType === 'lend' ? t('add.lend') : t('add.borrow')}
+                    >
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
 
-                {/* Right Card: Contact (if lend) OR Wallet (if borrow) */}
-                <div className="flex-1 min-w-0">
-                  <Select
-                    value={selectedToAccountId || undefined}
-                    onValueChange={(val) => setValue('toAccountId', val as string)}
-                  >
-                    <SelectTrigger
-                      size="custom"
-                      hideIcon
-                      className="w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl bg-card border border-border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground transition-colors shadow-none"
+                  {/* Right Card: Contact (if lend) OR Wallet (if borrow) */}
+                  <div className="relative flex-1 min-w-0 overflow-visible">
+                    {/* Right Avatar: Overlapping top-left corner */}
+                    <div className="absolute top-0 -translate-y-1/2 left-3 sm:left-4 z-20 pointer-events-none">
+                      {loanType === 'lend' ? (
+                        loanContact ? (
+                          <div 
+                            className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                            title={loanContact.name}
+                          >
+                            {loanContact.name.trim().charAt(0).toUpperCase()}
+                          </div>
+                        ) : (
+                          <div 
+                            className="w-9 h-9 rounded-full bg-card text-muted-foreground/40 border border-dashed border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                            title={t('add.contact')}
+                          >
+                            ?
+                          </div>
+                        )
+                      ) : (
+                        <div 
+                          className="w-9 h-9 rounded-full bg-foreground text-background border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                          title={t('add.me')}
+                        >
+                          {t('add.me')}
+                        </div>
+                      )}
+                    </div>
+
+                    {isCrossCurrency && parsedAmountIn > 0 && (
+                      <div className="absolute -top-3.5 right-0 sm:-right-4 z-20 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black dark:bg-white text-white dark:text-black border border-black dark:border-white text-xs font-mono font-bold shadow-none">
+                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-sans font-normal shrink-0">
+                            {t('add.inflow', '到款')}
+                          </span>
+                          <span className="text-xs font-mono font-bold whitespace-nowrap">
+                            {toCurrency} {parsedAmountIn.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isLend = loanType === 'lend';
+                        setAccountSelectConfig({
+                          open: true,
+                          title: isLend ? t('add.lendTo', '給款對象 (TO)') : t('add.borrowTo', '入款 (TO)'),
+                          selectedAccountId: selectedToAccountId || undefined,
+                          filterType: isLend ? 'contact' : 'wallet',
+                          disabledAccountIds: selectedFromAccountId ? [selectedFromAccountId] : [],
+                          disabledReason: !isLend ? t('accounts.alreadySelectedSource') : undefined,
+                          onSelect: (acc) => setValue('toAccountId', acc.id),
+                        });
+                      }}
+                      className={cn(
+                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        (loanType === 'lend' ? Boolean(loanContact) : (selectedToAccountId && accounts?.some(a => a.id === selectedToAccountId)))
+                          ? "bg-card border-border hover:bg-muted/30"
+                          : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
+                      )}
                     >
                       <div className="w-full flex items-center justify-end gap-1 mb-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {loanType === 'lend' ? t('add.lendTo', '借款對象 (TO)') : t('add.borrowTo', '入款 (TO)')}
+                          {loanType === 'lend' ? t('add.lendTo', '給款對象 (TO)') : t('add.borrowTo', '入款 (TO)')}
                         </span>
                       </div>
                       <div className="w-full min-w-0 pl-3">
                         <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
                           {loanType === 'lend'
-                            ? (loanContact?.name || t('add.contact'))
-                            : (accounts?.find(a => a.id === selectedToAccountId)?.name || t('add.account'))}
+                            ? (loanContact?.name || '\u00A0')
+                            : (accounts?.find(a => a.id === selectedToAccountId)?.name || '\u00A0')}
                         </span>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border border-border text-popover-foreground">
-                      {(loanType === 'lend' ? contacts : accounts)?.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id} disabled={selectedFromAccountId === acc.id} className="py-2 cursor-pointer">
-                          {loanType === 'lend' ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
-                                {acc.name ? acc.name.trim().charAt(0).toUpperCase() : '?'}
-                              </div>
-                              <div className="flex flex-col text-left">
-                                <span className="text-xs font-semibold">{acc.name}</span>
-                                <span className="text-[9px] text-muted-foreground">
-                                  {acc.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <span>{acc.name} ({acc.currency || baseCurrency})</span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Massive Monospace Amount Display */}
-          <div className="flex items-baseline justify-center gap-1.5 w-full py-1">
-            <span className="text-xl font-medium text-muted-foreground tracking-tight">{selectedCurrency}</span>
-            <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
-              {formatDisplayAmount(displayAmount)}
-            </span>
+                {(errors.fromAccountId || errors.toAccountId) && (
+                  <p className="text-xs font-medium text-destructive mt-1">{(errors.fromAccountId || errors.toAccountId)?.message}</p>
+                )}
+              </>
+            )}
+
           </div>
-
-          {errors.amount && <p className="text-xs font-medium text-destructive mt-1">{errors.amount.message}</p>}
-          {errors.accountId && (type !== 'transfer' && type !== 'loan') && <p className="text-xs font-medium text-destructive mt-1">{errors.accountId.message}</p>}
-
-          {/* Transfer Fee & Multi-currency Info Pills */}
-          {type === 'transfer' && (
-            <div className="mt-1 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setFeeInput(diffAmount > 0 ? diffAmount.toString() : '');
-                  setIsFeeDialogOpen(true);
-                }}
-                className="px-2.5 py-1 rounded-full bg-muted/80 border border-border text-[11px] text-muted-foreground hover:text-foreground hover:border-foreground/30 flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Zap className="w-3 h-3 text-amber-500" />
-                <span>{t('add.fee', '手續費')}：</span>
-                <span className="font-mono font-semibold text-foreground">
-                  {diffAmount > 0 ? `${diffAmount.toLocaleString()} ${selectedCurrency}` : t('add.noFee', '無手續費')}
-                </span>
-                <span className="text-[9px] opacity-60">▾</span>
-              </button>
-
-              {selectedCurrency !== selectedToCurrency && (
-                <div className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1">
-                  <span>1 {selectedCurrency} ≈ {getRate(selectedCurrency, selectedToCurrency).toFixed(4)} {selectedToCurrency}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-
-          {/* Multi-currency Exchange Rate Info */}
-          {selectedCurrency !== baseCurrency && (
-            <div className="w-full mt-2 p-2 border border-border rounded-xl bg-muted/40 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground text-[11px]">1 {selectedCurrency} =</span>
-              <Input 
-                type="number" 
-                className="w-20 h-6 text-right font-mono text-xs px-1 bg-transparent border-border text-foreground" 
-                value={customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency).toFixed(4)}
-                onChange={(e) => setCustomExchangeRate(parseFloat(e.target.value) || 1)}
-              />
-              <span className="text-muted-foreground text-[11px]">{baseCurrency}</span>
-              <span className="font-mono text-foreground ml-2">
-                ≈ {((parseFloat(displayAmount) || 0) * (customExchangeRate !== null ? customExchangeRate : getRate(selectedCurrency, baseCurrency))).toLocaleString(undefined, { maximumFractionDigits: 2 })} {baseCurrency}
-              </span>
-            </div>
-          )}
-        </div>
 
         {/* 3. Lower Control Deck: Categories + Note + Keypad with strictly uniform gap-2 (8px) */}
         <div className="w-full flex flex-col gap-2 shrink-0 mt-auto">
@@ -1035,18 +1360,18 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           {/* Integrated Keypad */}
           <div className="w-full">
           <NumericKeypad 
-            value={type === 'transfer' && focusedAmount === 'in' ? displayInAmount : displayAmount} 
+            value={
+              type === 'transfer' && focusedField === 'fee'
+                ? displayFeeAmount
+                : isCrossCurrency && focusedField === 'in'
+                ? displayAmountIn
+                : displayAmount
+            } 
             onChange={(val) => {
-              if (type === 'transfer') {
-                if (focusedAmount === 'in') {
-                  setDisplayInAmount(val);
-                  setIsLinked(false);
-                } else {
-                  setDisplayAmount(val);
-                  if (isLinked && selectedCurrency === selectedToCurrency) {
-                    setDisplayInAmount(val);
-                  }
-                }
+              if (type === 'transfer' && focusedField === 'fee') {
+                setDisplayFeeAmount(val);
+              } else if (isCrossCurrency && focusedField === 'in') {
+                setDisplayAmountIn(val);
               } else {
                 setDisplayAmount(val);
               }
@@ -1063,25 +1388,32 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
               setSplits(newSplits);
               setValue('reimbursementContactId', newSplits.length === 1 ? newSplits[0].contactId : undefined);
             }}
-            currencySymbol={getCurrencySymbol(selectedCurrency)}
+            currencySymbol={getCurrencySymbol(fromCurrency)}
             reimbursementContactId={splits.length === 1 ? splits[0].contactId : undefined}
             onReimbursementContactChange={(cId) => {
               setValue('reimbursementContactId', cId);
             }}
             contacts={contacts}
-            onFeeClick={() => {
-              setFeeInput(diffAmount > 0 ? diffAmount.toString() : '');
-              setIsFeeDialogOpen(true);
-            }}
-            feeAmount={diffAmount}
-            loanContactName={loanContact?.name}
-            onLoanContactSelect={(cId) => {
-              if (loanType === 'lend') {
-                setValue('toAccountId', cId);
+            feeAmount={type === 'transfer' ? parsedFeeAmount : 0}
+            isFeeActive={type === 'transfer' && focusedField === 'fee'}
+            onToggleFeeMode={() => {
+              if (focusedField === 'fee') {
+                setFocusedField(previousAmountField);
               } else {
-                setValue('fromAccountId', cId);
+                setPreviousAmountField(focusedField === 'in' ? 'in' : 'out');
+                setFocusedField('fee');
               }
             }}
+            isCrossCurrency={isCrossCurrency}
+            activeAmountField={focusedField === 'fee' ? null : (focusedField === 'in' ? 'in' : 'out')}
+            onSelectAmountField={(field) => {
+              setPreviousAmountField(field);
+              setFocusedField(field);
+            }}
+            fromCurrency={fromCurrency}
+            toCurrency={toCurrency}
+            isGift={isGift}
+            onToggleGift={() => setIsGift(prev => !prev)}
           />
         </div>
       </div>
@@ -1175,74 +1507,19 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
           </DialogContent>
         </Dialog>
 
-        {/* Transfer Fee Settings Dialog */}
-        <Dialog open={isFeeDialogOpen} onOpenChange={setIsFeeDialogOpen}>
-          <DialogContent className="sm:max-w-[340px] bg-card border border-border text-card-foreground p-4">
-            <DialogHeader>
-              <DialogTitle className="text-card-foreground text-base font-semibold flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
-                <span>{t('add.feeSetting', '手續費設定')}</span>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 py-2">
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">
-                  {t('add.fee', '手續費')} ({selectedCurrency})
-                </label>
-                <Input
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  value={feeInput}
-                  onChange={(e) => setFeeInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmFee()}
-                  className="bg-muted/60 border-border text-foreground font-mono"
-                  autoFocus
-                />
-              </div>
-
-              {categories && (
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">
-                    {t('add.category', '分類')}
-                  </label>
-                  <Select
-                    value={watch('feeCategoryId') || ''}
-                    onValueChange={(val) => setValue('feeCategoryId', val || undefined)}
-                  >
-                    <SelectTrigger className="w-full bg-muted/60 border-border text-foreground text-xs">
-                      <SelectValue placeholder={t('add.category', '分類')} />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border border-border text-popover-foreground max-h-48">
-                      {categories.filter(c => c.type === 'expense').map(cat => (
-                        <SelectItem key={cat.id} value={cat.id} className="text-xs cursor-pointer">
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            <DialogFooter className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setIsFeeDialogOpen(false)}
-                className="border-border text-foreground hover:bg-muted"
-              >
-                {t('common.cancel', '取消')}
-              </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmFee}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {t('common.confirm', '確認')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Account / Contact Select Dialog */}
+        <AccountSelectDialog
+          open={accountSelectConfig.open}
+          onOpenChange={(open) => setAccountSelectConfig(prev => ({ ...prev, open }))}
+          title={accountSelectConfig.title}
+          selectedAccountId={accountSelectConfig.selectedAccountId}
+          disabledAccountIds={accountSelectConfig.disabledAccountIds}
+          disabledReason={accountSelectConfig.disabledReason}
+          filterType={accountSelectConfig.filterType}
+          onSelectAccount={(acc) => {
+            accountSelectConfig.onSelect(acc);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

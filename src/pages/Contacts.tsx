@@ -38,7 +38,7 @@ export default function Contacts() {
     const map: Record<string, number> = {};
     transactions?.forEach(t => {
       if (!t.deleted && t.parentId && t.type === 'income') {
-        map[t.parentId] = (map[t.parentId] || 0) + t.amount;
+        map[t.parentId] = (map[t.parentId] || 0) + (t.originalAmount ?? t.amount);
       }
     });
     return map;
@@ -66,8 +66,8 @@ export default function Contacts() {
       // If money flows TO the contact account, the contact balance INCREASES
       // (This means they hold our money, i.e., Owes you)
       if (tx.type === 'transfer' || tx.type === 'loan') {
-        if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount; // transfer FROM contact
-        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.amount); // transfer TO contact
+        if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.originalAmount; // transfer FROM contact
+        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.originalAmount); // transfer TO contact
       }
     });
 
@@ -89,7 +89,8 @@ export default function Contacts() {
         const contactId = tx.reimbursementContactId || (tx.type === 'loan' ? tx.toAccountId : undefined);
         if (contactId && reimbursements[contactId] !== undefined) {
           const refunded = childRefundsMap[tx.id] || 0;
-          const remaining = Math.max(0, Math.round((tx.amount - refunded) * 100) / 100);
+          const orig = tx.originalAmount ?? tx.amount;
+          const remaining = Math.max(0, Math.round((orig - refunded) * 100) / 100);
           reimbursements[contactId] += remaining;
         }
       }

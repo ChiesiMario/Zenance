@@ -25,6 +25,8 @@ export default function ContactDetails() {
   
   const contact = contacts?.find(a => a.id === id);
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
+  const baseCurrency = activeLedger?.baseCurrency || 'CNY';
+  const currency = contact?.currency || baseCurrency;
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -181,7 +183,7 @@ export default function ContactDetails() {
             {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
           </p>
           <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", netBalance === 0 ? 'text-muted-foreground/50' : netBalance > 0 ? 'text-foreground' : 'text-muted-foreground')}>
-            <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+            <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={currency} type="neutral" />
           </div>
         </div>
 
@@ -190,13 +192,13 @@ export default function ContactDetails() {
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
             <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalLent === 0 ? "text-muted-foreground/50" : "text-foreground")}>
-              <AmountDisplay amount={totalLent} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+              <AmountDisplay amount={totalLent} baseCurrency={currency} type="neutral" />
             </p>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
             <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalBorrowed === 0 ? "text-muted-foreground/50" : "text-foreground")}>
-              <AmountDisplay amount={totalBorrowed} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+              <AmountDisplay amount={totalBorrowed} baseCurrency={currency} type="neutral" />
             </p>
           </div>
         </div>

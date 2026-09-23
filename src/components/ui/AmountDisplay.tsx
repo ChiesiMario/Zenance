@@ -4,6 +4,7 @@ export interface AmountDisplayProps {
   amount: number;
   originalCurrency?: string;
   baseCurrency?: string;
+  isApproximate?: boolean;
   type?: 'income' | 'expense' | 'transfer' | 'loan' | 'neutral';
   showSign?: boolean;
   className?: string;
@@ -13,11 +14,14 @@ export function AmountDisplay({
   amount,
   originalCurrency,
   baseCurrency = 'CNY',
+  isApproximate,
   type = 'neutral',
   showSign = true,
   className,
 }: AmountDisplayProps) {
-  const isApproximate = originalCurrency && originalCurrency !== baseCurrency;
+  const effectiveIsApproximate = isApproximate !== undefined
+    ? isApproximate
+    : Boolean(originalCurrency && originalCurrency !== baseCurrency);
   const symbol = getCurrencySymbol(baseCurrency);
   const formattedAmount = Math.abs(amount).toLocaleString(undefined, { maximumFractionDigits: 2 });
   
@@ -47,7 +51,7 @@ export function AmountDisplay({
 
   return (
     <span className={cn('font-mono font-medium', colorClass, className)}>
-      {isApproximate && '≈ '}
+      {effectiveIsApproximate && '≈ '}
       {sign}
       {symbol}
       {formattedAmount}

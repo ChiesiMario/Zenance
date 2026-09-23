@@ -1,6 +1,6 @@
 import type { Account } from '@/services/db/db';
 import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
+import { cn, getCurrencySymbol } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import React from 'react';
 
@@ -81,7 +81,7 @@ export function ContactGroupCard({
                         : "text-muted-foreground"
                     )}
                   >
-                    {netReceivable < 0 ? '-' : ''}{currencySymbol}{Math.abs(netReceivable).toLocaleString()}
+                    {netReceivable < 0 ? '-' : ''}{contact.currency ? getCurrencySymbol(contact.currency) : currencySymbol}{Math.abs(netReceivable).toLocaleString()}
                   </span>
                 </div>
               </div>

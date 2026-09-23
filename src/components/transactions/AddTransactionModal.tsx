@@ -29,9 +29,20 @@ interface Props {
   initialLoanType?: 'borrow' | 'lend';
   transactionToEditId?: string | null;
   initialContactId?: string | null;
+  initialToAccountId?: string | null;
+  initialAmount?: number | null;
 }
 
-export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', initialLoanType = 'borrow', transactionToEditId, initialContactId }: Props) {
+export function AddTransactionModal({ 
+  isOpen, 
+  onClose, 
+  initialType = 'expense', 
+  initialLoanType = 'borrow', 
+  transactionToEditId, 
+  initialContactId,
+  initialToAccountId,
+  initialAmount,
+}: Props) {
   const { t } = useTranslation();
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactions();
   const { categories, addCategory } = useCategories();
@@ -202,7 +213,15 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
         setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
         setValue('reimbursementContactId', initialContactId || undefined);
-        setDisplayAmount('');
+        if (initialAmount && initialAmount > 0) {
+          setDisplayAmount(initialAmount.toString());
+          setValue('amount', initialAmount);
+        } else {
+          setDisplayAmount('');
+        }
+        if (initialToAccountId) {
+          setValue('toAccountId', initialToAccountId);
+        }
         setDisplayAmountIn('');
         setDisplayFeeAmount('');
         setFocusedField('out');
@@ -212,7 +231,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         setIsGift(false);
       }
     }
-  }, [isOpen, initialType, initialLoanType, initialContactId, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue]);
+  }, [isOpen, initialType, initialLoanType, initialContactId, initialToAccountId, initialAmount, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue]);
 
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer' | 'loan', newLoanType?: 'borrow' | 'lend') => {
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;
@@ -385,8 +404,12 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
     }
 
     if (type === 'transfer') {
+      if (initialToAccountId && !selectedToAccountId) {
+        setValue('toAccountId', initialToAccountId);
+      }
       if (!selectedFromAccountId) {
-        setValue('fromAccountId', defaultAcc.id);
+        const candidate = accounts.find(a => a.id !== initialToAccountId && a.isDefault) || accounts.find(a => a.id !== initialToAccountId) || defaultAcc;
+        setValue('fromAccountId', candidate.id);
       }
       return;
     }
@@ -409,7 +432,7 @@ export function AddTransactionModal({ isOpen, onClose, initialType = 'expense', 
         }
       }
     }
-  }, [accounts, type, loanType, contacts, setValue, initialContactId, selectedAccountId, selectedFromAccountId, selectedToAccountId]);
+  }, [accounts, type, loanType, contacts, setValue, initialContactId, selectedAccountId, selectedFromAccountId, selectedToAccountId, initialToAccountId]);
 
   const onSubmit = async (data: FormValues) => {
     const rateToBase = getRate(fromCurrency, baseCurrency);

@@ -38,7 +38,14 @@ export function useAccounts() {
     };
   }, [accounts, archivedAccounts]);
 
-  const addAccount = async (name: string, type: 'wallet' | 'contact' = 'wallet', initialBalance: number = 0, currency?: string, group: string = 'cash'): Promise<Account | null> => {
+  const addAccount = async (
+    name: string,
+    type: 'wallet' | 'contact' = 'wallet',
+    initialBalance: number = 0,
+    currency?: string,
+    group: string = 'cash',
+    extra?: Partial<Account>
+  ): Promise<Account | null> => {
     if (!activeLedgerId) return null;
     const isFirstAccount = await db.accounts.filter(a => !a.deleted && (!a.type || a.type === 'wallet') && a.ledgerId === activeLedgerId).count() === 0;
     
@@ -51,6 +58,7 @@ export function useAccounts() {
       isDefault: type === 'wallet' ? isFirstAccount : false,
       initialBalance,
       currency,
+      ...extra,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       deleted: false,

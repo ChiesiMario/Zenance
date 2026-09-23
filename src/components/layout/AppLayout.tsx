@@ -22,7 +22,21 @@ export function AppLayout() {
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
   const { wallets } = useAccounts();
-  const { activeLedgerId, editingTransactionId, setEditingTransactionId, viewingTransactionId, setViewingTransactionId, isAddModalOpen, addModalType, addModalLoanType, addModalContactId, openAddModal, closeAddModal } = useAppStore();
+  const { 
+    activeLedgerId, 
+    editingTransactionId, 
+    setEditingTransactionId, 
+    viewingTransactionId, 
+    setViewingTransactionId, 
+    isAddModalOpen, 
+    addModalType, 
+    addModalLoanType, 
+    addModalContactId, 
+    addModalInitialToAccountId,
+    addModalInitialAmount,
+    openAddModal, 
+    closeAddModal 
+  } = useAppStore();
   
   const walletCount = wallets?.length ?? 0;
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
@@ -184,6 +198,8 @@ export function AppLayout() {
         initialLoanType={addModalLoanType}
         transactionToEditId={editingTransactionId}
         initialContactId={addModalContactId}
+        initialToAccountId={addModalInitialToAccountId}
+        initialAmount={addModalInitialAmount}
       />
 
       <TransactionDetailsDialog 

@@ -69,7 +69,11 @@ export interface Account {
   isDefault: boolean;
   initialBalance?: number;
   currency?: string;
+  creditLimit?: number; // 信用總額度
+  statementDay?: number; // 每月帳單日 (1 - 31)
+  dueDay?: number; // 每月還款日 (1 - 31)
   archived?: boolean;
+  excludeFromStats?: boolean; // 排除資產統計
   createdAt: string;
   updatedAt: string;
   deleted: boolean;

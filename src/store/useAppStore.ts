@@ -16,7 +16,15 @@ interface AppState {
   addModalType: 'expense' | 'income' | 'transfer' | 'loan';
   addModalLoanType: 'borrow' | 'lend';
   addModalContactId: string | null;
-  openAddModal: (type?: 'expense' | 'income' | 'transfer' | 'loan', loanType?: 'borrow' | 'lend', contactId?: string) => void;
+  addModalInitialToAccountId?: string | null;
+  addModalInitialAmount?: number | null;
+  openAddModal: (
+    type?: 'expense' | 'income' | 'transfer' | 'loan',
+    loanType?: 'borrow' | 'lend',
+    contactId?: string,
+    initialToAccountId?: string,
+    initialAmount?: number
+  ) => void;
   closeAddModal: () => void;
 }
 
@@ -32,14 +40,28 @@ export const useAppStore = create<AppState>()(
       addModalType: 'expense',
       addModalLoanType: 'borrow',
       addModalContactId: null,
+      addModalInitialToAccountId: null,
+      addModalInitialAmount: null,
       setSyncing: (isSyncing) => set({ isSyncing }),
       setLastSyncTime: (time) => set({ lastSyncTime: time }),
       setActiveLedgerId: (id) => set({ activeLedgerId: id }),
       setEditingTransactionId: (id) => set({ editingTransactionId: id }),
       setViewingTransactionId: (id) => set({ viewingTransactionId: id }),
-      openAddModal: (type = 'expense', loanType = 'borrow', contactId) => 
-        set({ isAddModalOpen: true, addModalType: type, addModalLoanType: loanType, addModalContactId: contactId || null }),
-      closeAddModal: () => set({ isAddModalOpen: false, addModalContactId: null }),
+      openAddModal: (type = 'expense', loanType = 'borrow', contactId, initialToAccountId, initialAmount) => 
+        set({ 
+          isAddModalOpen: true, 
+          addModalType: type, 
+          addModalLoanType: loanType, 
+          addModalContactId: contactId || null,
+          addModalInitialToAccountId: initialToAccountId || null,
+          addModalInitialAmount: initialAmount ?? null,
+        }),
+      closeAddModal: () => set({ 
+        isAddModalOpen: false, 
+        addModalContactId: null,
+        addModalInitialToAccountId: null,
+        addModalInitialAmount: null,
+      }),
     }),
     {
       name: 'zenance-app-storage',

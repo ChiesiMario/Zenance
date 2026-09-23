@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft, User, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
@@ -164,7 +164,14 @@ export default function ContactDetails() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/contacts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer">
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-xl font-semibold tracking-tight truncate px-2">{contact?.name}</h2>
+        <div className="flex items-center gap-2 min-w-0 px-2 overflow-hidden">
+          {contact?.group === 'organization' ? (
+            <Building2 className="w-5 h-5 text-muted-foreground shrink-0" />
+          ) : (
+            <User className="w-5 h-5 text-muted-foreground shrink-0" />
+          )}
+          <h2 className="text-xl font-semibold tracking-tight truncate">{contact?.name}</h2>
+        </div>
         <Button 
           variant="ghost" 
           size="icon" 

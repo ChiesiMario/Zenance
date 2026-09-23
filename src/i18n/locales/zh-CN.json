@@ -10,11 +10,32 @@
       "back": "返回",
       "today": "今天",
       "yesterday": "昨天",
+      "dayBeforeYesterday": "前天",
       "loading": "加载中...",
       "error": "发生错误",
       "unknown": "未知",
       "uncategorized": "未分类",
+      "unknownAccount": "未知账户",
       "listSeparator": "、"
+    },
+    "calendar": {
+      "monthYearFormat": "yyyy 年 M 月",
+      "selectDate": "选择交易日期",
+      "today": "今天",
+      "yesterday": "昨天",
+      "dayBeforeYesterday": "前天",
+      "close": "关闭",
+      "cancel": "取消",
+      "confirm": "确认选择",
+      "weekdays": {
+        "sun": "日",
+        "mon": "一",
+        "tue": "二",
+        "wed": "三",
+        "thu": "四",
+        "fri": "五",
+        "sat": "六"
+      }
     },
     "alerts": {
       "noAccounts": "尚无任何账户，请先建立一个账户。",
@@ -400,6 +421,8 @@
       "add": "添加",
       "owesYou": "应收",
       "youOwe": "应付",
+      "toCollect": "待收",
+      "toPay": "待还",
       "settled": "已结清",
       "groupPersonal": "个人",
       "groupOrganization": "机构",

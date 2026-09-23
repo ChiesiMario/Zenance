@@ -10,11 +10,32 @@
       "back": "Back",
       "today": "Today",
       "yesterday": "Yesterday",
+      "dayBeforeYesterday": "2 Days Ago",
       "loading": "Loading...",
       "error": "An error occurred",
       "unknown": "Unknown",
       "uncategorized": "Uncategorized",
+      "unknownAccount": "Unknown Account",
       "listSeparator": ", "
+    },
+    "calendar": {
+      "monthYearFormat": "MMMM yyyy",
+      "selectDate": "Select Date",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "dayBeforeYesterday": "2 Days Ago",
+      "close": "Close",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "weekdays": {
+        "sun": "Su",
+        "mon": "Mo",
+        "tue": "Tu",
+        "wed": "We",
+        "thu": "Th",
+        "fri": "Fr",
+        "sat": "Sa"
+      }
     },
     "alerts": {
       "noAccounts": "No accounts available. Please create an account first.",
@@ -400,6 +421,8 @@
       "add": "Add",
       "owesYou": "Owes you",
       "youOwe": "You owe",
+      "toCollect": "To collect",
+      "toPay": "To pay",
       "settled": "Settled",
       "groupPersonal": "Personal",
       "groupOrganization": "Organization",

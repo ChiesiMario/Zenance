@@ -8,7 +8,6 @@ import {
   Zap,
   Check,
 } from 'lucide-react';
-import { isToday, isYesterday, parseISO, format } from 'date-fns';
 
 import { useBudgets } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -20,6 +19,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { cn, sortTransactionsDesc } from '@/lib/utils';
+import { cn, sortTransactionsDesc, formatTransactionDateHeader } from '@/lib/utils';
 import { type Budget } from '@/services/db/db';
 
 export default function BudgetDetails() {
@@ -172,10 +172,7 @@ export default function BudgetDetails() {
 
   // Date header formatting
   const formatDateHeader = (dateStr: string) => {
-    const dateObj = parseISO(dateStr);
-    if (isToday(dateObj)) return t('common.today');
-    if (isYesterday(dateObj)) return t('common.yesterday');
-    return format(dateObj, 'yyyy-MM-dd');
+    return formatTransactionDateHeader(dateStr, t, i18n.language);
   };
 
   // Monitored categories resolution
@@ -466,7 +463,7 @@ export default function BudgetDetails() {
                               />
                             </div>
                             {(() => {
-                              const wallet = wallets?.find(w => w.id === tx.accountId);
+                              const wallet = wallets?.find(w => w.id === tx.accountId) || wallets?.find(w => w.id === tx.toAccountId);
                               if (!wallet?.name) return null;
                               return (
                                 <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
@@ -532,18 +529,16 @@ export default function BudgetDetails() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('budgets.startDate')}</label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formStartDate}
-                    onChange={e => setFormStartDate(e.target.value)}
+                    onChange={setFormStartDate}
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formEndDate}
-                    onChange={e => setFormEndDate(e.target.value)}
+                    onChange={setFormEndDate}
                   />
                 </div>
               </div>

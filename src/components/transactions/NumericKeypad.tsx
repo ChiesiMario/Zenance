@@ -265,13 +265,13 @@ export function NumericKeypad({
                 />
                 
                 {/* Calendar Popup */}
-                <div className="relative z-10 w-auto p-3 flex flex-col items-center justify-center rounded-xl bg-background border border-border shadow-none animate-in zoom-in-95 duration-200">
+                <div className="relative z-10 w-auto flex flex-col items-center justify-center animate-in zoom-in-95 duration-200">
                   <Calendar
                     selected={parseISO(date)}
                     onSelect={(d: Date) => {
                       onDateChange(format(d, 'yyyy-MM-dd'));
-                      setIsCalendarOpen(false);
                     }}
+                    onClose={() => setIsCalendarOpen(false)}
                   />
                 </div>
               </div>,

@@ -1,8 +1,9 @@
 import type { Account } from '@/services/db/db';
 import { useTranslation } from 'react-i18next';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { getCurrencySymbol } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import React from 'react';
+import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 
 interface ContactGroupCardProps {
   title?: string | React.ReactNode;
@@ -20,7 +21,6 @@ export function ContactGroupCard({
   contactBalances,
   contactReimbursements = {},
   currencySymbol,
-  hideGroupTag,
   emptyMessage,
 }: ContactGroupCardProps) {
   const { t } = useTranslation();
@@ -44,45 +44,51 @@ export function ContactGroupCard({
             const loanBalance = contactBalances[contact.id] || 0;
             const reimbBalance = contactReimbursements[contact.id] || 0;
             const netReceivable = loanBalance + reimbBalance;
-            const initial = contact.name ? contact.name.charAt(0).toUpperCase() : '?';
+            const sym = contact.currency ? getCurrencySymbol(contact.currency) : currencySymbol;
+            const absAmt = Math.abs(netReceivable).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
             return (
               <div
                 key={contact.id}
                 onClick={() => navigate(`/contacts/${contact.id}`)}
-                className="flex flex-col p-3 bg-transparent border-r border-b border-border transition-colors hover:bg-muted/30 group min-h-[156px] justify-between cursor-pointer"
+                className="flex flex-col items-center justify-center p-3 bg-transparent border-r border-b border-border transition-colors hover:bg-muted/30 group min-h-[128px] cursor-pointer"
               >
-                {/* Top: Category Tag */}
-                <div className="w-full flex justify-between items-start h-3 mb-1">
-                  {!hideGroupTag && (
-                    <span className="text-[9px] uppercase tracking-widest text-muted-foreground/60 font-normal truncate w-full text-left">
-                      {contact.group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
+                {/* Top: Avatar and Name */}
+                <div className="flex flex-col items-center gap-1.5 text-center w-full">
+                  <ContactAvatar 
+                    group={contact.group} 
+                    className="w-10 h-10" 
+                    iconClassName="w-5 h-5 text-muted-foreground" 
+                    title={contact.name} 
+                  />
+                  <div className="text-sm font-medium leading-none truncate w-full px-1">{contact.name}</div>
+                </div>
+                
+                {/* Bottom: Status & Amount (Fixed 30px slot, strictly aligned across all cards) */}
+                <div className="h-[30px] flex flex-col items-center justify-center text-center w-full mt-1.5">
+                  {netReceivable === 0 ? (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted/40 text-muted-foreground/60 border border-border/60 leading-none">
+                      {t('contacts.settled')}
                     </span>
+                  ) : netReceivable > 0 ? (
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground/80 block leading-none mb-1">
+                        {t('contacts.toCollect')}
+                      </span>
+                      <span className="text-sm font-mono font-medium tracking-tight text-emerald-500 block truncate leading-none">
+                        {sym}{absAmt}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center">
+                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground/80 block leading-none mb-1">
+                        {t('contacts.toPay')}
+                      </span>
+                      <span className="text-sm font-mono font-medium tracking-tight text-rose-500 block truncate leading-none">
+                        {sym}{absAmt}
+                      </span>
+                    </div>
                   )}
-                </div>
-                
-                {/* Middle: Avatar and Name */}
-                <div className="flex flex-col items-center gap-2 text-center flex-1 justify-center my-1.5">
-                  <div className="w-10 h-10 rounded-full bg-muted/50 border border-border flex items-center justify-center text-base font-medium text-foreground shrink-0">
-                    {initial}
-                  </div>
-                  <div className="text-sm font-normal leading-none truncate w-full px-1">{contact.name}</div>
-                </div>
-                
-                {/* Bottom: Net Total */}
-                <div className="w-full text-right mt-auto pt-1">
-                  <span
-                    className={cn(
-                      "text-xl font-mono tracking-tight font-normal truncate block",
-                      netReceivable === 0
-                        ? "text-muted-foreground/50"
-                        : netReceivable > 0
-                        ? "text-foreground"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {netReceivable < 0 ? '-' : ''}{contact.currency ? getCurrencySymbol(contact.currency) : currencySymbol}{Math.abs(netReceivable).toLocaleString()}
-                  </span>
                 </div>
               </div>
             );

@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -843,18 +844,16 @@ export default function Budgets() {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.startDate')}</label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={formBudgetStartDate}
-                  onChange={e => setFormBudgetStartDate(e.target.value)}
+                  onChange={setFormBudgetStartDate}
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={formBudgetEndDate}
-                  onChange={e => setFormBudgetEndDate(e.target.value)}
+                  onChange={setFormBudgetEndDate}
                 />
               </div>
             </div>

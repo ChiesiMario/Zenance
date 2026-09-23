@@ -9,6 +9,7 @@ import type { Transaction } from '@/services/db/db';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { getCurrencySymbol, cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -415,12 +416,12 @@ export function SettleReimbursementDialog({
               <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                 {t('reimbursements.settleDate')}
               </span>
-              <input
-                type="date"
-                value={settleDate}
-                onChange={(e) => setSettleDate(e.target.value)}
-                className="text-sm font-mono font-medium text-right bg-transparent border-none outline-none text-foreground cursor-pointer"
-              />
+              <div className="w-36">
+                <DatePicker
+                  value={settleDate}
+                  onChange={setSettleDate}
+                />
+              </div>
             </div>
 
             {/* 交易備註 */}

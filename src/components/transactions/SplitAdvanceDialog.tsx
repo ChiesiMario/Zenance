@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Users, UserCheck, RotateCcw, Search, X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import type { Account } from '@/services/db/db';
 
 export interface SplitItem {
@@ -157,10 +158,13 @@ function SelectContactsModal({
                     {isSelected && <Check className="size-3 stroke-[3]" />}
                   </div>
 
-                  {/* 圓形首字頭像（沿用對象頁面風格） */}
-                  <div className="size-7 rounded-full bg-muted/50 border border-border flex items-center justify-center text-xs font-medium text-foreground shrink-0">
-                    {c.name ? c.name.charAt(0).toUpperCase() : '?'}
-                  </div>
+                  {/* 頭像（🏢/👤） */}
+                  <ContactAvatar 
+                    group={c.group} 
+                    className="size-7" 
+                    iconClassName="size-3.5 text-muted-foreground" 
+                    title={c.name} 
+                  />
 
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-xs font-medium text-foreground truncate">
@@ -507,10 +511,13 @@ export function SplitAdvanceDialog({
                     >
                       {/* 左側：頭像與資訊 */}
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        {/* 圓形首字頭像（沿用對象頁面風格） */}
-                        <div className="size-7 rounded-full bg-muted/50 border border-border flex items-center justify-center text-xs font-medium text-foreground shrink-0">
-                          {c?.name ? c.name.charAt(0).toUpperCase() : '?'}
-                        </div>
+                        {/* 頭像（🏢/👤） */}
+                        <ContactAvatar 
+                          group={c?.group} 
+                          className="size-7" 
+                          iconClassName="size-3.5 text-muted-foreground" 
+                          title={c?.name} 
+                        />
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-medium truncate text-foreground">
                             {c?.name || cId}

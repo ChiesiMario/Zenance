@@ -18,6 +18,7 @@ import { useBudgets } from '@/hooks/useBudgets';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { NumericKeypad } from './NumericKeypad';
 import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
+import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import type { Account } from '@/services/db/db';
 import type { SplitItem } from './SplitAdvanceDialog';
 import { v4 as uuidv4 } from 'uuid';
@@ -1163,12 +1164,12 @@ export function AddTransactionModal({
                           {t('add.me')}
                         </div>
                       ) : loanContact ? (
-                        <div 
-                          className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                        <ContactAvatar 
+                          group={loanContact.group}
+                          className="w-9 h-9 bg-card"
+                          iconClassName="w-4 h-4 text-muted-foreground"
                           title={loanContact.name}
-                        >
-                          {loanContact.name.trim().charAt(0).toUpperCase()}
-                        </div>
+                        />
                       ) : (
                         <div 
                           className="w-9 h-9 rounded-full bg-card text-muted-foreground/40 border border-dashed border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
@@ -1249,12 +1250,12 @@ export function AddTransactionModal({
                     <div className="absolute top-0 -translate-y-1/2 left-3 sm:left-4 z-20 pointer-events-none">
                       {loanType === 'lend' ? (
                         loanContact ? (
-                          <div 
-                            className="w-9 h-9 rounded-full bg-card text-foreground border border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"
+                          <ContactAvatar 
+                            group={loanContact.group}
+                            className="w-9 h-9 bg-card"
+                            iconClassName="w-4 h-4 text-muted-foreground"
                             title={loanContact.name}
-                          >
-                            {loanContact.name.trim().charAt(0).toUpperCase()}
-                          </div>
+                          />
                         ) : (
                           <div 
                             className="w-9 h-9 rounded-full bg-card text-muted-foreground/40 border border-dashed border-border flex items-center justify-center text-sm font-semibold select-none shadow-none"

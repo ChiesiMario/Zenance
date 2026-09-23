@@ -1,16 +1,38 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { isToday, isYesterday, parseISO, format } from 'date-fns';
-import { cn, sortTransactionsDesc } from '@/lib/utils';
+import { cn, sortTransactionsDesc, formatTransactionDateHeader } from '@/lib/utils';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, User, Building2 } from 'lucide-react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import type { Transaction } from '@/services/db/db';
+
+interface ContactCapsuleProps {
+  name: string;
+  group?: string;
+  maxWidthClass?: string;
+}
+
+function ContactCapsule({ name, group, maxWidthClass = 'max-w-[120px]' }: ContactCapsuleProps) {
+  const isOrg = group === 'organization';
+  const Icon = isOrg ? Building2 : User;
+  return (
+    <span
+      title={name}
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 leading-none shrink-0",
+        maxWidthClass
+      )}
+    >
+      <Icon className="w-3 h-3 text-muted-foreground/70 shrink-0" />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
 
 export interface SingleTransactionItem {
   isSettlementGroup: false;
@@ -44,6 +66,7 @@ export interface SplitGroupItem {
   transactions: Transaction[];
   totalAmount: number;
   contactNames: string[];
+  contactsList: { id: string; name: string; group?: string }[];
   hasSelf: boolean;
   note?: string;
   latestCreatedAt: string;
@@ -84,7 +107,7 @@ export function GroupedTransactionList({
   className,
 }: GroupedTransactionListProps) {
   const { t, i18n } = useTranslation();
-  const { contacts, wallets } = useAccounts();
+  const { contacts, archivedContacts, wallets, accounts, archivedAccounts } = useAccounts();
   const { allCategories } = useCategories();
   const { ledgers } = useLedgers();
   const { activeLedgerId } = useAppStore();
@@ -117,21 +140,16 @@ export function GroupedTransactionList({
 
   // Format date header matching Dashboard
   const formatDateHeader = (dateStr: string) => {
-    const date = parseISO(dateStr);
-    if (isToday(date)) return t('common.today');
-    if (isYesterday(date)) return t('common.yesterday');
-
-    let str = format(date, 'MMM d, yyyy');
-    if (i18n.language === 'zh-TW' || i18n.language === 'zh-CN') {
-      str = format(date, 'yyyy年M月d日');
-    }
-
-    if (i18n.language.startsWith('zh')) {
-      str = str.replace(/([0-9a-zA-Z])([一-龥])/g, '$1 $2').replace(/([一-龥])([0-9a-zA-Z])/g, '$1 $2');
-    }
-
-    return str;
+    return formatTransactionDateHeader(dateStr, t, i18n.language);
   };
+
+  const getAccountName = useCallback((id?: string) => {
+    if (!id) return t('common.unknownAccount');
+    const target = wallets?.find(w => w.id === id) 
+      || accounts?.find(a => a.id === id) 
+      || archivedAccounts?.find(a => a.id === id);
+    return target?.name || t('common.unknownAccount');
+  }, [wallets, accounts, archivedAccounts, t]);
 
   const isBalanceAdjustment = useCallback((tx: Transaction) => {
     if (tx.type !== 'income' && tx.type !== 'expense') return false;
@@ -265,7 +283,13 @@ export function GroupedTransactionList({
           const totalAmount = Math.round(batchTxs.reduce((sum, t) => sum + t.amount, 0) * 100) / 100;
           const hasSelf = batchTxs.some(t => t.type === 'expense');
           const contactIds = Array.from(new Set(batchTxs.filter(t => t.toAccountId).map(t => t.toAccountId!)));
-          const contactNames = contactIds.map(cId => contacts?.find(c => c.id === cId)?.name || cId);
+          const contactsList = contactIds.map(cId => {
+            const c = contacts?.find(item => item.id === cId)
+              || archivedContacts?.find(item => item.id === cId)
+              || accounts?.find(item => item.id === cId);
+            return { id: cId, name: c?.name || cId, group: c?.group };
+          });
+          const contactNames = contactsList.map(c => c.name);
           const selfTx = batchTxs.find(t => t.type === 'expense');
           const mainTx = selfTx || batchTxs[0];
           const catName = getCategoryName(mainTx);
@@ -282,6 +306,7 @@ export function GroupedTransactionList({
             transactions: sortedBatch,
             totalAmount,
             contactNames,
+            contactsList,
             hasSelf,
             note,
             latestCreatedAt,
@@ -331,7 +356,7 @@ export function GroupedTransactionList({
           dailyBalance: balance,
         };
       });
-  }, [transactions, calcDailyBalance, contextAccountId, contextContactId, contextCategoryId, contacts, getCategoryName, isBalanceAdjustment]);
+  }, [transactions, calcDailyBalance, contextAccountId, contextContactId, contextCategoryId, contacts, archivedContacts, accounts, getCategoryName, isBalanceAdjustment]);
 
   const handleRowClick = (tx: Transaction) => {
     if (onTransactionClick) {
@@ -392,24 +417,92 @@ export function GroupedTransactionList({
                           renderItemLeft(tx)
                         ) : (
                           <div className="flex flex-col justify-center min-w-0 pr-3 overflow-hidden">
-                            <div className="h-5 flex items-center gap-1.5 min-w-0">
-                              <span className="text-sm font-medium leading-none truncate">
-                                {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income'
-                                  ? t('reimbursements.reimbursementRefund', '代付回款')
+                            {tx.type === 'transfer' ? (
+                              (() => {
+                                const fromName = getAccountName(tx.accountId);
+                                const toName = getAccountName(tx.toAccountId);
+                                return (
+                                  <div className="h-5 flex items-center gap-1.5 min-w-0">
+                                    <span
+                                      title={fromName}
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                                    >
+                                      {fromName}
+                                    </span>
+                                    <span className="text-muted-foreground/60 text-xs shrink-0 select-none">→</span>
+                                    <span
+                                      title={toName}
+                                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                                    >
+                                      {toName}
+                                    </span>
+                                  </div>
+                                );
+                              })()
+                            ) : tx.type === 'loan' && !(tx.category === 'advance' || tx.reimbursementContactId || tx.reimbursementStatus) ? (
+                              (() => {
+                                const isLent = contacts?.some(c => c.id === tx.toAccountId) || archivedContacts?.some(c => c.id === tx.toAccountId);
+                                const contactId = isLent ? tx.toAccountId : tx.accountId;
+                                const contactObj = contacts?.find(c => c.id === contactId)
+                                  || archivedContacts?.find(c => c.id === contactId)
+                                  || accounts?.find(a => a.id === contactId);
+                                const contactName = contactObj?.name || t('common.unknown');
+
+                                return (
+                                  <div className="h-5 flex items-center gap-1.5 min-w-0">
+                                    <span className="text-sm font-medium leading-none shrink-0">
+                                      {isLent ? t('add.lent') : t('add.borrowed')}
+                                    </span>
+                                    <ContactCapsule name={contactName} group={contactObj?.group} />
+                                  </div>
+                                );
+                              })()
+                            ) : (tx.type !== 'income' && (tx.category === 'advance' || !!tx.reimbursementContactId || (tx.type === 'loan' && !!tx.reimbursementStatus))) ? (
+                              (() => {
+                                const advanceContactId = tx.reimbursementContactId || tx.toAccountId;
+                                const contactObj = contacts?.find(c => c.id === advanceContactId)
+                                  || archivedContacts?.find(c => c.id === advanceContactId)
+                                  || accounts?.find(a => a.id === advanceContactId);
+                                const categoryTitle = (tx.category === 'advance' || tx.type === 'loan')
+                                  ? t('add.reimburse', '代付')
                                   : (contextCategoryId
                                       ? allCategories?.find(c => c.id === contextCategoryId)?.name || getCategoryName(tx)
-                                      : getCategoryName(tx))}
-                              </span>
-                              
-                              {/* Reimbursement Badges */}
-                              {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income' ? (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shrink-0">
-                                  {t('contacts.refundIncome', '回款入帳')}
+                                      : getCategoryName(tx));
+
+                                return (
+                                  <div className="h-5 flex items-center gap-1.5 min-w-0">
+                                    <span className="text-sm font-medium leading-none shrink-0">
+                                      {categoryTitle}
+                                    </span>
+                                    {contactObj?.name && (
+                                      <ContactCapsule name={contactObj.name} group={contactObj?.group} />
+                                    )}
+                                    {tx.reimbursementStatus && tx.reimbursementStatus !== 'pending' && (
+                                      <ReimbursementBadge transaction={tx} />
+                                    )}
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <div className="h-5 flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-medium leading-none truncate">
+                                  {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income'
+                                    ? t('reimbursements.reimbursementRefund', '代付回款')
+                                    : (contextCategoryId
+                                        ? allCategories?.find(c => c.id === contextCategoryId)?.name || getCategoryName(tx)
+                                        : getCategoryName(tx))}
                                 </span>
-                              ) : (
-                                <ReimbursementBadge transaction={tx} />
-                              )}
-                            </div>
+                                
+                                {/* Reimbursement Badges */}
+                                {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income' ? (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shrink-0">
+                                    {t('contacts.refundIncome', '回款入帳')}
+                                  </span>
+                                ) : (
+                                  <ReimbursementBadge transaction={tx} />
+                                )}
+                              </div>
+                            )}
 
                             {/* Note display */}
                             {(() => {
@@ -526,8 +619,8 @@ export function GroupedTransactionList({
                               )}
                             </div>
 
-                            {!contextAccountId && (tx.type === 'expense' || tx.type === 'income') && (() => {
-                              const wallet = wallets?.find(w => w.id === tx.accountId);
+                            {!contextAccountId && tx.type !== 'transfer' && (() => {
+                              const wallet = wallets?.find(w => w.id === tx.accountId) || wallets?.find(w => w.id === tx.toAccountId);
                               if (!wallet?.name) return null;
                               return (
                                 <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
@@ -560,26 +653,30 @@ export function GroupedTransactionList({
                             </div>
 
                             <div className="flex flex-col justify-center min-w-0 overflow-hidden">
-                              <div className="h-5 flex items-center min-w-0">
-                                <span className="text-sm font-medium leading-none truncate">
-                                  {item.categoryName}
+                              <div className="h-5 flex items-center gap-1.5 min-w-0 overflow-hidden">
+                                <span className="text-sm font-medium leading-none shrink-0">
+                                  {item.hasSelf ? item.categoryName : t('add.reimburse', '代付')}
                                 </span>
+                                {item.hasSelf && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-foreground text-background leading-none shrink-0">
+                                    {t('add.me', '我')}
+                                  </span>
+                                )}
+                                {item.contactsList.map(c => (
+                                  <ContactCapsule
+                                    key={c.id}
+                                    name={c.name}
+                                    group={c.group}
+                                    maxWidthClass="max-w-[100px]"
+                                  />
+                                ))}
                               </div>
 
-                              <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
-                                {(() => {
-                                  const participants = [
-                                    ...(item.hasSelf ? [t('add.me', '我')] : []),
-                                    ...item.contactNames,
-                                  ];
-                                  const participantsText = participants.join(t('common.listSeparator', '、'));
-
-                                  if (item.note) {
-                                    return participantsText ? `${item.note} (${participantsText})` : item.note;
-                                  }
-                                  return participantsText;
-                                })()}
-                              </div>
+                              {item.note && (
+                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
+                                  {item.note}
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -610,35 +707,54 @@ export function GroupedTransactionList({
                           <div className="bg-muted/20 border-t border-border divide-y divide-border/50 animate-in slide-in-from-top-1 duration-150">
                             {item.transactions.map(subTx => {
                               const isSelf = subTx.type === 'expense';
-                              const targetContact = contacts?.find(c => c.id === subTx.toAccountId);
+                              const targetContact = contacts?.find(c => c.id === subTx.toAccountId)
+                                || archivedContacts?.find(c => c.id === subTx.toAccountId)
+                                || accounts?.find(a => a.id === subTx.toAccountId);
+                              const targetContactName = targetContact?.name || t('common.unknown');
 
                               return (
                                 <button
                                   key={subTx.id}
                                   type="button"
                                   onClick={() => handleRowClick(subTx)}
-                                  className="w-full h-12 flex items-center justify-between pl-12 pr-4 transition-colors hover:bg-muted/40 text-left group cursor-pointer"
+                                  className="w-full h-16 flex items-center justify-between pl-12 pr-4 transition-colors hover:bg-muted/40 text-left group cursor-pointer"
                                 >
-                                  <div className="flex items-center gap-2 min-w-0 pr-3">
-                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono shrink-0 bg-muted text-foreground border-border">
-                                      {isSelf ? t('add.myExpense', '支出') : (targetContact?.name || t('add.reimburse', '代付'))}
-                                    </span>
-
-                                    {!isSelf && <ReimbursementBadge transaction={subTx} />}
-
-                                    <span className="text-[10px] font-mono text-muted-foreground/60">
-                                      #{subTx.displayId || subTx.id.split('-')[0].toUpperCase()}
-                                    </span>
+                                  {/* 左側：分類/代付與膠囊（不顯示備註） */}
+                                  <div className="h-5 flex items-center gap-1.5 min-w-0 pr-3 overflow-hidden">
+                                    {isSelf ? (
+                                      <>
+                                        <span className="text-sm font-medium leading-none shrink-0">
+                                          {item.categoryName}
+                                        </span>
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-foreground text-background leading-none shrink-0">
+                                          {t('add.me', '我')}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-sm font-medium leading-none shrink-0">
+                                          {t('add.reimburse', '代付')}
+                                        </span>
+                                        <ContactCapsule
+                                          name={targetContactName}
+                                          group={targetContact?.group}
+                                        />
+                                        {subTx.reimbursementStatus && subTx.reimbursementStatus !== 'pending' && (
+                                          <ReimbursementBadge transaction={subTx} />
+                                        )}
+                                      </>
+                                    )}
                                   </div>
 
-                                  <div className="flex items-center shrink-0">
+                                  {/* 右側：金額（不顯示帳戶） */}
+                                  <div className="flex items-center justify-end shrink-0">
                                     <AmountDisplay
                                       amount={subTx.amount}
                                       originalCurrency={subTx.originalCurrency}
                                       baseCurrency={activeLedger?.baseCurrency}
-                                      type={isSelf ? 'expense' : 'loan'}
+                                      type="expense"
                                       showSign={true}
-                                      className="text-sm font-mono"
+                                      className="text-sm font-mono leading-none"
                                     />
                                   </div>
                                 </button>

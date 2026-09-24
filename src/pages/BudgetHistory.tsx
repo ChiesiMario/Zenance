@@ -8,8 +8,9 @@ import {
   TrendingDown,
   TrendingUp,
   Archive,
+  Zap,
 } from 'lucide-react';
-import { useBudgets } from '@/hooks/useBudgets';
+import { useBudgets, formatBudgetDisplayRange } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,7 @@ import { cn } from '@/lib/utils';
 import { type Budget } from '@/services/db/db';
 
 export default function BudgetHistory() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
@@ -39,11 +40,11 @@ export default function BudgetHistory() {
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   }, []);
 
-  // Filter historical budgets (endDate < today) and sort descending by endDate
+  // Filter historical budgets (isEnded or endDate < today) and sort descending by endDate
   const historyBudgets = useMemo(() => {
     if (!budgets) return [];
     return budgets
-      .filter(b => b.endDate && b.endDate < todayStr)
+      .filter(b => b.isEnded || (b.endDate && b.endDate < todayStr))
       .sort((a, b) => (b.endDate || '').localeCompare(a.endDate || ''))
       .map(b => {
         const spent = getBudgetSpent(b);
@@ -189,8 +190,9 @@ export default function BudgetHistory() {
                           {budget.name}
                         </h3>
                         {budget.ruleId && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border">
-                            {t('budgets.ruleStrategy')}
+                          <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border">
+                            <Zap className="h-2.5 w-2.5 opacity-70" />
+                            <span>{t('budgets.ruleBadge')}</span>
                           </span>
                         )}
                         <span
@@ -207,7 +209,12 @@ export default function BudgetHistory() {
                       <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                         <Calendar className="h-3 w-3 opacity-60" />
                         <span>
-                          {budget.startDate} ~ {budget.endDate}
+                          {formatBudgetDisplayRange(budget.startDate, budget.endDate, {
+                            isEnded: budget.isEnded,
+                            endedAt: budget.endedAt,
+                            language: i18n.language,
+                            t,
+                          })}
                         </span>
                       </div>
                     </div>
@@ -267,7 +274,7 @@ export default function BudgetHistory() {
                   <div className="flex justify-between items-center text-xs font-mono">
                     {isOver ? (
                       <span className="text-destructive font-semibold">
-                        {t('budgets.overBudget')}: +
+                        {t('budgets.overBudget')}:{' '}
                         <AmountDisplay
                           amount={spent - effectiveAmount}
                           baseCurrency={activeLedger?.baseCurrency}

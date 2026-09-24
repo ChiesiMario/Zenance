@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useBudgets, getBudgetDaysInfo } from '@/hooks/useBudgets';
+import { useBudgets, getBudgetDaysInfo, formatBudgetDisplayRange } from '@/hooks/useBudgets';
 import { useCategories } from '@/hooks/useCategories';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -30,13 +30,16 @@ import {
   Clock,
   ChevronDown,
   Archive,
+  Infinity as InfinityIcon,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { type Budget, type BudgetRule } from '@/services/db/db';
 
 export default function Budgets() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -150,7 +153,7 @@ export default function Budgets() {
     }> = [];
 
     for (const b of budgets) {
-      if (b.endDate && b.endDate < todayStr) {
+      if (b.isEnded || (b.endDate && b.endDate < todayStr)) {
         continue;
       }
 
@@ -171,15 +174,24 @@ export default function Budgets() {
     }
 
     // Sort: Ongoing (status === 'ongoing') sorted by endDate ASC (soonest expiring first);
-    // Upcoming (status === 'upcoming') sorted by startDate ASC placed after ongoing.
+    // Unlimited ongoing sorted by startDate DESC; Upcoming sorted by startDate ASC placed after ongoing.
     ongoingList.sort((a, b) => {
       if (a.daysInfo.status === 'ongoing' && b.daysInfo.status === 'ongoing') {
         return (a.budget.endDate || '').localeCompare(b.budget.endDate || '');
       }
-      if (a.daysInfo.status === 'ongoing' && b.daysInfo.status === 'upcoming') {
+      if ((a.daysInfo.status === 'ongoing' || a.daysInfo.status === 'unlimited') && b.daysInfo.status === 'upcoming') {
         return -1;
       }
-      if (a.daysInfo.status === 'upcoming' && b.daysInfo.status === 'ongoing') {
+      if (a.daysInfo.status === 'upcoming' && (b.daysInfo.status === 'ongoing' || b.daysInfo.status === 'unlimited')) {
+        return 1;
+      }
+      if (a.daysInfo.status === 'unlimited' && b.daysInfo.status === 'unlimited') {
+        return (b.budget.startDate || '').localeCompare(a.budget.startDate || '');
+      }
+      if (a.daysInfo.status === 'ongoing' && b.daysInfo.status === 'unlimited') {
+        return -1;
+      }
+      if (a.daysInfo.status === 'unlimited' && b.daysInfo.status === 'ongoing') {
         return 1;
       }
       return (a.budget.startDate || '').localeCompare(b.budget.startDate || '');
@@ -188,12 +200,16 @@ export default function Budgets() {
     return ongoingList;
   }, [budgets, todayStr, today, getBudgetSpent]);
 
-  // Unified Ended Budgets (sorted descending by endDate)
+  // Unified Ended Budgets (sorted descending by endedAt / endDate)
   const endedBudgets = useMemo(() => {
     if (!budgets) return [];
     return budgets
-      .filter(b => b.endDate && b.endDate < todayStr)
-      .sort((a, b) => (b.endDate || '').localeCompare(a.endDate || ''))
+      .filter(b => b.isEnded || (b.endDate && b.endDate < todayStr))
+      .sort((a, b) => {
+        const aDate = a.endedAt || a.endDate || a.startDate || '';
+        const bDate = b.endedAt || b.endDate || b.startDate || '';
+        return bDate.localeCompare(aDate);
+      })
       .map(b => {
         const spent = getBudgetSpent(b);
         const effectiveAmount = b.amount;
@@ -210,7 +226,7 @@ export default function Budgets() {
   }, [budgets, todayStr, getBudgetSpent]);
 
   // ----------------------------------------------------
-  // Budget Modal States (Add Manual Fixed-Period Budget)
+  // Budget Modal States (Add Manual Budget)
   // ----------------------------------------------------
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [formBudgetName, setFormBudgetName] = useState('');
@@ -218,23 +234,34 @@ export default function Budgets() {
   const [formBudgetStartDate, setFormBudgetStartDate] = useState('');
   const [formBudgetEndDate, setFormBudgetEndDate] = useState('');
   const [formBudgetCategoryIds, setFormBudgetCategoryIds] = useState<string[]>([]);
+  const [isUnlimited, setIsUnlimited] = useState(false);
+  const [activePreset, setActivePreset] = useState<'month' | 'year' | 'next30' | 'unlimited' | null>('month');
 
-  const applyDatePreset = (preset: 'month' | 'year' | 'next30') => {
+  const applyDatePreset = (preset: 'month' | 'year' | 'next30' | 'unlimited') => {
+    setActivePreset(preset);
     const now = new Date();
     const y = now.getFullYear();
     const m = now.getMonth();
     const d = now.getDate();
 
-    if (preset === 'month') {
+    if (preset === 'unlimited') {
+      setIsUnlimited(true);
+      const start = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      setFormBudgetStartDate(start);
+      setFormBudgetEndDate('');
+    } else if (preset === 'month') {
+      setIsUnlimited(false);
       const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
       const lastDay = new Date(y, m + 1, 0).getDate();
       const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
       setFormBudgetStartDate(first);
       setFormBudgetEndDate(last);
     } else if (preset === 'year') {
+      setIsUnlimited(false);
       setFormBudgetStartDate(`${y}-01-01`);
       setFormBudgetEndDate(`${y}-12-31`);
     } else if (preset === 'next30') {
+      setIsUnlimited(false);
       const start = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       const end = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
@@ -247,22 +274,38 @@ export default function Budgets() {
     setFormBudgetName('');
     setFormBudgetAmount('');
     setFormBudgetCategoryIds([]);
+    setIsUnlimited(false);
     applyDatePreset('month');
     setIsBudgetModalOpen(true);
   };
 
+  const handleToggleUnlimited = (checked: boolean) => {
+    setIsUnlimited(checked);
+    if (checked) {
+      setActivePreset('unlimited');
+      setFormBudgetEndDate('');
+    } else {
+      setActivePreset(null);
+      if (!formBudgetEndDate) {
+        applyDatePreset('month');
+      }
+    }
+  };
+
   const handleSaveBudget = async () => {
     if (!formBudgetName.trim() || !formBudgetAmount || parseFloat(formBudgetAmount) <= 0) return;
-    if (!formBudgetStartDate || !formBudgetEndDate || formBudgetStartDate > formBudgetEndDate) return;
+    if (!formBudgetStartDate) return;
+    if (!isUnlimited && (!formBudgetEndDate || formBudgetStartDate > formBudgetEndDate)) return;
     const amountNum = parseFloat(formBudgetAmount);
 
     await addBudget({
       name: formBudgetName.trim(),
       amount: amountNum,
-      periodType: 'custom',
+      periodType: isUnlimited ? 'unlimited' : 'custom',
       startDate: formBudgetStartDate,
-      endDate: formBudgetEndDate,
+      endDate: isUnlimited ? '' : formBudgetEndDate,
       categoryIds: formBudgetCategoryIds,
+      isEnded: false,
     });
 
     setIsBudgetModalOpen(false);
@@ -422,13 +465,23 @@ export default function Budgets() {
             ongoingBudgets.map(({ budget, spent, effectiveAmount, daysInfo, isOver, percentage }) => {
               const remaining = Math.max(0, effectiveAmount - spent);
 
+              // Date Range text
+              const dateRangeLabel = formatBudgetDisplayRange(budget.startDate, budget.endDate, {
+                isEnded: budget.isEnded,
+                endedAt: budget.endedAt,
+                language: i18n.language,
+                t,
+              });
+
               // Countdown text
               const countdownLabel =
-                daysInfo.status === 'ongoing'
-                  ? daysInfo.days === 0
-                    ? t('budgets.dueToday')
-                    : t('budgets.daysRemaining', { count: daysInfo.days })
-                  : t('budgets.startsInDays', { count: daysInfo.days });
+                daysInfo.status === 'unlimited'
+                  ? t('budgets.unlimitedPeriod', '無期限')
+                  : daysInfo.status === 'ongoing'
+                    ? daysInfo.days === 0
+                      ? t('budgets.dueToday', '今日到期')
+                      : t('budgets.daysRemaining', { count: daysInfo.days, defaultValue: `剩餘 ${daysInfo.days} 天` })
+                    : t('budgets.startsInDays', { count: daysInfo.days, defaultValue: `${daysInfo.days} 天後開始` });
 
               return (
                 <div
@@ -443,13 +496,18 @@ export default function Budgets() {
                   <div className="relative z-10 space-y-3">
                     {/* Top Pill Bar with Divider */}
                     <div className="flex items-center gap-1.5 flex-wrap pb-3 border-b border-border/50">
-                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                        <Calendar className="h-2.5 w-2.5 opacity-70" />
+                        <span>{dateRangeLabel}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
                         <Clock className="h-2.5 w-2.5 opacity-70" />
                         <span>{countdownLabel}</span>
                       </span>
                       {budget.ruleId && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                          {t('budgets.ruleBadge')}
+                        <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                          <Zap className="h-2.5 w-2.5 opacity-70" />
+                          <span>{t('budgets.ruleBadge')}</span>
                         </span>
                       )}
                     </div>
@@ -495,7 +553,7 @@ export default function Budgets() {
                     <div className="flex justify-between items-center text-xs font-mono">
                       {isOver ? (
                         <span className="text-destructive font-semibold">
-                          {t('budgets.overBudget')}: +
+                          {t('budgets.overBudget')}:{' '}
                           <AmountDisplay
                             amount={spent - effectiveAmount}
                             baseCurrency={activeLedger?.baseCurrency}
@@ -555,12 +613,23 @@ export default function Budgets() {
                           {isOver ? t('budgets.settledOver') : t('budgets.settledUnder')}
                         </span>
 
-                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
                           <Calendar className="h-2.5 w-2.5 opacity-70" />
                           <span>
-                            {budget.startDate} ~ {budget.endDate}
+                            {formatBudgetDisplayRange(budget.startDate, budget.endDate, {
+                              isEnded: budget.isEnded,
+                              endedAt: budget.endedAt,
+                              language: i18n.language,
+                              t,
+                            })}
                           </span>
                         </span>
+                        {budget.ruleId && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                            <Zap className="h-2.5 w-2.5 opacity-70" />
+                            <span>{t('budgets.ruleBadge')}</span>
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0 -mr-1">
@@ -621,7 +690,7 @@ export default function Budgets() {
                     <div className="flex justify-between items-center text-xs font-mono">
                       {isOver ? (
                         <span className="text-destructive font-semibold">
-                          {t('budgets.overBudget')}: +
+                          {t('budgets.overBudget')}:{' '}
                           <AmountDisplay
                             amount={spent - effectiveAmount}
                             baseCurrency={activeLedger?.baseCurrency}
@@ -685,15 +754,20 @@ export default function Budgets() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span
                           className={cn(
-                            'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border shrink-0',
+                            'inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border shrink-0',
                             rule.isActive
                               ? 'bg-muted/60 text-muted-foreground border-border'
                               : 'bg-muted/30 text-muted-foreground/60 border-border/60'
                           )}
                         >
-                          {rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}
+                          {rule.isActive ? (
+                            <Play className="h-2.5 w-2.5 opacity-70" />
+                          ) : (
+                            <Pause className="h-2.5 w-2.5 opacity-70" />
+                          )}
+                          <span>{rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}</span>
                         </span>
-                        <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                        <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
                           <Calendar className="h-2.5 w-2.5 opacity-70" />
                           <span>{rule.periodType === 'monthly' ? t('budgets.cycleMonthly') : t('budgets.cycleYearly')}</span>
                         </span>
@@ -751,7 +825,7 @@ export default function Budgets() {
                       </span>
                       {ruleCategoryNames.length === 0 ? (
                         <span className="text-[11px] text-muted-foreground/70">
-                          {t('budgets.noCategoriesMonitored')}
+                          {t('budgets.none', '無')}
                         </span>
                       ) : (
                         ruleCategoryNames.map((name, idx) => (
@@ -776,7 +850,7 @@ export default function Budgets() {
       {/* Modal 1: Add / Edit Fixed-Period Budget Instance   */}
       {/* -------------------------------------------------- */}
       <Dialog open={isBudgetModalOpen} onOpenChange={setIsBudgetModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-[350px]">
           <DialogHeader>
             <DialogTitle>{t('budgets.addBudget')}</DialogTitle>
           </DialogHeader>
@@ -816,7 +890,10 @@ export default function Budgets() {
                   variant="outline"
                   size="sm"
                   onClick={() => applyDatePreset('month')}
-                  className="text-xs h-7 px-2.5 cursor-pointer"
+                  className={cn(
+                    "text-xs h-7 px-2.5 cursor-pointer",
+                    activePreset === 'month' && !isUnlimited && "bg-foreground text-background border-foreground font-medium"
+                  )}
                 >
                   {t('budgets.presetThisMonth')}
                 </Button>
@@ -825,7 +902,10 @@ export default function Budgets() {
                   variant="outline"
                   size="sm"
                   onClick={() => applyDatePreset('year')}
-                  className="text-xs h-7 px-2.5 cursor-pointer"
+                  className={cn(
+                    "text-xs h-7 px-2.5 cursor-pointer",
+                    activePreset === 'year' && !isUnlimited && "bg-foreground text-background border-foreground font-medium"
+                  )}
                 >
                   {t('budgets.presetThisYear')}
                 </Button>
@@ -834,9 +914,25 @@ export default function Budgets() {
                   variant="outline"
                   size="sm"
                   onClick={() => applyDatePreset('next30')}
-                  className="text-xs h-7 px-2.5 cursor-pointer"
+                  className={cn(
+                    "text-xs h-7 px-2.5 cursor-pointer",
+                    activePreset === 'next30' && !isUnlimited && "bg-foreground text-background border-foreground font-medium"
+                  )}
                 >
                   {t('budgets.presetNext30Days')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyDatePreset('unlimited')}
+                  className={cn(
+                    "text-xs h-7 px-2.5 cursor-pointer flex items-center gap-1",
+                    isUnlimited && "bg-foreground text-background border-foreground font-medium"
+                  )}
+                >
+                  <InfinityIcon className="size-3" />
+                  <span>{t('budgets.presetUnlimited')}</span>
                 </Button>
               </div>
             </div>
@@ -846,15 +942,40 @@ export default function Budgets() {
                 <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.startDate')}</label>
                 <DatePicker
                   value={formBudgetStartDate}
-                  onChange={setFormBudgetStartDate}
+                  onChange={val => {
+                    setFormBudgetStartDate(val);
+                    if (activePreset !== 'unlimited') setActivePreset(null);
+                  }}
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
-                <DatePicker
-                  value={formBudgetEndDate}
-                  onChange={setFormBudgetEndDate}
-                />
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
+                  <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground select-none">
+                    <input
+                      type="checkbox"
+                      checked={isUnlimited}
+                      onChange={e => handleToggleUnlimited(e.target.checked)}
+                      className="rounded border-border size-3 cursor-pointer"
+                    />
+                    <span>{t('budgets.noEndDate')}</span>
+                  </label>
+                </div>
+                {isUnlimited ? (
+                  <div className="h-9 px-3 rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground flex items-center justify-between text-xs font-mono select-none">
+                    <span className="italic">{t('budgets.manualEnd')}</span>
+                    <InfinityIcon className="size-3.5 opacity-60" />
+                  </div>
+                ) : (
+                  <DatePicker
+                    value={formBudgetEndDate}
+                    onChange={val => {
+                      setFormBudgetEndDate(val);
+                      setIsUnlimited(false);
+                      setActivePreset(null);
+                    }}
+                  />
+                )}
               </div>
             </div>
 
@@ -896,7 +1017,7 @@ export default function Budgets() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                {t('budgets.noCategoriesMonitored')}
+                {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
               </p>
             </div>
           </div>
@@ -912,8 +1033,7 @@ export default function Budgets() {
                 !formBudgetAmount ||
                 parseFloat(formBudgetAmount) <= 0 ||
                 !formBudgetStartDate ||
-                !formBudgetEndDate ||
-                formBudgetStartDate > formBudgetEndDate
+                (!isUnlimited && (!formBudgetEndDate || formBudgetStartDate > formBudgetEndDate))
               }
               className="cursor-pointer"
             >
@@ -1021,7 +1141,7 @@ export default function Budgets() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                {t('budgets.noCategoriesMonitored')}
+                {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
               </p>
             </div>
           </div>

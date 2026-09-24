@@ -7,9 +7,16 @@ import {
   Trash2,
   Zap,
   Check,
+  CircleStop,
+  RotateCcw,
+  Infinity as InfinityIcon,
+  ReceiptText,
+  Tag,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 
-import { useBudgets } from '@/hooks/useBudgets';
+import { useBudgets, formatBudgetDisplayRange, getBudgetDaysInfo } from '@/hooks/useBudgets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -20,6 +27,7 @@ import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/ui/date-picker';
+import { toast } from '@/components/ui/toast';
 import {
   Dialog,
   DialogContent,
@@ -60,39 +68,49 @@ export default function BudgetDetails() {
   const [formStartDate, setFormStartDate] = useState('');
   const [formEndDate, setFormEndDate] = useState('');
   const [formCategoryIds, setFormCategoryIds] = useState<string[]>([]);
+  const [isUnlimited, setIsUnlimited] = useState(false);
 
   // Delete Budget Confirmation Dialog State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // Period display info (Title & Date Range with Pangu Spacing)
-  const periodInfo = useMemo(() => {
-    if (!budget) return { title: '', dateRange: '' };
+  // End Budget Confirmation Dialog State
+  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
 
-    let title = '';
-    if (budget.periodType === 'monthly') {
-      const parts = (budget.periodKey || budget.startDate.substring(0, 7)).split('-');
-      const y = Number(parts[0]);
-      const m = Number(parts[1]);
-      const dateObj = new Date(y, m - 1, 1);
-      const isCurYear = y === new Date().getFullYear();
-      let str = dateObj.toLocaleDateString(i18n.language, {
-        year: isCurYear ? undefined : 'numeric',
-        month: 'long',
-      });
-      if (i18n.language.startsWith('zh')) {
-        str = str.replace(/([0-9a-zA-Z])([一-龥])/g, '$1 $2').replace(/([一-龥])([0-9a-zA-Z])/g, '$1 $2');
-      }
-      title = str;
-    } else if (budget.periodType === 'yearly') {
-      const y = budget.periodKey || budget.startDate.substring(0, 4);
-      title = i18n.language.startsWith('zh') ? `${y} 年` : y;
-    } else {
-      title = t('budgets.tabCustom');
+  const todayStr = useMemo(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const isNaturallyExpired = budget?.endDate ? budget.endDate < todayStr : false;
+  const isBudgetEnded = Boolean(budget?.isEnded || isNaturallyExpired);
+
+  // Period display info (Date Range)
+  const dateRange = useMemo(() => {
+    if (!budget) return '';
+    return formatBudgetDisplayRange(budget.startDate, budget.endDate, {
+      isEnded: budget.isEnded,
+      endedAt: budget.endedAt,
+      language: i18n.language,
+      t,
+    });
+  }, [budget, t, i18n.language]);
+
+  const daysInfo = useMemo(() => {
+    if (!budget) return { status: 'ongoing' as const, days: 0 };
+    return getBudgetDaysInfo(budget);
+  }, [budget]);
+
+  const countdownLabel = useMemo(() => {
+    if (daysInfo.status === 'unlimited') {
+      return t('budgets.unlimitedPeriod', '無期限');
     }
-
-    const dateRange = `${budget.startDate} ~ ${budget.endDate}`;
-    return { title, dateRange };
-  }, [budget, i18n.language, t]);
+    if (daysInfo.status === 'ongoing') {
+      return daysInfo.days === 0
+        ? t('budgets.dueToday', '今日到期')
+        : t('budgets.daysRemaining', { count: daysInfo.days, defaultValue: `剩餘 ${daysInfo.days} 天` });
+    }
+    return t('budgets.startsInDays', { count: daysInfo.days, defaultValue: `${daysInfo.days} 天後開始` });
+  }, [daysInfo, t]);
 
   const startDate = budget?.startDate || '';
   const endDate = budget?.endDate || '';
@@ -100,7 +118,12 @@ export default function BudgetDetails() {
 
   // Filter Transactions in active period belonging to budget categories
   const periodTransactions = useMemo(() => {
-    if (!transactions || !budget || !startDate || !endDate) return [];
+    if (!transactions || !budget || !startDate) return [];
+
+    const isUnlimitedBudget = budget.periodType === 'unlimited' || !endDate;
+    const effectiveEndDate = isUnlimitedBudget
+      ? (budget.isEnded && budget.endedAt ? budget.endedAt : undefined)
+      : endDate;
 
     const categorySet = new Set(budget.categoryIds || []);
     const filtered = transactions.filter(tx => {
@@ -121,7 +144,7 @@ export default function BudgetDetails() {
         categorySet.size > 0 &&
         categorySet.has(tx.category) &&
         tx.date >= startDate &&
-        tx.date <= endDate
+        (!effectiveEndDate || tx.date <= effectiveEndDate)
       );
     });
     return sortTransactionsDesc(filtered);
@@ -187,6 +210,7 @@ export default function BudgetDetails() {
     setFormAmount(String(b.amount));
     setFormStartDate(b.startDate || '');
     setFormEndDate(b.endDate || '');
+    setIsUnlimited(b.periodType === 'unlimited' || !b.endDate);
     setFormCategoryIds(b.categoryIds || []);
     setIsEditDialogOpen(true);
   };
@@ -195,11 +219,17 @@ export default function BudgetDetails() {
     if (!budget || !formName.trim() || !formAmount || parseFloat(formAmount) <= 0) return;
     const newAmountNum = parseFloat(formAmount);
 
+    const isCustomOrUnlimited = budget.periodType === 'custom' || budget.periodType === 'unlimited';
+    const targetPeriodType = isCustomOrUnlimited
+      ? (isUnlimited ? 'unlimited' : 'custom')
+      : budget.periodType;
+
     await updateBudget(budget.id, {
       name: formName.trim(),
       amount: newAmountNum,
-      startDate: budget.periodType === 'custom' ? formStartDate : budget.startDate,
-      endDate: budget.periodType === 'custom' ? formEndDate : budget.endDate,
+      periodType: targetPeriodType,
+      startDate: isCustomOrUnlimited ? formStartDate : budget.startDate,
+      endDate: isCustomOrUnlimited ? (isUnlimited ? '' : formEndDate) : budget.endDate,
       categoryIds: formCategoryIds,
     });
 
@@ -210,6 +240,19 @@ export default function BudgetDetails() {
     if (!budget) return;
     await deleteBudget(budget.id);
     navigate('/budgets');
+  };
+
+  const handleEndBudget = async () => {
+    if (!budget) return;
+    await updateBudget(budget.id, { isEnded: true, endedAt: todayStr });
+    setIsEndDialogOpen(false);
+    toast.show(t('budgets.budgetEnded'));
+  };
+
+  const handleResumeBudget = async () => {
+    if (!budget) return;
+    await updateBudget(budget.id, { isEnded: false, endedAt: undefined });
+    toast.show(t('budgets.budgetResumed'));
   };
 
   if (!id) return <Navigate to="/budgets" replace />;
@@ -258,18 +301,38 @@ export default function BudgetDetails() {
             <h2 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
               {budget.name}
             </h2>
-            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{periodInfo.title}</span>
-              <span>·</span>
-              <span className="font-mono">{periodInfo.dateRange}</span>
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              {isBudgetEnded ? (
+                <>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest bg-muted/60 text-muted-foreground border border-border shrink-0">
+                    {t('budgets.statusEnded')}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                    <Calendar className="h-2.5 w-2.5 opacity-70" />
+                    <span>{dateRange}</span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                    <Calendar className="h-2.5 w-2.5 opacity-70" />
+                    <span>{dateRange}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                    <Clock className="h-2.5 w-2.5 opacity-70" />
+                    <span>{countdownLabel}</span>
+                  </span>
+                </>
+              )}
+
               {budget.ruleId && (
                 <button
                   type="button"
                   onClick={() => navigate('/budgets?tab=rules')}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border border-border bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest border border-border bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
                   title={t('budgets.tabRules')}
                 >
-                  <Zap className="h-3 w-3 text-amber-500" />
+                  <Zap className="h-2.5 w-2.5 text-amber-500" />
                   <span>{t('budgets.ruleStrategy')}</span>
                 </button>
               )}
@@ -278,25 +341,54 @@ export default function BudgetDetails() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+          {/* End / Resume Button */}
+          {budget.isEnded ? (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleResumeBudget}
+              title={t('budgets.resumeBudget')}
+              aria-label={t('budgets.resumeBudget')}
+              className="size-8 text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="size-4" />
+            </Button>
+          ) : !isNaturallyExpired ? (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsEndDialogOpen(true)}
+              title={t('budgets.endBudget')}
+              aria-label={t('budgets.endBudget')}
+              className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              <CircleStop className="size-4" />
+            </Button>
+          ) : null}
+
+          {/* Edit Budget Button */}
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => handleOpenEdit(budget)}
-            className="gap-1.5 text-xs cursor-pointer"
+            title={t('budgets.editBudget')}
+            aria-label={t('budgets.editBudget')}
+            className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
-            <Pencil className="h-3.5 w-3.5" />
-            <span>{t('budgets.editBudget')}</span>
+            <Pencil className="size-4" />
           </Button>
 
+          {/* Delete Budget Button */}
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={() => setIsDeleteDialogOpen(true)}
-            className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-destructive hover:border-destructive/30"
+            title={t('budgets.deleteBudget')}
+            aria-label={t('budgets.deleteBudget')}
+            className="size-8 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors cursor-pointer"
           >
-            <Trash2 className="h-3.5 w-3.5" />
-            <span>{t('budgets.deleteBudget')}</span>
+            <Trash2 className="size-4" />
           </Button>
         </div>
       </div>
@@ -335,7 +427,6 @@ export default function BudgetDetails() {
             {isOver ? (
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-xs font-mono font-medium">
                 <span>{t('budgets.overBudget')}</span>
-                <span>+</span>
                 <AmountDisplay
                   amount={totalSpent - effectiveAmount}
                   baseCurrency={activeLedger?.baseCurrency}
@@ -395,19 +486,47 @@ export default function BudgetDetails() {
       </div>
 
       {/* Period Transactions List Header & Container */}
-      {(monitoredCategoryList.length > 0 || periodTransactions.length > 0) && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {t('budgets.periodTransactions')} ({periodTransactions.length})
-            </h3>
-          </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {t('budgets.periodTransactions')} ({periodTransactions.length})
+          </h3>
+        </div>
 
-          {groupedTransactions.length === 0 ? (
-            <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card">
-              {t('budgets.noTransactionsInPeriod')}
+        {groupedTransactions.length === 0 ? (
+          <div className="border border-border rounded-lg p-10 text-center bg-card space-y-3">
+            <div className="size-10 rounded-full border border-border bg-muted/30 flex items-center justify-center mx-auto text-muted-foreground/60">
+              {monitoredCategoryList.length > 0 ? (
+                <ReceiptText className="size-5" />
+              ) : (
+                <Tag className="size-5" />
+              )}
             </div>
-          ) : (
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">
+                {t('budgets.noTransactions', '此期間尚無任何支出交易')}
+              </p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                {monitoredCategoryList.length > 0
+                  ? t('budgets.noTransactionsWithCategoriesDesc', '設定的監控分類在該期間內尚未產生任何支出紀錄。')
+                  : t('budgets.noTransactionsNoCategoriesDesc', '此預算未設定監控分類，您可以編輯預算加入分類自動統計，或於記帳時手動指定歸屬此預算。')}
+              </p>
+            </div>
+            {monitoredCategoryList.length === 0 && (
+              <div className="pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenEdit(budget)}
+                  className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="size-3.5" />
+                  <span>{t('budgets.configureMonitoredCategories', '設定監控分類')}</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
             <div className="space-y-4">
               {groupedTransactions.map(group => (
                 <div
@@ -481,7 +600,6 @@ export default function BudgetDetails() {
             </div>
           )}
         </div>
-      )}
 
       {/* Transaction Details Dialog */}
       {selectedTransactionId && (
@@ -493,7 +611,7 @@ export default function BudgetDetails() {
 
       {/* Edit Budget Primary Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[350px]">
           <DialogHeader>
             <DialogTitle>{t('budgets.editBudget')}</DialogTitle>
           </DialogHeader>
@@ -524,8 +642,8 @@ export default function BudgetDetails() {
               />
             </div>
 
-            {/* Custom Fixed Range Date Controls */}
-            {budget.periodType === 'custom' && (
+            {/* Custom or Unlimited Range Date Controls */}
+            {(budget.periodType === 'custom' || budget.periodType === 'unlimited') && (
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('budgets.startDate')}</label>
@@ -535,11 +653,40 @@ export default function BudgetDetails() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
-                  <DatePicker
-                    value={formEndDate}
-                    onChange={setFormEndDate}
-                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
+                    <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground select-none">
+                      <input
+                        type="checkbox"
+                        checked={isUnlimited}
+                        onChange={e => {
+                          const checked = e.target.checked;
+                          setIsUnlimited(checked);
+                          if (checked) {
+                            setFormEndDate('');
+                          } else if (!formEndDate) {
+                            setFormEndDate(todayStr);
+                          }
+                        }}
+                        className="rounded border-border size-3 cursor-pointer"
+                      />
+                      <span>{t('budgets.noEndDate')}</span>
+                    </label>
+                  </div>
+                  {isUnlimited ? (
+                    <div className="h-9 px-3 rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground flex items-center justify-between text-xs font-mono select-none">
+                      <span className="italic">{t('budgets.manualEnd')}</span>
+                      <InfinityIcon className="size-3.5 opacity-60" />
+                    </div>
+                  ) : (
+                    <DatePicker
+                      value={formEndDate}
+                      onChange={val => {
+                        setFormEndDate(val);
+                        setIsUnlimited(false);
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -582,7 +729,7 @@ export default function BudgetDetails() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                {t('budgets.noCategoriesMonitored')}
+                {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
               </p>
             </div>
           </div>
@@ -597,7 +744,10 @@ export default function BudgetDetails() {
                 !formName.trim() ||
                 !formAmount ||
                 parseFloat(formAmount) <= 0 ||
-                (budget.periodType === 'custom' && (!formStartDate || !formEndDate || formStartDate > formEndDate))
+                ((budget.periodType === 'custom' || budget.periodType === 'unlimited') && (
+                  !formStartDate ||
+                  (!isUnlimited && (!formEndDate || formStartDate > formEndDate))
+                ))
               }
             >
               {t('budgets.save')}
@@ -625,6 +775,30 @@ export default function BudgetDetails() {
               className="cursor-pointer"
             >
               {t('budgets.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* End Budget Confirmation Dialog */}
+      <Dialog open={isEndDialogOpen} onOpenChange={setIsEndDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{t('budgets.endBudget')}</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground leading-relaxed py-2">
+            {t('budgets.endBudgetConfirm')}
+          </p>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <DialogClose render={<Button variant="outline" type="button" />}>
+              {t('budgets.cancel')}
+            </DialogClose>
+            <Button
+              variant="default"
+              onClick={handleEndBudget}
+              className="cursor-pointer"
+            >
+              {t('budgets.confirmEnd')}
             </Button>
           </DialogFooter>
         </DialogContent>

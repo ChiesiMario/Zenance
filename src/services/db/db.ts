@@ -79,7 +79,7 @@ export interface Account {
   deleted: boolean;
 }
 
-export type BudgetPeriodType = 'monthly' | 'yearly' | 'custom';
+export type BudgetPeriodType = 'monthly' | 'yearly' | 'custom' | 'unlimited';
 
 export interface BudgetRule {
   id: string;
@@ -109,6 +109,8 @@ export interface Budget {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
+  isEnded?: boolean;
+  endedAt?: string; // YYYY-MM-DD when ended manually
 }
 
 export class ZenanceDatabase extends Dexie {

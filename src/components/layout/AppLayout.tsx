@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins } from 'lucide-react';
+import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins, Coins } from 'lucide-react';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -9,7 +9,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { useAccounts } from '@/hooks/useAccounts';
 import { toast, Toaster } from '@/components/ui/toast';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 
@@ -21,7 +21,7 @@ export function AppLayout() {
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
-  const { wallets } = useAccounts();
+  const { wallets, contacts, archivedContacts } = useAccounts();
   const { 
     activeLedgerId, 
     editingTransactionId, 
@@ -48,13 +48,21 @@ export function AppLayout() {
     let expense = 0;
     let income = 0;
     let transfer = 0;
-    let loan = 0;
+    let lend = 0;
+    let borrow = 0;
     
-    transactions?.filter(t => t.date.startsWith(prefix)).forEach(t => {
+    transactions?.filter(t => t.date.startsWith(prefix) && !t.deleted).forEach(t => {
       if (t.type === 'expense') expense += t.amount;
       else if (t.type === 'income') income += t.amount;
       else if (t.type === 'transfer') transfer += t.amount;
-      else if (t.type === 'loan') loan += t.amount;
+      else if (t.type === 'loan') {
+        const isLent = contacts?.some(c => c.id === t.toAccountId) || archivedContacts?.some(c => c.id === t.toAccountId);
+        if (isLent) {
+          lend += t.amount;
+        } else {
+          borrow += t.amount;
+        }
+      }
     });
     
     const format = (val: number) => {
@@ -65,9 +73,10 @@ export function AppLayout() {
       expense: format(expense),
       income: format(income),
       transfer: format(transfer),
-      loan: format(loan)
+      lend: format(lend),
+      borrow: format(borrow),
     };
-  }, [transactions]);
+  }, [transactions, contacts, archivedContacts]);
   
   const handleOpenAddModal = (type: 'expense' | 'income' | 'transfer' | 'loan', loanType?: 'borrow' | 'lend') => {
     openAddModal(type, loanType);
@@ -149,23 +158,17 @@ export function AppLayout() {
                         <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.transfer}</span>
                       </DropdownMenuItem>
                       
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md [&>svg:last-child]:hidden outline-none data-[state=open]:bg-accent/50 focus:bg-accent/50 text-muted-foreground focus:text-foreground">
-                          <HandCoins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
-                          <span className="text-[11px] font-medium text-foreground">{t('add.loan')}</span>
-                          <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.loan}</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuPortal>
-                          <DropdownMenuSubContent sideOffset={8} className="min-w-[120px]">
-                            <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'lend')} className="cursor-pointer">
-                              {t('add.lend')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'borrow')} className="cursor-pointer">
-                              {t('add.borrow')}
-                            </DropdownMenuItem>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuPortal>
-                      </DropdownMenuSub>
+                      <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'lend')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
+                        <HandCoins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
+                        <span className="text-[11px] font-medium">{t('add.lend')}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.lend}</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'borrow')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
+                        <Coins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
+                        <span className="text-[11px] font-medium">{t('add.borrow')}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.borrow}</span>
+                      </DropdownMenuItem>
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>

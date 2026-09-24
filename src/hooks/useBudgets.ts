@@ -35,18 +35,22 @@ export function getEffectiveBudgetAmount(budget: Budget, _periodKey?: string): n
 }
 
 export function getBudgetDaysInfo(budget: Budget, today: Date = new Date()): {
-  status: 'ongoing' | 'upcoming' | 'ended';
+  status: 'ongoing' | 'upcoming' | 'ended' | 'unlimited';
   days: number;
 } {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const sDate = budget.startDate;
   const eDate = budget.endDate;
 
-  if (eDate < todayStr) {
-    const end = new Date(eDate);
-    const diffTime = today.getTime() - end.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return { status: 'ended', days: Math.max(1, diffDays) };
+  if (budget.isEnded || (eDate && eDate < todayStr)) {
+    const endStr = budget.endedAt || eDate;
+    if (endStr) {
+      const end = new Date(endStr);
+      const diffTime = today.getTime() - end.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      return { status: 'ended', days: Math.max(0, diffDays) };
+    }
+    return { status: 'ended', days: 0 };
   }
 
   if (sDate > todayStr) {
@@ -56,11 +60,100 @@ export function getBudgetDaysInfo(budget: Budget, today: Date = new Date()): {
     return { status: 'upcoming', days: Math.max(1, diffDays) };
   }
 
-  // Ongoing
+  // Ongoing Unlimited
+  if (budget.periodType === 'unlimited' || !eDate) {
+    const start = new Date(sDate);
+    const diffTime = today.getTime() - start.getTime();
+    const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+    return { status: 'unlimited', days: diffDays };
+  }
+
+  // Ongoing with End Date
   const end = new Date(eDate);
   const diffTime = end.getTime() - today.getTime();
   const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   return { status: 'ongoing', days: diffDays };
+}
+
+const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function formatBudgetDisplayRange(
+  startDate?: string,
+  endDate?: string,
+  options?: {
+    isEnded?: boolean;
+    endedAt?: string;
+    language?: string;
+    today?: Date;
+    t?: (key: string, options?: any) => string;
+  }
+): string {
+  if (!startDate) return '';
+
+  const today = options?.today || new Date();
+  const currentYear = today.getFullYear();
+  const isEnglish = (options?.language || '').toLowerCase().startsWith('en');
+
+  // If budget has ended manually and had no original endDate, use endedAt as effective end
+  const effectiveEnd = (options?.isEnded && options?.endedAt && !endDate)
+    ? options.endedAt
+    : endDate;
+
+  // Case 1: Unlimited / No End Date
+  if (!effectiveEnd) {
+    const sParts = startDate.split('-');
+    if (sParts.length !== 3) return startDate;
+    const sYear = parseInt(sParts[0], 10);
+    const dateFormatted = sYear === currentYear ? `${sParts[1]}-${sParts[2]}` : startDate;
+
+    if (options?.t) {
+      return options.t('budgets.sinceDate', {
+        date: dateFormatted,
+        defaultValue: isEnglish ? `Since ${dateFormatted}` : `自 ${dateFormatted} 起`,
+      });
+    }
+    return isEnglish ? `Since ${dateFormatted}` : `自 ${dateFormatted} 起`;
+  }
+
+  // Case 2: Has End Date
+  const sParts = startDate.split('-');
+  const eParts = effectiveEnd.split('-');
+  if (sParts.length !== 3 || eParts.length !== 3) {
+    return `${startDate} ~ ${effectiveEnd}`;
+  }
+
+  const sYear = parseInt(sParts[0], 10);
+  const sMonth = parseInt(sParts[1], 10);
+  const sDay = parseInt(sParts[2], 10);
+
+  const eYear = parseInt(eParts[0], 10);
+  const eMonth = parseInt(eParts[1], 10);
+  const eDay = parseInt(eParts[2], 10);
+
+  // Check Whole Calendar Month
+  if (sYear === eYear && sMonth === eMonth && sDay === 1) {
+    const lastDayOfMonth = new Date(sYear, sMonth, 0).getDate();
+    if (eDay === lastDayOfMonth) {
+      if (sYear === currentYear) {
+        return isEnglish ? EN_MONTHS[sMonth - 1] : `${sMonth} 月`;
+      } else {
+        return isEnglish ? `${EN_MONTHS[sMonth - 1]} ${sYear}` : `${sYear} 年 ${sMonth} 月`;
+      }
+    }
+  }
+
+  // Check Whole Calendar Year
+  if (sYear === eYear && sMonth === 1 && sDay === 1 && eMonth === 12 && eDay === 31) {
+    return isEnglish ? `${sYear}` : `${sYear} 年`;
+  }
+
+  // Normal Range: omit year if both are in current year
+  if (sYear === currentYear && eYear === currentYear) {
+    return `${sParts[1]}-${sParts[2]} ~ ${eParts[1]}-${eParts[2]}`;
+  }
+
+  // Cross-year or non-current-year
+  return `${startDate} ~ ${effectiveEnd}`;
 }
 
 export function useBudgets() {
@@ -188,7 +281,7 @@ export function useBudgets() {
 
   // Helper to calculate spent for a budget in its date range
   const calculateSpent = useCallback(
-    (budget: Budget, startDate: string, endDate: string): number => {
+    (budget: Budget, startDate: string, endDate?: string): number => {
       if (!transactions) return 0;
 
       const categorySet = new Set(budget.categoryIds || []);
@@ -219,7 +312,7 @@ export function useBudgets() {
           categorySet.size > 0 &&
           categorySet.has(tx.category) &&
           tx.date >= startDate &&
-          tx.date <= endDate
+          (!endDate || tx.date <= endDate)
         ) {
           spent += tx.amount;
         }
@@ -256,6 +349,11 @@ export function useBudgets() {
 
   const getBudgetSpent = useCallback(
     (budget: Budget): number => {
+      if (budget.periodType === 'unlimited' || !budget.endDate) {
+        const effectiveEnd = budget.isEnded && budget.endedAt ? budget.endedAt : undefined;
+        return calculateSpent(budget, budget.startDate, effectiveEnd);
+      }
+
       let sDate = budget.startDate;
       let eDate = budget.endDate;
 
@@ -271,7 +369,7 @@ export function useBudgets() {
         }
       }
 
-      if (!sDate || !eDate) return 0;
+      if (!sDate) return 0;
       return calculateSpent(budget, sDate, eDate);
     },
     [calculateSpent]
@@ -285,6 +383,12 @@ export function useBudgets() {
     if (budget.periodType === 'custom') {
       const { startDate, endDate } = getMonthDateRange(yearMonthStr);
       return (budget.startDate || '') <= endDate && (budget.endDate || '') >= startDate;
+    }
+    if (budget.periodType === 'unlimited') {
+      const { startDate, endDate } = getMonthDateRange(yearMonthStr);
+      if ((budget.startDate || '') > endDate) return false;
+      if (budget.isEnded && budget.endedAt && budget.endedAt < startDate) return false;
+      return true;
     }
     if (budget.periodType === 'yearly') {
       const yearStr = yearMonthStr.split('-')[0];
@@ -303,6 +407,11 @@ export function useBudgets() {
     }
     if (budget.periodType === 'custom') {
       return (budget.startDate || '') <= `${yearStr}-12-31` && (budget.endDate || '') >= `${yearStr}-01-01`;
+    }
+    if (budget.periodType === 'unlimited') {
+      if ((budget.startDate || '') > `${yearStr}-12-31`) return false;
+      if (budget.isEnded && budget.endedAt && budget.endedAt < `${yearStr}-01-01`) return false;
+      return true;
     }
     return false;
   }, []);
@@ -330,17 +439,22 @@ export function useBudgets() {
         return activeMonthly.slice(0, limit);
       }
 
-      // 2. Custom budgets crossing this month
+      // 2. Custom or Unlimited budgets crossing this month
       const activeCustom = budgets
         .filter(b => {
-          if (b.periodType !== 'custom' && (b.periodType as string) !== undefined) return false;
-          if (!b.startDate || !b.endDate) return false;
+          if (b.periodType === 'monthly' || b.periodType === 'yearly') return false;
+          if (!b.startDate) return false;
+          if (b.periodType === 'unlimited' || !b.endDate) {
+            if (b.startDate > targetMonthEnd) return false;
+            if (b.isEnded && b.endedAt && b.endedAt < targetMonthStart) return false;
+            return true;
+          }
           return b.startDate <= targetMonthEnd && b.endDate >= targetMonthStart;
         })
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .map(b => ({
           budget: b,
-          spent: getCustomBudgetSpent(b),
+          spent: getBudgetSpent(b),
           effectiveAmount: b.amount,
         }));
 
@@ -362,7 +476,7 @@ export function useBudgets() {
 
       return [...combined, ...activeYearly].slice(0, limit);
     },
-    [budgets, getMonthlyBudgetSpent, getCustomBudgetSpent, getYearlyBudgetSpent]
+    [budgets, getMonthlyBudgetSpent, getBudgetSpent, getYearlyBudgetSpent]
   );
 
   // Budget Instance CRUD

@@ -602,17 +602,17 @@ export function NumericKeypad({
       <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('.')}>.</Button>
       <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('0')}>0</Button>
       <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-xs sm:text-sm font-mono rounded-lg bg-muted/60 tracking-wider text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('00')}>00</Button>
-      <Button 
-        variant="ghost" 
-        className={cn("w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-all active:scale-95 border", 
+      <button 
+        type="button"
+        className={cn("w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-all active:scale-95 border cursor-pointer shadow-none", 
           isExpression
             ? "bg-muted/60 text-foreground hover:bg-muted border-border/40"
-            : "bg-primary text-primary-foreground hover:bg-primary/90 border-primary font-bold shadow-none"
+            : "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-primary font-bold"
         )} 
         onClick={() => handleKeyPress('=')}
       >
-        {isExpression ? <Equal className="size-5" /> : <Check className="size-5" />}
-      </Button>
+        {isExpression ? <Equal className="size-5" /> : <Check className="size-5 text-primary-foreground" />}
+      </button>
       
     </div>
   );

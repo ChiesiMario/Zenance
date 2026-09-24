@@ -5,6 +5,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useCategories } from '@/hooks/useCategories';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
+import { AmountInput } from '@/components/ui/AmountInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale, CreditCard } from 'lucide-react';
@@ -416,12 +417,11 @@ export default function AccountDetails() {
                     <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                       {t('accounts.creditLimit')}
                     </span>
-                    <input 
-                      type="number"
-                      step="100"
+                    <AmountInput 
                       placeholder={t('accounts.limitPlaceholder')}
                       value={editCreditLimit}
-                      onChange={(e) => setEditCreditLimit(e.target.value)}
+                      onValueChange={setEditCreditLimit}
+                      unstyled
                       className="text-sm font-mono font-medium text-right bg-transparent outline-none w-32 placeholder:text-muted-foreground/40 text-foreground"
                     />
                   </div>
@@ -562,25 +562,17 @@ export default function AccountDetails() {
                 <span className="text-2xl sm:text-3xl font-mono font-medium text-muted-foreground select-none">
                   {currencySymbol}
                 </span>
-                <input
+                <AmountInput
                   ref={adjustInputRef}
-                  type="text"
-                  inputMode="decimal"
                   value={newBalanceStr}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (/^-?\d*\.?\d*$/.test(val)) {
-                      setNewBalanceStr(val);
-                    }
-                  }}
-                  onFocus={(e) => {
-                    const len = e.target.value.length;
-                    e.target.setSelectionRange(len, len);
-                  }}
-                  onKeyDown={(e) => e.key === 'Enter' && balanceDiff !== 0 && handleAdjustBalance()}
+                  onValueChange={setNewBalanceStr}
+                  allowNegative
+                  unstyled
+                  currencySymbol={currencySymbol}
                   style={{ width: `${Math.max(1, newBalanceStr.length)}ch` }}
                   className="min-w-[1ch] max-w-[220px] text-left text-4xl sm:text-5xl font-mono font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground p-0"
                   placeholder="0"
+                  onSubmitAmount={() => balanceDiff !== 0 && handleAdjustBalance()}
                 />
               </div>
             </div>

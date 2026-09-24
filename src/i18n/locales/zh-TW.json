@@ -518,6 +518,14 @@
       "quarterFormat": "{{year}} 年 Q{{quarter}}",
       "percentage": "佔比",
       "others": "其他分類"
+    },
+    "keypad": {
+      "current": "當前",
+      "collapse": "收起鍵盤",
+      "clear": "清空",
+      "backspace": "退格",
+      "done": "完成",
+      "calculate": "計算"
     }
   }
 }

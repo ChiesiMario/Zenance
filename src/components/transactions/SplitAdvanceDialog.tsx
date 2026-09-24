@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/ui/AmountInput';
 import { Plus, Users, UserCheck, RotateCcw, Search, X, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeAmountInput } from '@/lib/utils';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import type { Account } from '@/services/db/db';
 
@@ -297,7 +297,7 @@ export function SplitAdvanceDialog({
   const handleAmountChange = (contactId: string, val: string) => {
     setAllocatedAmounts(prev => ({
       ...prev,
-      [contactId]: val,
+      [contactId]: sanitizeAmountInput(val),
     }));
   };
 
@@ -532,12 +532,9 @@ export function SplitAdvanceDialog({
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-muted-foreground font-mono">{currencySymbol}</span>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
+                          <AmountInput
                             value={currentAmountStr}
-                            onChange={(e) => handleAmountChange(cId, e.target.value)}
+                            onValueChange={(val) => handleAmountChange(cId, val)}
                             placeholder="0.00"
                             className="w-24 h-8 text-right text-xs font-mono font-medium border-border bg-background focus-visible:ring-1"
                           />

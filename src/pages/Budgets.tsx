@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/ui/AmountInput';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
@@ -860,11 +861,10 @@ export default function Budgets() {
               <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.targetAmount')}
               </label>
-              <Input
-                type="number"
+              <AmountInput
                 placeholder={t('budgets.targetAmount')}
                 value={formBudgetAmount}
-                onChange={e => setFormBudgetAmount(e.target.value)}
+                onValueChange={setFormBudgetAmount}
               />
             </div>
 
@@ -1084,11 +1084,10 @@ export default function Budgets() {
               <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.ruleDefaultAmount')}
               </label>
-              <Input
-                type="number"
+              <AmountInput
                 placeholder={t('budgets.ruleDefaultAmount')}
                 value={formRuleAmount}
-                onChange={e => setFormRuleAmount(e.target.value)}
+                onValueChange={setFormRuleAmount}
               />
             </div>
 

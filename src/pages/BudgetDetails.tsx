@@ -26,6 +26,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/ui/AmountInput';
 import { DatePicker } from '@/components/ui/date-picker';
 import { toast } from '@/components/ui/toast';
 import {
@@ -634,11 +635,10 @@ export default function BudgetDetails() {
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.targetAmount')}
               </label>
-              <Input
-                type="number"
+              <AmountInput
                 placeholder={t('budgets.targetAmount')}
                 value={formAmount}
-                onChange={e => setFormAmount(e.target.value)}
+                onValueChange={setFormAmount}
               />
             </div>
 

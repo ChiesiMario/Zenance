@@ -6,6 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/ui/AmountInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Plus, Wallet, ChevronDown, Check, RefreshCcw } from 'lucide-react';
 import {
@@ -230,14 +231,13 @@ export default function Accounts() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input
+                    <AmountInput
                       className="rounded-l-none font-mono flex-1 min-w-0"
-                      type="number"
-                      step="0.01"
                       placeholder="0.00"
                       value={newAccountInitialBalance}
-                      onChange={(e) => setNewAccountInitialBalance(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddAccount()}
+                      onValueChange={setNewAccountInitialBalance}
+                      allowNegative
+                      onSubmitAmount={handleAddAccount}
                     />
                   </div>
                 </div>
@@ -246,14 +246,12 @@ export default function Accounts() {
                   <div className="space-y-4 pt-1 border-t border-border animate-in fade-in slide-in-from-top-1 duration-200">
                     <div className="space-y-1.5">
                       <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.limit')}</label>
-                      <Input 
+                      <AmountInput 
                         className="font-mono"
-                        type="number"
-                        step="100"
                         placeholder={t('accounts.limitPlaceholder')}
                         value={newCreditLimit}
-                        onChange={(e) => setNewCreditLimit(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddAccount()}
+                        onValueChange={setNewCreditLimit}
+                        onSubmitAmount={handleAddAccount}
                       />
                     </div>
 

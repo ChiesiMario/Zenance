@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
-import { getCurrencySymbol, cn } from '@/lib/utils';
+import { getCurrencySymbol, cn, sanitizeAmountInput } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -264,11 +264,10 @@ export function SettleReimbursementDialog({
             <div className="flex items-center justify-center font-mono font-bold tracking-tight text-foreground">
               <span className="text-2xl mr-1 text-muted-foreground">{currencySymbol}</span>
               <input
-                type="number"
-                step="0.01"
-                min="0.01"
+                type="text"
+                inputMode="decimal"
                 value={receivedAmount}
-                onChange={(e) => setReceivedAmount(e.target.value)}
+                onChange={(e) => setReceivedAmount(sanitizeAmountInput(e.target.value))}
                 placeholder="0.00"
                 className="w-48 text-center text-4xl font-bold font-mono tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/40"
               />

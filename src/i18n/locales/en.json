@@ -518,6 +518,14 @@
       "quarterFormat": "Q{{quarter}} {{year}}",
       "percentage": "Share",
       "others": "Other Categories"
+    },
+    "keypad": {
+      "current": "Current",
+      "collapse": "Collapse Keypad",
+      "clear": "Clear",
+      "backspace": "Backspace",
+      "done": "Done",
+      "calculate": "Calculate"
     }
   }
 }

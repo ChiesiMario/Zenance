@@ -195,16 +195,6 @@ export default function BudgetHistory() {
                             <span>{t('budgets.ruleBadge')}</span>
                           </span>
                         )}
-                        <span
-                          className={cn(
-                            'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border',
-                            isOver
-                              ? 'bg-destructive/10 text-destructive border-destructive/20'
-                              : 'bg-muted text-muted-foreground border-border'
-                          )}
-                        >
-                          {isOver ? t('budgets.settledOver') : t('budgets.settledUnder')}
-                        </span>
                       </div>
                       <div className="text-[11px] font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                         <Calendar className="h-3 w-3 opacity-60" />

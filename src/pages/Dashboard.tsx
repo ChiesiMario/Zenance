@@ -97,7 +97,11 @@ export default function Dashboard() {
   const currentMonthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
   
   const currentMonthBudgets = useMemo(() => {
-    return getActiveBudgetsForMonth(currentMonth, 3);
+    const today = new Date();
+    const isCurrentMonth =
+      currentMonth.getFullYear() === today.getFullYear() &&
+      currentMonth.getMonth() === today.getMonth();
+    return getActiveBudgetsForMonth(currentMonth, isCurrentMonth ? 3 : 6);
   }, [getActiveBudgetsForMonth, currentMonth]);
 
   const filteredTransactions = useMemo(() => {

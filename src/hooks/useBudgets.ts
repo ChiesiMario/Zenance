@@ -418,16 +418,32 @@ export function useBudgets() {
 
   // Find up to `limit` active budgets for dashboard
   const getActiveBudgetsForMonth = useCallback(
-    (targetMonth: Date, limit = 3): Array<{ budget: Budget; spent: number; effectiveAmount: number }> => {
+    (targetMonth: Date, limit?: number): Array<{ budget: Budget; spent: number; effectiveAmount: number }> => {
       if (!budgets || budgets.length === 0) return [];
 
+      const today = new Date();
+      const isCurrentMonth =
+        targetMonth.getFullYear() === today.getFullYear() &&
+        targetMonth.getMonth() === today.getMonth();
+
+      const effectiveLimit = limit !== undefined ? limit : (isCurrentMonth ? 3 : 6);
+
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const yearMonthStr = getYearMonthString(targetMonth);
       const targetMonthStart = `${yearMonthStr}-01`;
       const targetMonthEnd = getMonthDateRange(yearMonthStr).endDate;
 
+      const isBudgetEnded = (b: Budget): boolean => {
+        return Boolean(b.isEnded || (b.endDate && b.endDate < todayStr));
+      };
+
       // 1. Monthly budgets for this month
       const activeMonthly = budgets
-        .filter(b => b.periodType === 'monthly' && b.periodKey === yearMonthStr)
+        .filter(b => {
+          if (b.periodType !== 'monthly' || b.periodKey !== yearMonthStr) return false;
+          if (isCurrentMonth && isBudgetEnded(b)) return false;
+          return true;
+        })
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .map(b => ({
           budget: b,
@@ -435,8 +451,8 @@ export function useBudgets() {
           effectiveAmount: b.amount,
         }));
 
-      if (activeMonthly.length >= limit) {
-        return activeMonthly.slice(0, limit);
+      if (activeMonthly.length >= effectiveLimit) {
+        return activeMonthly.slice(0, effectiveLimit);
       }
 
       // 2. Custom or Unlimited budgets crossing this month
@@ -444,12 +460,15 @@ export function useBudgets() {
         .filter(b => {
           if (b.periodType === 'monthly' || b.periodType === 'yearly') return false;
           if (!b.startDate) return false;
-          if (b.periodType === 'unlimited' || !b.endDate) {
+          if (isCurrentMonth && isBudgetEnded(b)) return false;
+
+          const effectiveEnd = b.isEnded && b.endedAt ? b.endedAt : b.endDate;
+          if (b.periodType === 'unlimited' || !effectiveEnd) {
             if (b.startDate > targetMonthEnd) return false;
             if (b.isEnded && b.endedAt && b.endedAt < targetMonthStart) return false;
             return true;
           }
-          return b.startDate <= targetMonthEnd && b.endDate >= targetMonthStart;
+          return b.startDate <= targetMonthEnd && effectiveEnd >= targetMonthStart;
         })
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .map(b => ({
@@ -459,14 +478,18 @@ export function useBudgets() {
         }));
 
       const combined = [...activeMonthly, ...activeCustom];
-      if (combined.length >= limit) {
-        return combined.slice(0, limit);
+      if (combined.length >= effectiveLimit) {
+        return combined.slice(0, effectiveLimit);
       }
 
       // 3. Yearly budgets for this year
       const yearStr = String(targetMonth.getFullYear());
       const activeYearly = budgets
-        .filter(b => b.periodType === 'yearly' && b.periodKey === yearStr)
+        .filter(b => {
+          if (b.periodType !== 'yearly' || b.periodKey !== yearStr) return false;
+          if (isCurrentMonth && isBudgetEnded(b)) return false;
+          return true;
+        })
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         .map(b => ({
           budget: b,
@@ -474,7 +497,7 @@ export function useBudgets() {
           effectiveAmount: b.amount,
         }));
 
-      return [...combined, ...activeYearly].slice(0, limit);
+      return [...combined, ...activeYearly].slice(0, effectiveLimit);
     },
     [budgets, getMonthlyBudgetSpent, getBudgetSpent, getYearlyBudgetSpent]
   );

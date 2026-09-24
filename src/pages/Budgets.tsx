@@ -602,17 +602,6 @@ export default function Budgets() {
                     {/* Top Pill Bar with Actions & Divider */}
                     <div className="flex items-center justify-between pb-3 border-b border-border/50">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={cn(
-                            'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border shrink-0',
-                            isOver
-                              ? 'bg-destructive/10 text-destructive border-destructive/20'
-                              : 'bg-muted/60 text-muted-foreground border-border'
-                          )}
-                        >
-                          {isOver ? t('budgets.settledOver') : t('budgets.settledUnder')}
-                        </span>
-
                         <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
                           <Calendar className="h-2.5 w-2.5 opacity-70" />
                           <span>

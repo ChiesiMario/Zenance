@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins, Coins } from 'lucide-react';
 import { cn, getCurrencySymbol } from '@/lib/utils';
@@ -92,8 +92,8 @@ export function AppLayout() {
 
   const mainRef = useRef<HTMLElement>(null);
 
-  // Reset scroll position on route change so new page smoothly fades in from top
-  useEffect(() => {
+  // Reset scroll position synchronously on route change before paint so new page smoothly fades in from top
+  useLayoutEffect(() => {
     if (mainRef.current) {
       mainRef.current.scrollTop = 0;
     }

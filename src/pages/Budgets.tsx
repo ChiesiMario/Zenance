@@ -446,8 +446,10 @@ export default function Budgets() {
       {/* Ongoing Budgets List View                           */}
       {/* -------------------------------------------------- */}
       {activeSection === 'budgets' && currentBudgetFilter === 'ongoing' && (
-        <div key="ongoing" className="animate-in fade-in duration-150 space-y-4">
-          {ongoingBudgets.length === 0 ? (
+        <div key="ongoing" className="space-y-4">
+          {budgets === undefined ? (
+            <div className="min-h-[200px]" />
+          ) : ongoingBudgets.length === 0 ? (
             <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card space-y-3">
               <Calendar className="h-8 w-8 mx-auto text-muted-foreground/50" />
               <p>{t('budgets.noOngoingBudgets')}</p>
@@ -585,8 +587,10 @@ export default function Budgets() {
       {/* Ended Budgets List View                             */}
       {/* -------------------------------------------------- */}
       {activeSection === 'budgets' && currentBudgetFilter === 'ended' && (
-        <div key="ended" className="animate-in fade-in duration-150 space-y-4">
-          {endedBudgets.length === 0 ? (
+        <div key="ended" className="space-y-4">
+          {budgets === undefined ? (
+            <div className="min-h-[200px]" />
+          ) : endedBudgets.length === 0 ? (
             <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card space-y-3">
               <Archive className="h-8 w-8 mx-auto text-muted-foreground/50" />
               <p>{t('budgets.noEndedBudgets')}</p>
@@ -711,8 +715,10 @@ export default function Budgets() {
       {/* Recurring Rules Tab Content                         */}
       {/* -------------------------------------------------- */}
       {activeSection === 'rules' && (
-        <div key="rules" className="animate-in fade-in duration-150 space-y-4">
-          {(!budgetRules || budgetRules.length === 0) ? (
+        <div key="rules" className="space-y-4">
+          {budgetRules === undefined ? (
+            <div className="min-h-[200px]" />
+          ) : (!budgetRules || budgetRules.length === 0) ? (
             <div className="border border-border rounded-lg p-12 text-center text-sm text-muted-foreground bg-card space-y-3">
               <Zap className="h-8 w-8 mx-auto text-muted-foreground/50" />
               <p>{t('budgets.noRulesFound')}</p>

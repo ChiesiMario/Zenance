@@ -256,27 +256,6 @@ export default function BudgetDetails() {
     toast.show(t('budgets.budgetResumed'));
   };
 
-  if (!id) return <Navigate to="/budgets" replace />;
-
-  if (!budgets || !transactions) {
-    return (
-      <div className="p-8 text-center text-sm text-muted-foreground font-mono">
-        {t('common.loading')}
-      </div>
-    );
-  }
-
-  if (!budget) {
-    return (
-      <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
-        <p className="text-sm font-medium">{t('budgets.budgetNotFound')}</p>
-        <Button variant="outline" onClick={() => navigate('/budgets')}>
-          {t('budgets.backToBudgets')}
-        </Button>
-      </div>
-    );
-  }
-
   const handleGoBack = () => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -284,6 +263,31 @@ export default function BudgetDetails() {
       navigate('/budgets');
     }
   };
+
+  if (!id) return <Navigate to="/budgets" replace />;
+
+  if (budgets && !budget) {
+    return (
+      <div className="animate-in fade-in duration-500 w-full space-y-4">
+        <div className="flex items-center h-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleGoBack}
+            className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4 border border-border rounded-lg bg-card">
+          <p className="text-sm font-medium">{t('budgets.budgetNotFound')}</p>
+          <Button variant="outline" onClick={() => navigate('/budgets')}>
+            {t('budgets.backToBudgets')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-in fade-in duration-500 w-full space-y-4">
@@ -300,9 +304,9 @@ export default function BudgetDetails() {
           </Button>
           <div className="space-y-1 min-w-0">
             <h2 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
-              {budget.name}
+              {budget?.name || '\u00A0'}
             </h2>
-            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5 min-h-[22px]">
               {isBudgetEnded ? (
                 <>
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest bg-muted/60 text-muted-foreground border border-border shrink-0">
@@ -326,7 +330,7 @@ export default function BudgetDetails() {
                 </>
               )}
 
-              {budget.ruleId && (
+              {budget?.ruleId && (
                 <button
                   type="button"
                   onClick={() => navigate('/budgets?tab=rules')}
@@ -344,7 +348,7 @@ export default function BudgetDetails() {
         {/* Action Buttons */}
         <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
           {/* End / Resume Button */}
-          {budget.isEnded ? (
+          {budget?.isEnded ? (
             <Button
               variant="outline"
               size="icon"
@@ -355,7 +359,7 @@ export default function BudgetDetails() {
             >
               <RotateCcw className="size-4" />
             </Button>
-          ) : !isNaturallyExpired ? (
+          ) : !isNaturallyExpired && budget ? (
             <Button
               variant="outline"
               size="icon"
@@ -372,10 +376,11 @@ export default function BudgetDetails() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => handleOpenEdit(budget)}
+            disabled={!budget}
+            onClick={() => budget && handleOpenEdit(budget)}
             title={t('budgets.editBudget')}
             aria-label={t('budgets.editBudget')}
-            className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-30"
           >
             <Pencil className="size-4" />
           </Button>
@@ -384,10 +389,11 @@ export default function BudgetDetails() {
           <Button
             variant="outline"
             size="icon"
+            disabled={!budget}
             onClick={() => setIsDeleteDialogOpen(true)}
             title={t('budgets.deleteBudget')}
             aria-label={t('budgets.deleteBudget')}
-            className="size-8 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors cursor-pointer"
+            className="size-8 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors cursor-pointer disabled:opacity-30"
           >
             <Trash2 className="size-4" />
           </Button>
@@ -494,7 +500,9 @@ export default function BudgetDetails() {
           </h3>
         </div>
 
-        {groupedTransactions.length === 0 ? (
+        {!budgets || !transactions ? (
+          <div className="border border-border rounded-lg h-36 bg-card/40 flex items-center justify-center text-xs font-mono text-muted-foreground/60" />
+        ) : groupedTransactions.length === 0 ? (
           <div className="border border-border rounded-lg p-10 text-center bg-card space-y-3">
             <div className="size-10 rounded-full border border-border bg-muted/30 flex items-center justify-center mx-auto text-muted-foreground/60">
               {monitoredCategoryList.length > 0 ? (
@@ -518,8 +526,9 @@ export default function BudgetDetails() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleOpenEdit(budget)}
-                  className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground"
+                  disabled={!budget}
+                  onClick={() => budget && handleOpenEdit(budget)}
+                  className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground disabled:opacity-30"
                 >
                   <Pencil className="size-3.5" />
                   <span>{t('budgets.configureMonitoredCategories', '設定監控分類')}</span>
@@ -643,7 +652,7 @@ export default function BudgetDetails() {
             </div>
 
             {/* Custom or Unlimited Range Date Controls */}
-            {(budget.periodType === 'custom' || budget.periodType === 'unlimited') && (
+            {(budget?.periodType === 'custom' || budget?.periodType === 'unlimited') && (
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('budgets.startDate')}</label>
@@ -744,7 +753,7 @@ export default function BudgetDetails() {
                 !formName.trim() ||
                 !formAmount ||
                 parseFloat(formAmount) <= 0 ||
-                ((budget.periodType === 'custom' || budget.periodType === 'unlimited') && (
+                ((budget?.periodType === 'custom' || budget?.periodType === 'unlimited') && (
                   !formStartDate ||
                   (!isUnlimited && (!formEndDate || formStartDate > formEndDate))
                 ))

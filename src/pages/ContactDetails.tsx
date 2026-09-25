@@ -260,7 +260,6 @@ export default function ContactDetails() {
               </span>
               <input 
                 type="text"
-                autoFocus
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && editName.trim() && handleUpdate()}

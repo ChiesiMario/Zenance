@@ -194,7 +194,6 @@ export default function Categories() {
                       value={editName} 
                       onChange={e => setEditName(e.target.value)} 
                       className="h-8 flex-1"
-                      autoFocus
                       onKeyDown={e => {
                         if (e.key === 'Enter') handleEditSubmit();
                         if (e.key === 'Escape') setEditingCategory(null);
@@ -271,7 +270,6 @@ export default function Categories() {
               placeholder={t('add.newCategoryPlaceholder')} 
               value={newName}
               onChange={e => setNewName(e.target.value)}
-              autoFocus
             />
             <DialogFooter>
               <DialogClose render={<Button type="button" variant="outline" />}>

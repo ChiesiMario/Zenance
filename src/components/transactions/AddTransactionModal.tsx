@@ -1507,7 +1507,6 @@ export function AddTransactionModal({
                 onChange={(e) => setNewCatName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
                 className="bg-muted/60 border-border text-foreground placeholder:text-muted-foreground"
-                autoFocus
               />
             </div>
             <DialogFooter className="flex gap-2">

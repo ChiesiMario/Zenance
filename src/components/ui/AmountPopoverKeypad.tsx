@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Delete, Check, Equal, ChevronUp } from 'lucide-react';
+import { Delete, Check, Equal, ChevronDown } from 'lucide-react';
 import { cn, evaluateAmountExpression } from '@/lib/utils';
 
 export interface AmountPopoverKeypadProps {
@@ -212,7 +212,7 @@ export function AmountPopoverKeypad({
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             title={t('keypad.collapse', '收起鍵盤')}
           >
-            <ChevronUp className="size-3.5" />
+            <ChevronDown className="size-3.5" />
           </button>
         </div>
       </div>

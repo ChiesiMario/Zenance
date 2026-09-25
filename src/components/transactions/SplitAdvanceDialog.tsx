@@ -118,7 +118,6 @@ function SelectContactsModal({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('add.searchToAdd', '搜尋要添加的對象...')}
               className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none border-none p-0"
-              autoFocus
             />
             {searchQuery && (
               <button

@@ -216,7 +216,6 @@ export default function Dashboard() {
                             onBlur={() => handleUpdateLedgerName(ledger.id)}
                             onKeyDown={(e) => e.key === 'Enter' && handleUpdateLedgerName(ledger.id)}
                             className="h-7 w-32 px-2 text-sm shrink-0"
-                            autoFocus
                           />
                         ) : (
                           <span className="font-medium truncate block">{ledger.name}</span>

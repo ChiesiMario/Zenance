@@ -103,14 +103,6 @@ export default function AccountDetails() {
     if (isAdjustBalanceDialogOpen) {
       const initialStr = balance.toString();
       setNewBalanceStr(initialStr);
-      // 聚焦並將游標停留在末尾，不全選數字
-      setTimeout(() => {
-        if (adjustInputRef.current) {
-          adjustInputRef.current.focus();
-          const len = adjustInputRef.current.value.length;
-          adjustInputRef.current.setSelectionRange(len, len);
-        }
-      }, 50);
     }
   }, [isAdjustBalanceDialogOpen, balance]);
 
@@ -360,7 +352,6 @@ export default function AccountDetails() {
               </span>
               <input 
                 type="text"
-                autoFocus
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && editName.trim() && handleUpdate()}

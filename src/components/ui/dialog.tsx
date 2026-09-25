@@ -49,6 +49,7 @@ function DialogContent({
   container,
   fullscreen = false,
   commandDeck = false,
+  initialFocus,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
@@ -57,10 +58,14 @@ function DialogContent({
   fullscreen?: boolean
   commandDeck?: boolean
 }) {
+  const contentRef = React.useRef<HTMLDivElement>(null)
+
   return (
     <DialogPortal container={container}>
       <DialogOverlay className={cn(commandDeck && "bg-background/70 backdrop-blur-md", overlayClassName)} />
       <DialogPrimitive.Popup
+        ref={contentRef}
+        initialFocus={initialFocus !== undefined ? initialFocus : () => contentRef.current}
         data-slot="dialog-content"
         className={cn(
           fullscreen

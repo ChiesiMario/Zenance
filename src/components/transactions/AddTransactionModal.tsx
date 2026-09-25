@@ -834,9 +834,8 @@ export function AddTransactionModal({
             </button>
           </div>
 
-          {/* 2. Hero Section: Account Badge / Flow Bar + Monospace Amount */}
           {/* 2. Hero Section: Amount & Account / Dual Cards */}
-          <div className="w-full flex-1 flex flex-col items-center justify-start sm:justify-center [justify-content:safe_center] my-auto py-1 sm:py-2">
+          <div className="w-full flex-1 flex flex-col items-center justify-center [justify-content:safe_center] my-auto py-1 sm:py-2">
             {/* Case A: Expense / Income -> [Account Badge] then [Amount] */}
             {(type === 'expense' || type === 'income') && (
               <>

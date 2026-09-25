@@ -321,7 +321,7 @@ export function SettleReimbursementDialog({
                         {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-medium text-foreground truncate">
+                        <span className="text-xs font-medium text-foreground truncate select-text">
                           {tx.note || t('reimbursements.pending')}
                         </span>
                         <span className="text-[10px] font-mono text-muted-foreground">
@@ -330,7 +330,7 @@ export function SettleReimbursementDialog({
                       </div>
                     </div>
                     <div className="flex flex-col items-end shrink-0">
-                      <span className="font-mono text-xs font-medium text-foreground">
+                      <span className="font-mono text-xs font-medium text-foreground select-text">
                         {currencySymbol}{getTxPendingAmount(tx).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {tx.remainingAmount !== undefined && tx.remainingAmount < tx.amount && (

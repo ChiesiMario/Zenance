@@ -863,7 +863,7 @@ export function AddTransactionModal({
                 {/* Massive Monospace Amount Display */}
                 <div className="flex items-baseline justify-center gap-1.5 w-full py-1">
                   <span className="text-xl font-medium text-muted-foreground tracking-tight">{selectedCurrency}</span>
-                  <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+                  <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-text">
                     {formatDisplayAmount(displayAmount)}
                   </span>
                 </div>
@@ -909,7 +909,7 @@ export function AddTransactionModal({
                     <span className="text-xl font-medium text-muted-foreground tracking-tight">
                       {isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in')) ? toCurrency : fromCurrency}
                     </span>
-                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-text">
                       {formatDisplayAmount(
                         isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in'))
                           ? displayAmountIn
@@ -1112,7 +1112,7 @@ export function AddTransactionModal({
                     <span className="text-xl font-medium text-muted-foreground tracking-tight">
                       {isCrossCurrency && focusedField === 'in' ? toCurrency : fromCurrency}
                     </span>
-                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-none">
+                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-text">
                       {formatDisplayAmount(isCrossCurrency && focusedField === 'in' ? displayAmountIn : displayAmount)}
                     </span>
                   </button>

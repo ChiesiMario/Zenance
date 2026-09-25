@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '@/components/ThemeProvider';
 import { Link } from 'react-router-dom';
+import { Logo } from '@/components/ui/Logo';
 
 export default function Settings() {
   const { isSyncing, lastSyncTime } = useAppStore();
@@ -111,8 +112,9 @@ export default function Settings() {
         </div>
       </div>
       
-      <div className="text-center text-xs text-muted-foreground pt-4 font-mono">
-        Zenance v1.0.0
+      <div className="flex flex-col items-center justify-center gap-2 pt-6">
+        <Logo size={28} />
+        <span className="text-xs text-muted-foreground font-mono">Zenance v1.0.0</span>
       </div>
     </div>
   );

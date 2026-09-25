@@ -50,7 +50,7 @@ export function AmountDisplay({
   }
 
   return (
-    <span className={cn('font-mono font-medium', colorClass, className)}>
+    <span className={cn('font-mono font-medium select-text', colorClass, className)}>
       {effectiveIsApproximate && '≈ '}
       {sign}
       {symbol}

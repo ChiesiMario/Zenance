@@ -582,14 +582,14 @@ export default function Reports() {
             <div>
               {peakExpenseTx ? (
                 <>
-                  <p className="text-xl font-mono tracking-tight font-medium text-foreground truncate">
+                  <p className="text-xl font-mono tracking-tight font-medium text-foreground truncate select-text">
                     {currencySymbol}
                     {peakExpenseTx.amount.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
                   </p>
-                  <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5">
+                  <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5 select-text">
                     {peakExpenseTx.note ||
                       allCategories?.find(c => c.id === peakExpenseTx.category)?.name ||
                       t('common.unknown', '未分類')}
@@ -1111,7 +1111,7 @@ export default function Reports() {
                   >
                     <div className="flex flex-col min-w-0 pr-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs text-foreground font-medium truncate">
+                        <span className="text-xs text-foreground font-medium truncate select-text">
                           {tx.note || inspectCategory.name}
                         </span>
                         <ReimbursementBadge transaction={tx} />

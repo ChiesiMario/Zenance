@@ -211,9 +211,9 @@ export default function AccountDetails() {
             </div>
           )}
           {isForeign && (
-            <div className="flex items-center gap-1.5 mt-2 text-xs font-mono text-muted-foreground">
+            <div className="flex items-center gap-1.5 mt-2 text-xs font-mono text-muted-foreground select-text">
               <span>≈ {getCurrencySymbol(baseCurrency)}{Math.abs(convertAmount(balance, currency, baseCurrency, getRate)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-border bg-muted/20">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-border bg-muted/20 select-none">
                 {t('accounts.rateEstimated')}
               </span>
             </div>
@@ -226,7 +226,7 @@ export default function AccountDetails() {
               <div className="bg-card p-4 flex flex-col justify-between">
                 <div>
                   <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{t('accounts.availableCredit')}</p>
-                  <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground">
+                  <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground select-text">
                     {hasCreditLimit ? `${currencySymbol}${availableCredit.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '-'}
                   </p>
                 </div>

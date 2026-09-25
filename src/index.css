@@ -95,16 +95,29 @@
     @apply border-border;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    -webkit-tap-highlight-color: transparent;
   }
   html {
     font-size: 90%;
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
+  html, body {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     scrollbar-width: none;
     -ms-overflow-style: none;
+  }
+  
+  /* 豁免所有輸入框，原生允許自由選取文字與呼出編輯選單 */
+  input, textarea, [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
   }
   
   /* Globally hide all scrollbars for an app-like experience */
@@ -113,6 +126,12 @@
     width: 0;
     height: 0;
   }
+}
+
+@utility select-text {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
 }
 
 @utility no-scrollbar {

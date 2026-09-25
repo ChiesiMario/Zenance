@@ -209,7 +209,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               return (
                 <div className="flex min-h-12 md:min-h-10 justify-between items-center px-4 md:px-3 py-2">
                   <span className="text-muted-foreground shrink-0 mr-2">{t('add.note')}</span>
-                  <div className="font-medium text-right break-words">
+                  <div className="font-medium text-right break-words select-text">
                     {selectedTransaction.note}
                   </div>
                 </div>

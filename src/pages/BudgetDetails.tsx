@@ -576,7 +576,7 @@ export default function BudgetDetails() {
                               <ReimbursementBadge transaction={tx} />
                             </div>
                             {tx.note && (
-                              <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
+                              <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
                                 {tx.note}
                               </div>
                             )}

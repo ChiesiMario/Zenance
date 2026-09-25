@@ -5,7 +5,8 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Cloud, Wallet } from 'lucide-react';
+import { Cloud } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 
 export default function Setup() {
   const { t, i18n } = useTranslation();
@@ -49,9 +50,7 @@ export default function Setup() {
       <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
         <div className="w-full max-w-sm flex flex-col items-center text-center">
           <div className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both">
-            <div className="rounded-full border border-border p-5 bg-muted/5">
-              <Wallet className="size-12 text-primary" strokeWidth={1} />
-            </div>
+            <Logo size={72} />
           </div>
           
           <h1 className="text-4xl font-bold tracking-tight mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 fill-mode-both">

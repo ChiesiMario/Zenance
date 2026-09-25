@@ -515,7 +515,7 @@ export function GroupedTransactionList({
                               if (isAdj && isDefaultNote) return null;
                               if (!tx.note) return null;
                               return (
-                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
+                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
                                   {tx.note}
                                 </div>
                               );
@@ -673,7 +673,7 @@ export function GroupedTransactionList({
                               </div>
 
                               {item.note && (
-                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
+                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
                                   {item.note}
                                 </div>
                               )}
@@ -804,7 +804,7 @@ export function GroupedTransactionList({
                             </div>
 
                             {/* 次行備註或明細說明 */}
-                            <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1">
+                            <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
                               {item.note ? (
                                 item.note
                               ) : item.contactName ? (

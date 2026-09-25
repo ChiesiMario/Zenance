@@ -606,12 +606,22 @@ export function NumericKeypad({
         type="button"
         className={cn("w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-all active:scale-95 border cursor-pointer shadow-none", 
           isExpression
-            ? "bg-muted/60 text-foreground hover:bg-muted border-border/40"
+            ? "bg-muted/60 text-foreground hover:bg-muted border-border/40 font-bold"
             : "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-primary font-bold"
         )} 
         onClick={() => handleKeyPress('=')}
       >
-        {isExpression ? <Equal className="size-5" /> : <Check className="size-5 text-primary-foreground" />}
+        {isExpression ? (
+          <Equal className="size-5" />
+        ) : (
+          <Check
+            className="size-5 stroke-[2.5]"
+            style={{
+              color: 'var(--primary-foreground)',
+              stroke: 'var(--primary-foreground)',
+            }}
+          />
+        )}
       </button>
       
     </div>

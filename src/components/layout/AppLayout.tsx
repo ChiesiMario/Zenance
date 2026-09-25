@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins, Coins } from 'lucide-react';
 import { cn, getCurrencySymbol } from '@/lib/utils';
@@ -90,10 +90,19 @@ export function AppLayout() {
     { path: '/contacts', label: t('nav.contacts'), icon: Users },
   ];
 
+  const mainRef = useRef<HTMLElement>(null);
+
+  // Reset scroll position on route change so new page smoothly fades in from top
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [location.pathname]);
+
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground">
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-4 [scrollbar-gutter:stable]">
+      <main ref={mainRef} className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-4 [scrollbar-gutter:stable]">
         <Outlet />
       </main>
 

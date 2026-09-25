@@ -453,7 +453,7 @@ export default function BudgetDetails() {
         <div className="h-2 w-full bg-muted overflow-hidden rounded-full">
           <div
             className={cn(
-              'h-full transition-all duration-700 ease-out',
+              'h-full transition-all duration-500 ease-out',
               isOver ? 'bg-destructive' : 'bg-primary'
             )}
             style={{ width: `${percentage}%` }}

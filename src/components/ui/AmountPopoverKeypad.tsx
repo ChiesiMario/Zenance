@@ -359,7 +359,17 @@ export function AmountPopoverKeypad({
           )}
           title={isExpression ? t('keypad.calculate', '計算') : t('keypad.done', '完成')}
         >
-          {isExpression ? <Equal className="size-4.5" /> : <Check className="size-4.5" />}
+          {isExpression ? (
+            <Equal className="size-4.5" />
+          ) : (
+            <Check
+              className="size-4.5 stroke-[2.5]"
+              style={{
+                color: 'var(--primary-foreground)',
+                stroke: 'var(--primary-foreground)',
+              }}
+            />
+          )}
         </button>
       </div>
     </div>

@@ -540,6 +540,10 @@
       "backspace": "退格",
       "done": "完成",
       "calculate": "计算"
+    },
+    "receipt": {
+      "voucherTag": "TRANSACTION VOUCHER",
+      "voucherTitle": "交易凭证"
     }
   }
 }

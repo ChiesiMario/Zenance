@@ -533,6 +533,10 @@
       "backspace": "Backspace",
       "done": "Done",
       "calculate": "Calculate"
+    },
+    "receipt": {
+      "voucherTag": "TRANSACTION VOUCHER",
+      "voucherTitle": "Transaction Voucher"
     }
   }
 }

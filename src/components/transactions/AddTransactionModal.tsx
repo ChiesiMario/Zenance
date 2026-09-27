@@ -498,7 +498,7 @@ export function AddTransactionModal({
             category: feeCategoryId,
             accountId: data.fromAccountId!,
             splitGroupId,
-            note: data.note ? `${data.note} (${t('add.fee', '手續費')})` : t('add.fee', '手續費'),
+            note: data.note?.trim() || undefined,
             date: data.date,
           });
         }
@@ -528,7 +528,7 @@ export function AddTransactionModal({
             category: feeCategoryId,
             accountId: data.fromAccountId!,
             splitGroupId,
-            note: data.note ? `${data.note} (${t('add.fee', '手續費')})` : t('add.fee', '手續費'),
+            note: data.note?.trim() || undefined,
             date: data.date,
           });
         }
@@ -989,7 +989,7 @@ export function AddTransactionModal({
                       onClick={() => {
                         setAccountSelectConfig({
                           open: true,
-                          title: t('add.transferFrom', '轉出 (FROM)'),
+                          title: t('add.transferFrom', '轉出'),
                           selectedAccountId: selectedFromAccountId || undefined,
                           disabledAccountIds: selectedToAccountId ? [selectedToAccountId] : [],
                           disabledReason: t('accounts.alreadySelectedTarget', '當前轉入帳戶'),
@@ -1006,7 +1006,7 @@ export function AddTransactionModal({
                     >
                       <div className="w-full flex items-center justify-start gap-1 mb-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {t('add.transferFrom', '轉出 (FROM)')}
+                          {t('add.transferFrom', '轉出')}
                         </span>
                       </div>
                       <div className="w-full min-w-0 pr-3">
@@ -1052,7 +1052,7 @@ export function AddTransactionModal({
                       onClick={() => {
                         setAccountSelectConfig({
                           open: true,
-                          title: t('add.transferTo', '轉入 (TO)'),
+                          title: t('add.transferTo', '轉入'),
                           selectedAccountId: selectedToAccountId || undefined,
                           disabledAccountIds: selectedFromAccountId ? [selectedFromAccountId] : [],
                           disabledReason: t('accounts.alreadySelectedSource', '當前轉出帳戶'),
@@ -1069,7 +1069,7 @@ export function AddTransactionModal({
                     >
                       <div className="w-full flex items-center justify-end gap-1 mb-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {t('add.transferTo', '轉入 (TO)')}
+                          {t('add.transferTo', '轉入')}
                         </span>
                       </div>
                       <div className="w-full min-w-0 pl-3">
@@ -1198,7 +1198,7 @@ export function AddTransactionModal({
                         const isLend = loanType === 'lend';
                         setAccountSelectConfig({
                           open: true,
-                          title: isLend ? t('add.lendFrom', '出款 (FROM)') : t('add.borrowFrom', '收款來源 (FROM)'),
+                          title: isLend ? t('add.lendFrom', '出款') : t('add.borrowFrom', '出款'),
                           selectedAccountId: selectedFromAccountId || undefined,
                           filterType: isLend ? 'wallet' : 'contact',
                           disabledAccountIds: selectedToAccountId ? [selectedToAccountId] : [],
@@ -1215,7 +1215,7 @@ export function AddTransactionModal({
                     >
                       <div className="w-full flex items-center justify-start gap-1 mb-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {loanType === 'lend' ? t('add.lendFrom', '出款 (FROM)') : t('add.borrowFrom', '收款來源 (FROM)')}
+                          {loanType === 'lend' ? t('add.lendFrom', '出款') : t('add.borrowFrom', '出款')}
                         </span>
                       </div>
                       <div className="w-full min-w-0 pr-3">
@@ -1292,7 +1292,7 @@ export function AddTransactionModal({
                         const isLend = loanType === 'lend';
                         setAccountSelectConfig({
                           open: true,
-                          title: isLend ? t('add.lendTo', '給款對象 (TO)') : t('add.borrowTo', '入款 (TO)'),
+                          title: isLend ? t('add.lendTo', '入款') : t('add.borrowTo', '入款'),
                           selectedAccountId: selectedToAccountId || undefined,
                           filterType: isLend ? 'contact' : 'wallet',
                           disabledAccountIds: selectedFromAccountId ? [selectedFromAccountId] : [],
@@ -1309,7 +1309,7 @@ export function AddTransactionModal({
                     >
                       <div className="w-full flex items-center justify-end gap-1 mb-1.5">
                         <span className="text-xs font-medium text-muted-foreground">
-                          {loanType === 'lend' ? t('add.lendTo', '給款對象 (TO)') : t('add.borrowTo', '入款 (TO)')}
+                          {loanType === 'lend' ? t('add.lendTo', '入款') : t('add.borrowTo', '入款')}
                         </span>
                       </div>
                       <div className="w-full min-w-0 pl-3">

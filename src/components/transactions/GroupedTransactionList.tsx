@@ -68,6 +68,9 @@ export interface SplitGroupItem {
   contactNames: string[];
   contactsList: { id: string; name: string; group?: string }[];
   hasSelf: boolean;
+  isTransferGroup?: boolean;
+  transferTx?: Transaction;
+  feeAmount?: number;
   note?: string;
   latestCreatedAt: string;
 }
@@ -150,6 +153,186 @@ export function GroupedTransactionList({
       || archivedAccounts?.find(a => a.id === id);
     return target?.name || t('common.unknownAccount');
   }, [wallets, accounts, archivedAccounts, t]);
+
+  const accountCurrencies = useMemo(() => {
+    const map = new Map<string, string>();
+    wallets?.forEach((w) => {
+      if (w.currency) map.set(w.id, w.currency);
+    });
+    accounts?.forEach((a) => {
+      if (a.currency) map.set(a.id, a.currency);
+    });
+    contacts?.forEach((c) => {
+      if (c.currency) map.set(c.id, c.currency);
+    });
+    archivedAccounts?.forEach((a) => {
+      if (a.currency) map.set(a.id, a.currency);
+    });
+    archivedContacts?.forEach((c) => {
+      if (c.currency) map.set(c.id, c.currency);
+    });
+    return map;
+  }, [wallets, accounts, contacts, archivedAccounts, archivedContacts]);
+
+  const getDisplayAmountInfo = useCallback(
+    (tx: Transaction, baseCurr: string) => {
+      const fromCurr = tx.accountId
+        ? accountCurrencies.get(tx.accountId) || tx.originalCurrency || baseCurr
+        : tx.originalCurrency || baseCurr;
+      const toCurr = tx.toAccountId ? accountCurrencies.get(tx.toAccountId) : undefined;
+
+      const isForeignTo = Boolean(toCurr && toCurr !== baseCurr);
+      const isForeignFrom = Boolean(fromCurr && fromCurr !== baseCurr);
+      const isForeignOriginal = Boolean(tx.originalCurrency && tx.originalCurrency !== baseCurr);
+
+      const isTransfer = tx.type === 'transfer';
+      const isLoan = tx.type === 'loan';
+      const isLend =
+        isLoan &&
+        (contacts?.some((c) => c.id === tx.toAccountId) ||
+          archivedContacts?.some((c) => c.id === tx.toAccountId));
+      const isBorrow = isLoan && !isLend;
+      const isIncome = tx.type === 'income';
+      const isExpense = tx.type === 'expense';
+
+      // 1. 轉帳 (Transfer)
+      if (isTransfer) {
+        // 收款方為外幣卡：優先展示外幣卡的實際到款金額 (例如 $1)
+        if (isForeignTo && toCurr) {
+          const amount =
+            tx.transferInAmount !== undefined && tx.transferInAmount > 0
+              ? tx.transferInAmount
+              : tx.originalAmount ?? tx.amount;
+          return {
+            amount,
+            currency: toCurr,
+            type: 'transfer' as const,
+            isApproximate: false,
+            showSign: false,
+          };
+        }
+        // 出款方為外幣卡：展示外幣出款金額 (例如 $1)
+        if ((isForeignFrom || isForeignOriginal) && fromCurr) {
+          return {
+            amount: tx.originalAmount ?? tx.amount,
+            currency: tx.originalCurrency || fromCurr,
+            type: 'transfer' as const,
+            isApproximate: false,
+            showSign: false,
+          };
+        }
+        // 本幣轉帳
+        return {
+          amount: tx.originalAmount ?? tx.amount,
+          currency: tx.originalCurrency || baseCurr,
+          type: 'transfer' as const,
+          isApproximate: false,
+          showSign: false,
+        };
+      }
+
+      // 2. 借貸之收款 / 借入 (Borrow / Loan Collection)
+      if (isBorrow) {
+        // 收款錢包為外幣卡：展示外幣卡的實際到款金額 (例如 $1)
+        if (isForeignTo && toCurr) {
+          const amount =
+            tx.transferInAmount !== undefined && tx.transferInAmount > 0
+              ? tx.transferInAmount
+              : tx.originalAmount ?? tx.amount;
+          return {
+            amount,
+            currency: toCurr,
+            type: 'income' as const,
+            isApproximate: false,
+            showSign: false,
+          };
+        }
+        // 原幣為外幣或出款為外幣
+        if (isForeignOriginal || isForeignFrom) {
+          return {
+            amount: tx.originalAmount ?? tx.amount,
+            currency: tx.originalCurrency || fromCurr || baseCurr,
+            type: 'income' as const,
+            isApproximate: false,
+            showSign: false,
+          };
+        }
+        return {
+          amount: tx.originalAmount ?? tx.amount,
+          currency: tx.originalCurrency || baseCurr,
+          type: 'income' as const,
+          isApproximate: false,
+          showSign: false,
+        };
+      }
+
+      // 3. 借貸之出借 (Lend)
+      if (isLend) {
+        const loanAmt = tx.originalAmount ?? tx.amount;
+        const curr = tx.originalCurrency || fromCurr || baseCurr;
+        return {
+          amount: -loanAmt,
+          currency: curr,
+          type: 'expense' as const,
+          isApproximate: false,
+          showSign: true,
+        };
+      }
+
+      // 4. 一般收入 / 收款 (Income)
+      if (isIncome) {
+        const accCurr = tx.accountId ? accountCurrencies.get(tx.accountId) : undefined;
+        const targetCurr = tx.originalCurrency || accCurr || baseCurr;
+        if (targetCurr !== baseCurr) {
+          return {
+            amount: tx.originalAmount ?? tx.amount,
+            currency: targetCurr,
+            type: 'income' as const,
+            isApproximate: false,
+            showSign: false,
+          };
+        }
+        return {
+          amount: tx.amount,
+          currency: baseCurr,
+          type: 'income' as const,
+          isApproximate: false,
+          showSign: false,
+        };
+      }
+
+      // 5. 一般支出 (Expense)
+      if (isExpense) {
+        const accCurr = tx.accountId ? accountCurrencies.get(tx.accountId) : undefined;
+        const targetCurr = tx.originalCurrency || accCurr || baseCurr;
+        if (targetCurr !== baseCurr) {
+          return {
+            amount: -(tx.originalAmount ?? tx.amount),
+            currency: targetCurr,
+            type: 'expense' as const,
+            isApproximate: false,
+            showSign: true,
+          };
+        }
+        return {
+          amount: -tx.amount,
+          currency: baseCurr,
+          type: 'expense' as const,
+          isApproximate: false,
+          showSign: true,
+        };
+      }
+
+      return {
+        amount: tx.amount,
+        currency: tx.originalCurrency || baseCurr,
+        type: (tx.type as any) || 'neutral',
+        isApproximate: Boolean(tx.originalCurrency && tx.originalCurrency !== baseCurr),
+        showSign: false,
+      };
+    },
+    [accountCurrencies, contacts, archivedContacts]
+  );
 
   const isBalanceAdjustment = useCallback((tx: Transaction) => {
     if (tx.type !== 'income' && tx.type !== 'expense') return false;
@@ -276,24 +459,47 @@ export function GroupedTransactionList({
           displayItems.push({ isSettlementGroup: false, isSplitGroup: false, tx });
         });
 
-        // 加入多人分攤組合項目 (SplitGroupItem)
+        // 加入組合群組項目 (多人分攤 / 轉帳手續費)
         splitMap.forEach((batchTxs, groupId) => {
           if (batchTxs.length === 0) return;
           const sortedBatch = sortTransactionsDesc(batchTxs);
           const totalAmount = Math.round(batchTxs.reduce((sum, t) => sum + t.amount, 0) * 100) / 100;
-          const hasSelf = batchTxs.some(t => t.type === 'expense');
-          const contactIds = Array.from(new Set(batchTxs.filter(t => t.toAccountId).map(t => t.toAccountId!)));
-          const contactsList = contactIds.map(cId => {
-            const c = contacts?.find(item => item.id === cId)
-              || archivedContacts?.find(item => item.id === cId)
-              || accounts?.find(item => item.id === cId);
+
+          const transferTx = batchTxs.find((t) => t.type === 'transfer');
+          const isTransferGroup = !!transferTx;
+          const feeTx = isTransferGroup ? batchTxs.find((t) => t.type === 'expense') : undefined;
+          const feeAmount = feeTx ? feeTx.amount : 0;
+
+          const hasSelf = !isTransferGroup && batchTxs.some((t) => t.type === 'expense');
+          const contactIds = Array.from(
+            new Set(
+              batchTxs
+                .filter((t) => t.toAccountId && t.type !== 'transfer')
+                .map((t) => t.toAccountId!)
+            )
+          );
+          const contactsList = contactIds.map((cId) => {
+            const c =
+              contacts?.find((item) => item.id === cId) ||
+              archivedContacts?.find((item) => item.id === cId) ||
+              accounts?.find((item) => item.id === cId);
             return { id: cId, name: c?.name || cId, group: c?.group };
           });
-          const contactNames = contactsList.map(c => c.name);
-          const selfTx = batchTxs.find(t => t.type === 'expense');
-          const mainTx = selfTx || batchTxs[0];
+          const contactNames = contactsList.map((c) => c.name);
+          const selfTx = batchTxs.find((t) => t.type === 'expense');
+          const mainTx = transferTx || selfTx || batchTxs[0];
           const catName = getCategoryName(mainTx);
-          const note = batchTxs.find(t => t.note)?.note;
+          const rawNote = isTransferGroup
+            ? (transferTx?.note || '')
+            : (batchTxs.find((t) => t.note && !t.note.includes('手續費') && !t.note.includes('手续费'))?.note || '');
+          const cleanNote = rawNote.trim();
+          const isFeePlaceholder =
+            cleanNote === '手續費' ||
+            cleanNote === '手续费' ||
+            cleanNote === 'Fee' ||
+            cleanNote.startsWith('(手續費)') ||
+            cleanNote.startsWith('(手续费)');
+          const note = !isFeePlaceholder && cleanNote ? cleanNote : undefined;
           const latestCreatedAt = sortedBatch[0]?.createdAt || sortedBatch[0]?.date;
 
           displayItems.push({
@@ -308,6 +514,9 @@ export function GroupedTransactionList({
             contactNames,
             contactsList,
             hasSelf,
+            isTransferGroup,
+            transferTx,
+            feeAmount,
             note,
             latestCreatedAt,
           });
@@ -530,24 +739,51 @@ export function GroupedTransactionList({
                           <div className="flex flex-col items-end justify-center shrink-0">
                             <div className="h-5 flex items-center justify-end">
                               {contextAccountId ? (
-                                <AmountDisplay
-                                  amount={
-                                    (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextAccountId
-                                      ? -(tx.originalAmount ?? tx.amount)
-                                      : ((tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextAccountId
-                                          ? (tx.transferInAmount ?? tx.amount)
-                                          : tx.amount)
+                                (() => {
+                                  const accCurr =
+                                    accountCurrencies.get(contextAccountId) ||
+                                    activeLedger?.baseCurrency ||
+                                    'CNY';
+                                  const isOutflow =
+                                    (tx.type === 'transfer' || tx.type === 'loan') &&
+                                    tx.accountId === contextAccountId;
+                                  const isInflow =
+                                    (tx.type === 'transfer' || tx.type === 'loan') &&
+                                    tx.toAccountId === contextAccountId;
+
+                                  let amt: number;
+                                  let dispType: 'expense' | 'income' | 'transfer' | 'neutral' =
+                                    tx.type as any;
+                                  let showSign = true;
+
+                                  if (isOutflow) {
+                                    amt = -(tx.originalAmount ?? tx.amount);
+                                    dispType = 'expense';
+                                  } else if (isInflow) {
+                                    amt = tx.transferInAmount ?? (tx.originalAmount ?? tx.amount);
+                                    dispType = 'income';
+                                  } else if (tx.type === 'income') {
+                                    amt = tx.originalAmount ?? tx.amount;
+                                    dispType = 'income';
+                                    showSign = false;
+                                  } else if (tx.type === 'expense') {
+                                    amt = -(tx.originalAmount ?? tx.amount);
+                                    dispType = 'expense';
+                                  } else {
+                                    amt = tx.amount;
                                   }
-                                  originalCurrency={tx.originalCurrency}
-                                  baseCurrency={activeLedger?.baseCurrency}
-                                  type={
-                                    (tx.type === 'transfer' || tx.type === 'loan')
-                                      ? (tx.accountId === contextAccountId ? 'expense' : 'income')
-                                      : (tx.type as any)
-                                  }
-                                  showSign={true}
-                                  className="text-sm font-mono leading-none"
-                                />
+
+                                  return (
+                                    <AmountDisplay
+                                      amount={amt}
+                                      baseCurrency={accCurr}
+                                      isApproximate={false}
+                                      type={dispType}
+                                      showSign={showSign}
+                                      className="text-sm font-mono leading-none"
+                                    />
+                                  );
+                                })()
                               ) : contextContactId ? (
                                 (() => {
                                   const isReimbExpense = tx.reimbursementContactId === contextContactId && tx.type === 'expense';
@@ -581,13 +817,13 @@ export function GroupedTransactionList({
 
                                   const isLending = (tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextContactId;
                                   const isBorrowing = (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextContactId;
-                                  const contactAmt = isLending ? (tx.transferInAmount ?? tx.amount) : tx.amount;
+                                  const contactAmt = tx.originalAmount ?? (isLending ? (tx.transferInAmount ?? tx.amount) : tx.amount);
 
                                   return (
                                     <AmountDisplay
                                       amount={isLending ? -contactAmt : contactAmt}
-                                      originalCurrency={tx.originalCurrency}
-                                      baseCurrency={activeLedger?.baseCurrency}
+                                      baseCurrency={tx.originalCurrency || activeLedger?.baseCurrency}
+                                      isApproximate={false}
                                       type={
                                         isLending
                                           ? 'expense'
@@ -601,21 +837,22 @@ export function GroupedTransactionList({
                                   );
                                 })()
                               ) : (
-                                <AmountDisplay
-                                  amount={
-                                    tx.type === 'loan' && contacts?.some(c => c.id === tx.toAccountId)
-                                      ? -tx.amount
-                                      : tx.amount
-                                  }
-                                  originalCurrency={tx.originalCurrency}
-                                  baseCurrency={activeLedger?.baseCurrency}
-                                  type={
-                                    tx.type === 'loan'
-                                      ? (contacts?.some(c => c.id === tx.toAccountId) ? 'expense' : 'income')
-                                      : (tx.type as any)
-                                  }
-                                  className="text-sm font-mono leading-none"
-                                />
+                                (() => {
+                                  const info = getDisplayAmountInfo(
+                                    tx,
+                                    activeLedger?.baseCurrency || 'CNY'
+                                  );
+                                  return (
+                                    <AmountDisplay
+                                      amount={info.amount}
+                                      baseCurrency={info.currency}
+                                      isApproximate={info.isApproximate}
+                                      type={info.type}
+                                      showSign={info.showSign}
+                                      className="text-sm font-mono leading-none"
+                                    />
+                                  );
+                                })()
                               )}
                             </div>
 
@@ -654,22 +891,48 @@ export function GroupedTransactionList({
 
                             <div className="flex flex-col justify-center min-w-0 overflow-hidden">
                               <div className="h-5 flex items-center gap-1.5 min-w-0 overflow-hidden">
-                                <span className="text-sm font-medium leading-none shrink-0">
-                                  {item.hasSelf ? item.categoryName : t('add.reimburse', '代付')}
-                                </span>
-                                {item.hasSelf && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-foreground text-background leading-none shrink-0">
-                                    {t('add.me', '我')}
-                                  </span>
+                                {item.isTransferGroup && item.transferTx ? (
+                                  (() => {
+                                    const fromName = getAccountName(item.transferTx.accountId);
+                                    const toName = getAccountName(item.transferTx.toAccountId);
+                                    return (
+                                      <div className="h-5 flex items-center gap-1.5 min-w-0">
+                                        <span
+                                          title={fromName}
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                                        >
+                                          {fromName}
+                                        </span>
+                                        <span className="text-muted-foreground/60 text-xs shrink-0 select-none">→</span>
+                                        <span
+                                          title={toName}
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                                        >
+                                          {toName}
+                                        </span>
+                                      </div>
+                                    );
+                                  })()
+                                ) : (
+                                  <>
+                                    <span className="text-sm font-medium leading-none shrink-0">
+                                      {item.hasSelf ? item.categoryName : t('add.reimburse', '代付')}
+                                    </span>
+                                    {item.hasSelf && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-foreground text-background leading-none shrink-0">
+                                        {t('add.me', '我')}
+                                      </span>
+                                    )}
+                                    {item.contactsList.map(c => (
+                                      <ContactCapsule
+                                        key={c.id}
+                                        name={c.name}
+                                        group={c.group}
+                                        maxWidthClass="max-w-[100px]"
+                                      />
+                                    ))}
+                                  </>
                                 )}
-                                {item.contactsList.map(c => (
-                                  <ContactCapsule
-                                    key={c.id}
-                                    name={c.name}
-                                    group={c.group}
-                                    maxWidthClass="max-w-[100px]"
-                                  />
-                                ))}
                               </div>
 
                               {item.note && (
@@ -682,15 +945,34 @@ export function GroupedTransactionList({
 
                           <div className="flex flex-col items-end justify-center shrink-0">
                             <div className="h-5 flex items-center justify-end">
-                              <AmountDisplay
-                                amount={item.totalAmount}
-                                baseCurrency={activeLedger?.baseCurrency}
-                                type="expense"
-                                showSign={true}
-                                className="text-sm font-mono leading-none"
-                              />
+                              {item.isTransferGroup && item.transferTx ? (
+                                (() => {
+                                  const info = getDisplayAmountInfo(
+                                    item.transferTx,
+                                    activeLedger?.baseCurrency || 'CNY'
+                                  );
+                                  return (
+                                    <AmountDisplay
+                                      amount={info.amount}
+                                      baseCurrency={info.currency}
+                                      isApproximate={false}
+                                      type="transfer"
+                                      showSign={false}
+                                      className="text-sm font-mono leading-none"
+                                    />
+                                  );
+                                })()
+                              ) : (
+                                <AmountDisplay
+                                  amount={item.totalAmount}
+                                  baseCurrency={activeLedger?.baseCurrency}
+                                  type="expense"
+                                  showSign={true}
+                                  className="text-sm font-mono leading-none"
+                                />
+                              )}
                             </div>
-                            {!contextAccountId && (() => {
+                            {!contextAccountId && !item.isTransferGroup && (() => {
                               const mainTx = item.transactions.find(t => t.type === 'expense') || item.transactions[0];
                               const wallet = wallets?.find(w => w.id === mainTx?.accountId);
                               if (!wallet?.name) return null;
@@ -719,12 +1001,38 @@ export function GroupedTransactionList({
                                   onClick={() => handleRowClick(subTx)}
                                   className="w-full h-16 flex items-center justify-between pl-12 pr-4 transition-colors hover:bg-muted/40 text-left group cursor-pointer"
                                 >
-                                  {/* 左側：分類/代付與膠囊（不顯示備註） */}
+                                  {/* 左側：分類/轉帳與膠囊（不顯示備註） */}
                                   <div className="h-5 flex items-center gap-1.5 min-w-0 pr-3 overflow-hidden">
-                                    {isSelf ? (
+                                    {subTx.type === 'transfer' ? (
+                                      (() => {
+                                        const fromName = getAccountName(subTx.accountId);
+                                        const toName = getAccountName(subTx.toAccountId);
+                                        return (
+                                          <div className="h-5 flex items-center gap-1.5 min-w-0">
+                                            <span
+                                              title={fromName}
+                                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                                            >
+                                              {fromName}
+                                            </span>
+                                            <span className="text-muted-foreground/60 text-xs shrink-0 select-none">→</span>
+                                            <span
+                                              title={toName}
+                                              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                                            >
+                                              {toName}
+                                            </span>
+                                          </div>
+                                        );
+                                      })()
+                                    ) : item.isTransferGroup ? (
+                                      <span className="text-sm font-medium leading-none shrink-0">
+                                        {getCategoryName(subTx)}
+                                      </span>
+                                    ) : isSelf ? (
                                       <>
                                         <span className="text-sm font-medium leading-none shrink-0">
-                                          {item.categoryName}
+                                          {getCategoryName(subTx)}
                                         </span>
                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-foreground text-background leading-none shrink-0">
                                           {t('add.me', '我')}
@@ -746,16 +1054,54 @@ export function GroupedTransactionList({
                                     )}
                                   </div>
 
-                                  {/* 右側：金額（不顯示帳戶） */}
-                                  <div className="flex items-center justify-end shrink-0">
-                                    <AmountDisplay
-                                      amount={subTx.amount}
-                                      originalCurrency={subTx.originalCurrency}
-                                      baseCurrency={activeLedger?.baseCurrency}
-                                      type="expense"
-                                      showSign={true}
-                                      className="text-sm font-mono leading-none"
-                                    />
+                                  {/* 右側：金額（手續費子交易下方顯示帳戶） */}
+                                  <div className="flex flex-col items-end justify-center shrink-0">
+                                    <div className="h-5 flex items-center justify-end">
+                                      {subTx.type === 'transfer' ? (
+                                        (() => {
+                                          const info = getDisplayAmountInfo(
+                                            subTx,
+                                            activeLedger?.baseCurrency || 'CNY'
+                                          );
+                                          return (
+                                            <AmountDisplay
+                                              amount={info.amount}
+                                              baseCurrency={info.currency}
+                                              isApproximate={false}
+                                              type="transfer"
+                                              className="text-sm font-mono leading-none"
+                                            />
+                                          );
+                                        })()
+                                      ) : item.isTransferGroup ? (
+                                        <AmountDisplay
+                                          amount={subTx.originalAmount ?? subTx.amount}
+                                          baseCurrency={subTx.originalCurrency || activeLedger?.baseCurrency}
+                                          isApproximate={false}
+                                          type="expense"
+                                          showSign={true}
+                                          className="text-sm font-mono leading-none"
+                                        />
+                                      ) : (
+                                        <AmountDisplay
+                                          amount={subTx.amount}
+                                          originalCurrency={subTx.originalCurrency}
+                                          baseCurrency={activeLedger?.baseCurrency}
+                                          type="expense"
+                                          showSign={true}
+                                          className="text-sm font-mono leading-none"
+                                        />
+                                      )}
+                                    </div>
+                                    {item.isTransferGroup && subTx.type === 'expense' && (() => {
+                                      const wallet = wallets?.find((w) => w.id === subTx.accountId);
+                                      if (!wallet?.name) return null;
+                                      return (
+                                        <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
+                                          {wallet.name}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 </button>
                               );

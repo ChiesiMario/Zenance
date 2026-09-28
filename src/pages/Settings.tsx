@@ -23,6 +23,8 @@ import {
   KeyRound,
   Copy,
   Check,
+  Database,
+  HardDrive,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +44,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useCategories } from '@/hooks/useCategories';
 import { useDropboxSync } from '@/hooks/useDropboxSync';
 import { useAppLockStore } from '@/store/useAppLockStore';
+import { useStorageStatus } from '@/hooks/useStorageStatus';
 import { isE2EEEnabled, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
 import {
   db,
@@ -119,6 +122,9 @@ export default function Settings() {
     disableLock,
   } = useAppLockStore();
 
+  // Browser Storage & Persistent storage status
+  const { isPersisted, estimate, requestPersistence } = useStorageStatus();
+
   // E2EE modal states
   const [e2eeActive, setE2eeActive] = useState<boolean>(isE2EEEnabled());
   const [isE2eeModalOpen, setIsE2eeModalOpen] = useState(false);
@@ -186,6 +192,11 @@ export default function Settings() {
     } else {
       toast.show('啟用安全鎖失敗');
     }
+  };
+
+  const handleRequestPersistence = async () => {
+    const granted = await requestPersistence();
+    toast.show(granted ? '已獲得瀏覽器持久化儲存授權！' : '瀏覽器未授權持久化，將依設備容量自動管理');
   };
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
@@ -912,6 +923,59 @@ export default function Settings() {
             </div>
             <ChevronRight className="h-5 w-5 text-muted-foreground mr-2" />
           </button>
+
+          {/* 資料庫持久化保護 */}
+          <div className="p-4 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3 pl-2">
+              <HardDrive className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+              <div>
+                <span className="font-medium block">資料庫持久化保護</span>
+                <span className="text-xs text-muted-foreground">
+                  防止瀏覽器在低儲存或長期閒置時自動清空帳本
+                </span>
+              </div>
+            </div>
+            <div>
+              {isPersisted ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  <Check className="size-3" />
+                  <span>已受保護</span>
+                </span>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs cursor-pointer"
+                  onClick={handleRequestPersistence}
+                >
+                  申請保護
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* 本機儲存空間佔用 */}
+          <div className="p-4 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3 pl-2">
+              <Database className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+              <div>
+                <span className="font-medium block">本機儲存空間佔用</span>
+                <span className="text-xs text-muted-foreground">
+                  IndexedDB 資料庫與離線快取總容量
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-mono font-medium text-foreground block">
+                {estimate ? `${estimate.usageFormatted} / ${estimate.quotaFormatted}` : '計算中...'}
+              </span>
+              {estimate && (
+                <span className="text-[10px] text-muted-foreground font-mono block">
+                  已用 {estimate.percentUsed}%
+                </span>
+              )}
+            </div>
+          </div>
 
           <button
             type="button"

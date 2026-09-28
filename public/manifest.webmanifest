@@ -1,0 +1,19 @@
+{
+  "name": "Zenance",
+  "short_name": "Zenance",
+  "description": "Minimalist craft personal finance & multi-currency ledger",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

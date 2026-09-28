@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAccounts } from '@/hooks/useAccounts';
+import { useContacts } from '@/hooks/useContacts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -19,7 +19,7 @@ import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
 
 export default function Contacts() {
   const { t } = useTranslation();
-  const { contacts, archivedContacts, addAccount } = useAccounts();
+  const { contacts, archivedContacts, addContact } = useContacts();
   const { transactions } = useTransactions();
   
   const [currentView, setCurrentView] = useState<'active' | 'archived'>('active');
@@ -33,71 +33,32 @@ export default function Contacts() {
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
 
-  // 建立 parentId -> 子回款總額 map
-  const childRefundsMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    transactions?.forEach(t => {
-      if (!t.deleted && t.parentId && t.type === 'income') {
-        map[t.parentId] = (map[t.parentId] || 0) + (t.originalAmount ?? t.amount);
-      }
-    });
-    return map;
-  }, [transactions]);
-
-  // Calculate balances for each contact
+  // 純淨流水餘額法計算各對象應收應付淨額
   const contactBalances = useMemo(() => {
     const balances: Record<string, number> = {};
     const allContacts = [...(contacts || []), ...(archivedContacts || [])];
     if (!allContacts || !transactions) return balances;
 
-    // Initialize balances
     allContacts.forEach(c => {
       balances[c.id] = 0;
     });
 
     transactions.forEach(tx => {
-      if (tx.deleted) return;
-      // 贈與交易不計入應收與應還
-      if (tx.isGift) return;
-      // 代付交易（帶有 reimbursementStatus）由下方 contactReimbursements 統計待收款項，排除以避免重複計算
-      const isAdvance = (tx.reimbursementContactId || tx.toAccountId) && !!tx.reimbursementStatus;
-      if (isAdvance) return;
-
-      // If money flows TO the contact account, the contact balance INCREASES
-      // (This means they hold our money, i.e., Owes you)
+      if (tx.deleted || tx.isGift) return;
       if (tx.type === 'transfer' || tx.type === 'loan') {
-        if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.originalAmount; // transfer FROM contact
-        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) balances[tx.toAccountId] += (tx.transferInAmount ?? tx.originalAmount); // transfer TO contact
+        // 出款給聯絡人（出借 / 代付）：聯絡人欠款增加 (+)
+        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) {
+          balances[tx.toAccountId] += (tx.transferInAmount ?? tx.originalAmount ?? tx.amount);
+        }
+        // 聯絡人出款（還款 / 借入）：聯絡人欠款減少 (-)
+        if (tx.accountId && balances[tx.accountId] !== undefined) {
+          balances[tx.accountId] -= (tx.originalAmount ?? tx.amount);
+        }
       }
     });
 
     return balances;
   }, [contacts, archivedContacts, transactions]);
-
-  // Calculate pending reimbursements for each contact
-  const contactReimbursements = useMemo(() => {
-    const reimbursements: Record<string, number> = {};
-    const allContacts = [...(contacts || []), ...(archivedContacts || [])];
-    if (!allContacts || !transactions) return reimbursements;
-
-    allContacts.forEach(c => {
-      reimbursements[c.id] = 0;
-    });
-
-    transactions.forEach(tx => {
-      if (!tx.deleted && tx.reimbursementStatus === 'pending') {
-        const contactId = tx.reimbursementContactId || (tx.type === 'loan' ? tx.toAccountId : undefined);
-        if (contactId && reimbursements[contactId] !== undefined) {
-          const refunded = childRefundsMap[tx.id] || 0;
-          const orig = tx.originalAmount ?? tx.amount;
-          const remaining = Math.max(0, Math.round((orig - refunded) * 100) / 100);
-          reimbursements[contactId] += remaining;
-        }
-      }
-    });
-
-    return reimbursements;
-  }, [contacts, archivedContacts, transactions, childRefundsMap]);
 
   const filteredAndSortedContacts = useMemo(() => {
     let source = currentView === 'archived' ? (archivedContacts || []) : (contacts || []);
@@ -108,8 +69,8 @@ export default function Contacts() {
     }
 
     return source.sort((a, b) => {
-      const aNet = Math.abs((contactBalances[a.id] || 0) + (contactReimbursements[a.id] || 0));
-      const bNet = Math.abs((contactBalances[b.id] || 0) + (contactReimbursements[b.id] || 0));
+      const aNet = Math.abs(contactBalances[a.id] || 0);
+      const bNet = Math.abs(contactBalances[b.id] || 0);
       const aHasBalance = aNet > 0;
       const bHasBalance = bNet > 0;
 
@@ -119,11 +80,11 @@ export default function Contacts() {
       
       return (a.name || '').localeCompare(b.name || '');
     });
-  }, [contacts, archivedContacts, currentView, filterType, contactBalances, contactReimbursements]);
+  }, [contacts, archivedContacts, currentView, filterType, contactBalances]);
 
   const handleAddContact = async () => {
     if (!newContactName.trim()) return;
-    await addAccount(newContactName.trim(), 'contact', 0, undefined, newContactGroup);
+    await addContact(newContactName.trim(), newContactGroup);
     setNewContactName('');
     setNewContactGroup('personal');
     setIsDialogOpen(false);
@@ -253,7 +214,6 @@ export default function Contacts() {
           }
           contacts={filteredAndSortedContacts}
           contactBalances={contactBalances}
-          contactReimbursements={contactReimbursements}
           currencySymbol={currencySymbol}
           hideGroupTag={filterType !== 'all'}
           emptyMessage={currentView === 'archived' ? t('contacts.noArchivedContacts', '目前沒有任何已歸檔對象') : undefined}

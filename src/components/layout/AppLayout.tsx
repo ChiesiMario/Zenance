@@ -4,6 +4,7 @@ import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, Arrow
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useDropboxSync } from '@/hooks/useDropboxSync';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
@@ -18,6 +19,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   useExchangeRates(); // Trigger background sync
+  useDropboxSync(); // Trigger background sync & auto network reconnection pull
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();

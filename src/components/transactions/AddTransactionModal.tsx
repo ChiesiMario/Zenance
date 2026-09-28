@@ -19,7 +19,7 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { NumericKeypad } from './NumericKeypad';
 import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
-import type { Account } from '@/services/db/db';
+import { db, type Account } from '@/services/db/db';
 import type { SplitItem } from './SplitAdvanceDialog';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -92,7 +92,6 @@ export function AddTransactionModal({
     transferInAmount: z.number().nonnegative(t('add.errors.amountPositive')).optional(),
     feeCategoryId: z.string().optional(),
     budgetId: z.string().optional(),
-    reimbursementContactId: z.string().optional(),
     date: z.string().min(1, t('add.errors.dateRequired')),
     note: z.string().optional(),
   }).refine((data) => {
@@ -124,7 +123,6 @@ export function AddTransactionModal({
       transferInAmount: undefined,
       feeCategoryId: undefined,
       budgetId: initialType === 'income' ? 'none' : 'auto',
-      reimbursementContactId: initialContactId || undefined,
       date: new Date().toISOString().split('T')[0],
       note: '',
     },
@@ -142,18 +140,18 @@ export function AddTransactionModal({
         if (transactionToEdit.splitGroupId) {
           const groupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
           const loadedSplits: SplitItem[] = groupTxs
-            .filter(t => t.type === 'loan' && t.toAccountId && t.reimbursementStatus)
+            .filter(t => t.type === 'loan' && t.toAccountId && t.category === 'advance')
             .map(t => ({ contactId: t.toAccountId!, amount: t.originalAmount }));
           setSplits(loadedSplits);
           const totalGroupOriginalAmount = groupTxs.reduce((sum, t) => sum + t.originalAmount, 0);
           setDisplayAmount(totalGroupOriginalAmount.toString());
-        } else if (transactionToEdit.reimbursementContactId) {
-          setSplits([{ contactId: transactionToEdit.reimbursementContactId, amount: transactionToEdit.originalAmount }]);
+        } else if (transactionToEdit.type === 'loan' && transactionToEdit.category === 'advance' && transactionToEdit.toAccountId) {
+          setSplits([{ contactId: transactionToEdit.toAccountId, amount: transactionToEdit.originalAmount }]);
         } else {
           setSplits([]);
         }
 
-        const isAdvanceLoan = transactionToEdit.type === 'loan' && !!transactionToEdit.reimbursementContactId;
+        const isAdvanceLoan = transactionToEdit.type === 'loan' && transactionToEdit.category === 'advance';
         if (isAdvanceLoan) {
           setType('expense');
         } else {
@@ -203,7 +201,6 @@ export function AddTransactionModal({
           toAccountId: !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan') ? transactionToEdit.toAccountId || undefined : undefined,
           transferInAmount: transactionToEdit.transferInAmount,
           budgetId: transactionToEdit.budgetId || (transactionToEdit.type === 'income' ? 'none' : 'auto'),
-          reimbursementContactId: transactionToEdit.reimbursementContactId,
           date: transactionToEdit.date,
           note: transactionToEdit.note || '',
         });
@@ -213,7 +210,6 @@ export function AddTransactionModal({
         reset();
         setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
         setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
-        setValue('reimbursementContactId', initialContactId || undefined);
         if (initialAmount && initialAmount > 0) {
           setDisplayAmount(initialAmount.toString());
           setValue('amount', initialAmount);
@@ -239,7 +235,6 @@ export function AddTransactionModal({
     setType(newType);
     reset();
     setValue('budgetId', newType === 'income' ? 'none' : 'auto');
-    setValue('reimbursementContactId', undefined);
     setDisplayAmount('');
     setDisplayAmountIn('');
     setDisplayFeeAmount('');
@@ -466,73 +461,75 @@ export function AddTransactionModal({
 
       const splitGroupId = (feeAmount > 0) ? (transactionToEdit?.splitGroupId || uuidv4()) : undefined;
 
-      if (transactionToEdit) {
-        if (transactionToEdit.splitGroupId) {
-          const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
-          for (const otherTx of otherGroupTxs) {
-            await deleteTransaction(otherTx.id);
+      await db.transaction('rw', db.transactions, async () => {
+        if (transactionToEdit) {
+          if (transactionToEdit.splitGroupId) {
+            const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+            for (const otherTx of otherGroupTxs) {
+              await deleteTransaction(otherTx.id);
+            }
+          }
+          await updateTransaction(transactionToEdit.id, {
+            originalAmount: transferAmount,
+            originalCurrency: fromCurrency,
+            exchangeRate: transferRate,
+            amount: baseAmount,
+            type: 'transfer',
+            category: 'transfer',
+            accountId: data.fromAccountId!,
+            toAccountId: data.toAccountId,
+            transferInAmount: transferInAmount,
+            splitGroupId,
+            note: data.note,
+            date: data.date,
+          });
+
+          if (feeAmount > 0 && feeCategoryId) {
+            await addTransaction({
+              originalAmount: feeAmount,
+              originalCurrency: fromCurrency,
+              exchangeRate: transferRate,
+              amount: feeAmount * rateToBase,
+              type: 'expense',
+              category: feeCategoryId,
+              accountId: data.fromAccountId!,
+              splitGroupId,
+              note: data.note?.trim() || undefined,
+              date: data.date,
+            });
+          }
+        } else {
+          await addTransaction({
+            originalAmount: transferAmount,
+            originalCurrency: fromCurrency,
+            exchangeRate: transferRate,
+            amount: baseAmount,
+            type: 'transfer',
+            category: 'transfer',
+            accountId: data.fromAccountId!,
+            toAccountId: data.toAccountId,
+            transferInAmount: transferInAmount,
+            splitGroupId,
+            note: data.note,
+            date: data.date,
+          });
+
+          if (feeAmount > 0 && feeCategoryId) {
+            await addTransaction({
+              originalAmount: feeAmount,
+              originalCurrency: fromCurrency,
+              exchangeRate: transferRate,
+              amount: feeAmount * rateToBase,
+              type: 'expense',
+              category: feeCategoryId,
+              accountId: data.fromAccountId!,
+              splitGroupId,
+              note: data.note?.trim() || undefined,
+              date: data.date,
+            });
           }
         }
-        await updateTransaction(transactionToEdit.id, {
-          originalAmount: transferAmount,
-          originalCurrency: fromCurrency,
-          exchangeRate: transferRate,
-          amount: baseAmount,
-          type: 'transfer',
-          category: 'transfer',
-          accountId: data.fromAccountId!,
-          toAccountId: data.toAccountId,
-          transferInAmount: transferInAmount,
-          splitGroupId,
-          note: data.note,
-          date: data.date,
-        });
-
-        if (feeAmount > 0 && feeCategoryId) {
-          await addTransaction({
-            originalAmount: feeAmount,
-            originalCurrency: fromCurrency,
-            exchangeRate: transferRate,
-            amount: feeAmount * rateToBase,
-            type: 'expense',
-            category: feeCategoryId,
-            accountId: data.fromAccountId!,
-            splitGroupId,
-            note: data.note?.trim() || undefined,
-            date: data.date,
-          });
-        }
-      } else {
-        await addTransaction({
-          originalAmount: transferAmount,
-          originalCurrency: fromCurrency,
-          exchangeRate: transferRate,
-          amount: baseAmount,
-          type: 'transfer',
-          category: 'transfer',
-          accountId: data.fromAccountId!,
-          toAccountId: data.toAccountId,
-          transferInAmount: transferInAmount,
-          splitGroupId,
-          note: data.note,
-          date: data.date,
-        });
-
-        if (feeAmount > 0 && feeCategoryId) {
-          await addTransaction({
-            originalAmount: feeAmount,
-            originalCurrency: fromCurrency,
-            exchangeRate: transferRate,
-            amount: feeAmount * rateToBase,
-            type: 'expense',
-            category: feeCategoryId,
-            accountId: data.fromAccountId!,
-            splitGroupId,
-            note: data.note?.trim() || undefined,
-            date: data.date,
-          });
-        }
-      }
+      });
 
       onClose();
       return;
@@ -585,7 +582,7 @@ export function AddTransactionModal({
 
     const calculatedBaseAmount = data.amount * rateToBase;
     const hasSplits = type === 'expense' && splits.length > 0;
-    const isAdvance = type === 'expense' && (hasSplits || !!data.reimbursementContactId);
+    const isAdvance = type === 'expense' && hasSplits;
 
     // 多人分攤或部分代付分拆處理
     if (type === 'expense' && splits.length > 0) {
@@ -597,54 +594,54 @@ export function AddTransactionModal({
         const splitGroupId = transactionToEdit?.splitGroupId || uuidv4();
 
         // 若為編輯模式，清除舊群組所有交易
-        if (transactionToEdit) {
-          if (transactionToEdit.splitGroupId) {
-            const oldGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
-            for (const oldTx of oldGroupTxs) {
-              await deleteTransaction(oldTx.id);
+        await db.transaction('rw', db.transactions, async () => {
+          if (transactionToEdit) {
+            if (transactionToEdit.splitGroupId) {
+              const oldGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
+              for (const oldTx of oldGroupTxs) {
+                await deleteTransaction(oldTx.id);
+              }
+            } else {
+              await deleteTransaction(transactionToEdit.id);
             }
-          } else {
-            await deleteTransaction(transactionToEdit.id);
           }
-        }
 
-        // 1. 若有自己的自費支出，建立支出交易
-        if (selfExpenseOriginal > 0) {
-          const selfBaseAmount = selfExpenseOriginal * exchangeRate;
-          await addTransaction({
-            originalAmount: selfExpenseOriginal,
-            originalCurrency: selectedCurrency,
-            exchangeRate: exchangeRate,
-            amount: selfBaseAmount,
-            type: 'expense',
-            category: data.categoryId!,
-            accountId: data.accountId!,
-            budgetId: data.budgetId,
-            splitGroupId,
-            note: data.note,
-            date: data.date,
-          });
-        }
+          // 1. 若有自己的自費支出，建立支出交易
+          if (selfExpenseOriginal > 0) {
+            const selfBaseAmount = selfExpenseOriginal * exchangeRate;
+            await addTransaction({
+              originalAmount: selfExpenseOriginal,
+              originalCurrency: selectedCurrency,
+              exchangeRate: exchangeRate,
+              amount: selfBaseAmount,
+              type: 'expense',
+              category: data.categoryId!,
+              accountId: data.accountId!,
+              budgetId: data.budgetId,
+              splitGroupId,
+              note: data.note,
+              date: data.date,
+            });
+          }
 
-        // 2. 為每位代付對象建立借貸代付交易 (type: 'loan'，分類為代付)
-        for (const s of splits) {
-          const advBaseAmount = s.amount * exchangeRate;
-          await addTransaction({
-            originalAmount: s.amount,
-            originalCurrency: selectedCurrency,
-            exchangeRate: exchangeRate,
-            amount: advBaseAmount,
-            type: 'loan',
-            category: 'advance', // 分類為「代付」
-            accountId: data.accountId!, // 付款錢包扣款
-            toAccountId: s.contactId,   // 借給代付對象（應收債權）
-            reimbursementContactId: s.contactId,
-            reimbursementStatus: 'pending',
-            splitGroupId,
-            note: data.note,
-            date: data.date,
-          });
-        }
+          // 2. 為每位代付對象建立借貸代付交易 (type: 'loan'，分類為代付)
+          for (const s of splits) {
+            const advBaseAmount = s.amount * exchangeRate;
+            await addTransaction({
+              originalAmount: s.amount,
+              originalCurrency: selectedCurrency,
+              exchangeRate: exchangeRate,
+              amount: advBaseAmount,
+              type: 'loan',
+              category: 'advance', // 分類為「代付」
+              accountId: data.accountId!, // 付款錢包扣款
+              toAccountId: s.contactId,   // 借給代付對象（應收債權）
+              splitGroupId,
+              note: data.note,
+              date: data.date,
+            });
+          }
+        });
 
         onClose();
         return;
@@ -652,7 +649,7 @@ export function AddTransactionModal({
     }
 
     const effectiveType = (isAdvance ? 'loan' : type) as 'expense' | 'income' | 'loan';
-    const singleContactId = splits.length === 1 ? splits[0].contactId : data.reimbursementContactId;
+    const singleContactId = splits.length === 1 ? splits[0].contactId : undefined;
     
     const txData = {
       originalAmount: data.amount,
@@ -669,10 +666,6 @@ export function AddTransactionModal({
         : undefined,
       transferInAmount: undefined,
       budgetId: isAdvance ? undefined : data.budgetId,
-      reimbursementStatus: (isAdvance || (type === 'expense' && singleContactId))
-        ? (transactionToEdit?.reimbursementStatus || 'pending')
-        : undefined,
-      reimbursementContactId: singleContactId,
       note: data.note,
       date: data.date,
     };
@@ -1409,13 +1402,8 @@ export function AddTransactionModal({
             splits={splits}
             onSplitsChange={(newSplits) => {
               setSplits(newSplits);
-              setValue('reimbursementContactId', newSplits.length === 1 ? newSplits[0].contactId : undefined);
             }}
             currencySymbol={getCurrencySymbol(fromCurrency)}
-            reimbursementContactId={splits.length === 1 ? splits[0].contactId : undefined}
-            onReimbursementContactChange={(cId) => {
-              setValue('reimbursementContactId', cId);
-            }}
             contacts={contacts}
             feeAmount={type === 'transfer' ? parsedFeeAmount : 0}
             isFeeActive={type === 'transfer' && focusedField === 'fee'}

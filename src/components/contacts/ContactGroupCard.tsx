@@ -1,4 +1,4 @@
-import type { Account } from '@/services/db/db';
+import type { Contact } from '@/services/db/db';
 import { useTranslation } from 'react-i18next';
 import { getCurrencySymbol } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -7,9 +7,8 @@ import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 
 interface ContactGroupCardProps {
   title?: string | React.ReactNode;
-  contacts: Account[];
+  contacts: Contact[];
   contactBalances: Record<string, number>;
-  contactReimbursements?: Record<string, number>;
   currencySymbol: string;
   hideGroupTag?: boolean;
   emptyMessage?: string;
@@ -19,7 +18,6 @@ export function ContactGroupCard({
   title,
   contacts,
   contactBalances,
-  contactReimbursements = {},
   currencySymbol,
   emptyMessage,
 }: ContactGroupCardProps) {
@@ -41,9 +39,7 @@ export function ContactGroupCard({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 -mr-px -mb-px">
           {contacts.map(contact => {
-            const loanBalance = contactBalances[contact.id] || 0;
-            const reimbBalance = contactReimbursements[contact.id] || 0;
-            const netReceivable = loanBalance + reimbBalance;
+            const netReceivable = contactBalances[contact.id] || 0;
             const sym = contact.currency ? getCurrencySymbol(contact.currency) : currencySymbol;
             const absAmt = Math.abs(netReceivable).toLocaleString(undefined, { maximumFractionDigits: 2 });
 

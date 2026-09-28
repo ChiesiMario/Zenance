@@ -1,4 +1,4 @@
-import type { Account, Transaction } from '@/services/db/db';
+import type { Wallet, Contact, Account, Transaction, BalanceSnapshot } from '@/services/db/db';
 
 /**
  * 安全轉換任意金額從來源幣種至目標幣種
@@ -20,7 +20,7 @@ export function convertAmount(
  */
 export function getTxAccountDelta(
   tx: Transaction,
-  account: Account,
+  account: Wallet | Contact | (Wallet & { type?: string }),
   getRate: (from: string, to: string) => number,
   baseCurrency: string = 'CNY'
 ): number {
@@ -28,7 +28,10 @@ export function getTxAccountDelta(
 
   const accId = account.id;
   const accCurrency = account.currency || baseCurrency;
-  const isContact = account.type === 'contact';
+  const isContact =
+    ('type' in account && (account as any).type === 'contact') ||
+    account.group === 'personal' ||
+    account.group === 'organization';
 
   // 1. 支出交易 (Expense)
   if (tx.type === 'expense') {
@@ -39,19 +42,6 @@ export function getTxAccountDelta(
         ? tx.originalAmount
         : convertAmount(tx.originalAmount, origCurr, accCurrency, getRate);
       return -amountInAccCurr;
-    }
-
-    // 若此支出為代付 (Pending Reimbursement)，代付對象 (聯絡人) 持有應收債權
-    if (
-      isContact &&
-      tx.reimbursementStatus === 'pending' &&
-      tx.reimbursementContactId === accId
-    ) {
-      const origCurr = tx.originalCurrency || accCurrency;
-      const amountInAccCurr = origCurr === accCurrency
-        ? tx.originalAmount
-        : convertAmount(tx.originalAmount, origCurr, accCurrency, getRate);
-      return amountInAccCurr;
     }
 
     return 0;
@@ -107,20 +97,30 @@ export function getTxAccountDelta(
 
 /**
  * 批次精確計算所有帳戶在各自「原生幣種」下的當前餘額字典。
+ * 支援傳入月度餘額快照字典 (snapshotsMap) 進行基線檢查點加速運算。
  */
 export function calculateAccountBalances(
   accounts: Account[],
   transactions: Transaction[],
   getRate: (from: string, to: string) => number,
-  baseCurrency: string = 'CNY'
+  baseCurrency: string = 'CNY',
+  snapshotsMap?: Map<string, BalanceSnapshot>
 ): Record<string, number> {
   const balances: Record<string, number> = {};
   if (!accounts || accounts.length === 0) return balances;
 
   const accountMap = new Map<string, Account>();
+  const snapshotDateMap = new Map<string, string>(); // accountId -> snapshotDate
+
   accounts.forEach(acc => {
     accountMap.set(acc.id, acc);
-    balances[acc.id] = acc.initialBalance || 0;
+    const snap = snapshotsMap?.get(acc.id);
+    if (snap) {
+      balances[acc.id] = snap.closingBalance;
+      snapshotDateMap.set(acc.id, snap.snapshotDate);
+    } else {
+      balances[acc.id] = acc.initialBalance || 0;
+    }
   });
 
   if (!transactions || transactions.length === 0) return balances;
@@ -128,28 +128,22 @@ export function calculateAccountBalances(
   transactions.forEach(tx => {
     if (tx.deleted) return;
 
-    // 檢查來源帳戶
+    // 檢查來源帳戶：若有快照，僅累計快照日期之後發生的增量流水
     if (tx.accountId && accountMap.has(tx.accountId)) {
-      const acc = accountMap.get(tx.accountId)!;
-      balances[tx.accountId] += getTxAccountDelta(tx, acc, getRate, baseCurrency);
+      const snapDate = snapshotDateMap.get(tx.accountId);
+      if (!snapDate || tx.date > snapDate) {
+        const acc = accountMap.get(tx.accountId)!;
+        balances[tx.accountId] += getTxAccountDelta(tx, acc, getRate, baseCurrency);
+      }
     }
 
-    // 檢查目標帳戶
+    // 檢查目標帳戶：若有快照，僅累計快照日期之後發生的增量流水
     if (tx.toAccountId && accountMap.has(tx.toAccountId) && tx.toAccountId !== tx.accountId) {
-      const toAcc = accountMap.get(tx.toAccountId)!;
-      balances[tx.toAccountId] += getTxAccountDelta(tx, toAcc, getRate, baseCurrency);
-    }
-
-    // 檢查待報銷代付對象 (若與 toAccountId 不同)
-    if (
-      tx.type === 'expense' &&
-      tx.reimbursementStatus === 'pending' &&
-      tx.reimbursementContactId &&
-      tx.reimbursementContactId !== tx.accountId &&
-      accountMap.has(tx.reimbursementContactId)
-    ) {
-      const contactAcc = accountMap.get(tx.reimbursementContactId)!;
-      balances[tx.reimbursementContactId] += getTxAccountDelta(tx, contactAcc, getRate, baseCurrency);
+      const snapDate = snapshotDateMap.get(tx.toAccountId);
+      if (!snapDate || tx.date > snapDate) {
+        const toAcc = accountMap.get(tx.toAccountId)!;
+        balances[tx.toAccountId] += getTxAccountDelta(tx, toAcc, getRate, baseCurrency);
+      }
     }
   });
 

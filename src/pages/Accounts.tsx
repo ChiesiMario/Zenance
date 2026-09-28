@@ -21,12 +21,14 @@ import { cn, getCurrencySymbol } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { calculateAccountBalances, convertAmount } from '@/lib/currency';
+import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
 
 export default function Accounts() {
   const { t } = useTranslation();
   const { accounts, wallets, archivedWallets, contacts, addAccount, unarchiveAccount } = useAccounts();
   const { transactions } = useTransactions();
   const { getRate } = useExchangeRates();
+  const { latestSnapshotsMap } = useBalanceSnapshots();
   
   const [currentView, setCurrentView] = useState<'active' | 'archived'>('active');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -45,11 +47,11 @@ export default function Accounts() {
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
   const selectedCurrency = newAccountCurrency || baseCurrency;
 
-  // 計算所有帳戶在各自原生幣種下的餘額
+  // 計算所有帳戶在各自原生幣種下的餘額 (支援月度餘額快照加速)
   const accountBalances = useMemo(() => {
     if (!accounts) return {};
-    return calculateAccountBalances(accounts, transactions || [], getRate, baseCurrency);
-  }, [accounts, transactions, getRate, baseCurrency]);
+    return calculateAccountBalances(accounts, transactions || [], getRate, baseCurrency, latestSnapshotsMap);
+  }, [accounts, transactions, getRate, baseCurrency, latestSnapshotsMap]);
 
   const groupedAccounts = useMemo(() => {
     const groups: Record<string, typeof wallets> = {

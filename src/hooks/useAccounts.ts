@@ -1,42 +1,50 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Account } from '@/services/db/db';
+import { db, type Wallet, type Account } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
-import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { useContacts } from '@/hooks/useContacts';
 
 export function useAccounts() {
   const { activeLedgerId } = useAppStore();
+  const {
+    contacts,
+    archivedContacts,
+    allContacts,
+    addContact,
+    updateContact,
+    archiveContact: archiveContactFn,
+    unarchiveContact: unarchiveContactFn,
+    deleteContact: deleteContactFn,
+  } = useContacts();
 
-  const accounts = useLiveQuery(
+  // 純淨實體錢包列表 (db.accounts 現只儲存錢包實體)
+  const wallets = useLiveQuery(
     () => {
-      if (!activeLedgerId) return Promise.resolve([] as Account[]);
-      return db.accounts.filter(a => !a.deleted && !a.archived && a.ledgerId === activeLedgerId).toArray();
+      if (!activeLedgerId) return Promise.resolve([] as Wallet[]);
+      return db.accounts
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(a => !a.deleted && !a.archived)
+        .toArray();
     },
     [activeLedgerId]
   );
 
-  const archivedAccounts = useLiveQuery(
+  const archivedWallets = useLiveQuery(
     () => {
-      if (!activeLedgerId) return Promise.resolve([] as Account[]);
-      return db.accounts.filter(a => !a.deleted && a.archived === true && a.ledgerId === activeLedgerId).toArray();
+      if (!activeLedgerId) return Promise.resolve([] as Wallet[]);
+      return db.accounts
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(a => !a.deleted && a.archived === true)
+        .toArray();
     },
     [activeLedgerId]
   );
 
-  const { wallets, archivedWallets, contacts, archivedContacts, allContacts } = useMemo(() => {
-    const activeWallets = accounts ? accounts.filter(a => !a.type || a.type === 'wallet') : [];
-    const archivedW = archivedAccounts ? archivedAccounts.filter(a => !a.type || a.type === 'wallet') : [];
-    const activeContacts = accounts ? accounts.filter(a => a.type === 'contact') : [];
-    const archived = archivedAccounts ? archivedAccounts.filter(a => a.type === 'contact') : [];
-    
-    return {
-      wallets: activeWallets,
-      archivedWallets: archivedW,
-      contacts: activeContacts,
-      archivedContacts: archived,
-      allContacts: [...activeContacts, ...archived]
-    };
-  }, [accounts, archivedAccounts]);
+  // 向後相容別名
+  const accounts = wallets;
+  const archivedAccounts = archivedWallets;
 
   const addAccount = async (
     name: string,
@@ -44,18 +52,29 @@ export function useAccounts() {
     initialBalance: number = 0,
     currency?: string,
     group: string = 'cash',
-    extra?: Partial<Account>
+    extra?: Partial<Wallet & { note?: string }>
   ): Promise<Account | null> => {
     if (!activeLedgerId) return null;
-    const isFirstAccount = await db.accounts.filter(a => !a.deleted && (!a.type || a.type === 'wallet') && a.ledgerId === activeLedgerId).count() === 0;
+
+    if (type === 'contact') {
+      const contact = await addContact(name, group || 'personal', currency, extra?.note);
+      return contact as unknown as Account;
+    }
+
+    const isFirstAccount =
+      (await db.accounts
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(a => !a.deleted)
+        .count()) === 0;
     
-    const newAccount: Account = {
+    const newWallet: Wallet = {
       id: uuidv4(),
       ledgerId: activeLedgerId,
       name,
-      type,
+      type: 'wallet',
       group,
-      isDefault: type === 'wallet' ? isFirstAccount : false,
+      isDefault: isFirstAccount,
       initialBalance,
       currency,
       ...extra,
@@ -63,11 +82,18 @@ export function useAccounts() {
       updatedAt: new Date().toISOString(),
       deleted: false,
     };
-    await db.accounts.add(newAccount);
-    return newAccount;
+    await db.accounts.add(newWallet);
+    return newWallet;
   };
 
-  const updateAccount = async (id: string, updates: Partial<Account>) => {
+  const updateAccount = async (id: string, updates: Partial<Wallet>) => {
+    // 檢查是否為聯絡人
+    const isContact = (await db.contacts.get(id)) !== undefined;
+    if (isContact) {
+      await updateContact(id, updates as any);
+      return;
+    }
+
     await db.accounts.update(id, {
       ...updates,
       updatedAt: new Date().toISOString(),
@@ -75,6 +101,12 @@ export function useAccounts() {
   };
 
   const archiveAccount = async (id: string) => {
+    const isContact = (await db.contacts.get(id)) !== undefined;
+    if (isContact) {
+      await archiveContactFn(id);
+      return;
+    }
+
     await db.accounts.update(id, {
       archived: true,
       updatedAt: new Date().toISOString(),
@@ -82,6 +114,12 @@ export function useAccounts() {
   };
 
   const unarchiveAccount = async (id: string) => {
+    const isContact = (await db.contacts.get(id)) !== undefined;
+    if (isContact) {
+      await unarchiveContactFn(id);
+      return;
+    }
+
     await db.accounts.update(id, {
       archived: false,
       updatedAt: new Date().toISOString(),
@@ -89,12 +127,26 @@ export function useAccounts() {
   };
 
   const deleteAccount = async (id: string): Promise<{ success: boolean; reason?: string }> => {
-    // Check if account has any transactions
-    const txCount = await db.transactions
-      .filter(t => !t.deleted && (t.accountId === id || t.toAccountId === id))
-      .count();
+    const isContact = (await db.contacts.get(id)) !== undefined;
+    if (isContact) {
+      return deleteContactFn(id);
+    }
 
-    if (txCount > 0) {
+    // Check if account has any transactions via accountId and toAccountId indexes
+    const [fromCount, toCount] = await Promise.all([
+      db.transactions
+        .where('accountId')
+        .equals(id)
+        .filter(t => !t.deleted)
+        .count(),
+      db.transactions
+        .where('toAccountId')
+        .equals(id)
+        .filter(t => !t.deleted)
+        .count(),
+    ]);
+
+    if (fromCount > 0 || toCount > 0) {
       return { success: false, reason: 'has_transactions' };
     }
 

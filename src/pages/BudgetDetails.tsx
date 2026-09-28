@@ -23,7 +23,6 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
-import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/AmountInput';
@@ -569,11 +568,10 @@ export default function BudgetDetails() {
                           <div className="flex flex-col justify-center min-w-0 pr-4 overflow-hidden">
                             <div className="h-5 flex items-center gap-1.5 min-w-0">
                               <span className="text-sm font-medium leading-none truncate">
-                                {tx.isWriteOff || (category?.name && (category.name.includes('差額吸收') || category.name.includes('差额吸收') || category.name === '抹零'))
+                                {category?.name && (category.name.includes('差額吸收') || category.name.includes('差额吸收') || category.name === '抹零')
                                   ? t('reimbursements.writeOffCategory', '抹零')
                                   : (category?.name || t('common.uncategorized'))}
                               </span>
-                              <ReimbursementBadge transaction={tx} />
                             </div>
                             {tx.note && (
                               <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">

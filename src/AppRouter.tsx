@@ -16,6 +16,7 @@ import AccountDetails from './pages/AccountDetails';
 import ContactDetails from './pages/ContactDetails';
 import Reports from './pages/Reports';
 import { SetupGuard } from './components/layout/SetupGuard';
+import { LockGuard } from './components/security/LockGuard';
 
 const router = createBrowserRouter([
   {
@@ -26,7 +27,9 @@ const router = createBrowserRouter([
     path: '/',
     element: (
       <SetupGuard>
-        <AppLayout />
+        <LockGuard>
+          <AppLayout />
+        </LockGuard>
       </SetupGuard>
     ),
     children: [

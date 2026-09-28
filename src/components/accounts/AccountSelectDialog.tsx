@@ -7,16 +7,22 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { convertAmount } from '@/lib/currency';
-import type { Account } from '@/services/db/db';
+import type { Wallet, Contact } from '@/services/db/db';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { Check } from 'lucide-react';
+
+export type SelectableAccount = (Wallet | Contact) & {
+  type?: 'wallet' | 'contact';
+  initialBalance?: number;
+  creditLimit?: number;
+};
 
 export interface AccountSelectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedAccountId?: string;
-  onSelectAccount: (account: Account) => void;
+  onSelectAccount: (account: any) => void;
   disabledAccountIds?: string[];
   disabledReason?: string;
   title?: string;
@@ -46,7 +52,7 @@ export function AccountSelectDialog({
   filterType = 'wallet',
 }: AccountSelectDialogProps) {
   const { t } = useTranslation();
-  const { wallets, contacts, accounts } = useAccounts();
+  const { wallets, contacts } = useAccounts();
   const { transactions } = useTransactions();
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
@@ -58,13 +64,16 @@ export function AccountSelectDialog({
   // Live account balance calculation across transactions
   const accountBalances = useMemo(() => {
     const balances: Record<string, number> = {};
-    if (!accounts || !transactions) return balances;
+    if (!transactions) return balances;
 
-    accounts.forEach(a => {
-      balances[a.id] = a.initialBalance || 0;
+    (wallets || []).forEach(w => {
+      balances[w.id] = w.initialBalance || 0;
+    });
+    (contacts || []).forEach(c => {
+      balances[c.id] = 0;
     });
 
-    const contactIdSet = new Set(accounts.filter(a => a.type === 'contact').map(a => a.id));
+    const contactIdSet = new Set((contacts || []).map(c => c.id));
 
     transactions.forEach(tx => {
       if (tx.deleted) return;
@@ -72,9 +81,6 @@ export function AccountSelectDialog({
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] += tx.amount;
       } else if (tx.type === 'expense') {
         if (balances[tx.accountId] !== undefined) balances[tx.accountId] -= tx.amount;
-        if (tx.reimbursementStatus === 'pending' && tx.reimbursementContactId && balances[tx.reimbursementContactId] !== undefined) {
-          balances[tx.reimbursementContactId] += tx.amount;
-        }
       } else if (tx.type === 'transfer' || tx.type === 'loan') {
         if (tx.type === 'loan' && tx.isGift) {
           // 贈與交易：只變動錢包餘額，不計入聯絡人應收應還
@@ -94,22 +100,25 @@ export function AccountSelectDialog({
     });
 
     return balances;
-  }, [accounts, transactions]);
+  }, [wallets, contacts, transactions]);
 
   // Determine eligible accounts based on filterType
   const eligibleAccounts = useMemo(() => {
     if (filterType === 'contact') {
-      return contacts || [];
+      return (contacts || []).map(c => ({ ...c, type: 'contact' as const }));
     }
     if (filterType === 'all') {
-      return accounts || [];
+      return [
+        ...(wallets || []).map(w => ({ ...w, type: 'wallet' as const })),
+        ...(contacts || []).map(c => ({ ...c, type: 'contact' as const })),
+      ];
     }
-    return wallets || [];
-  }, [filterType, contacts, accounts, wallets]);
+    return (wallets || []).map(w => ({ ...w, type: 'wallet' as const }));
+  }, [filterType, contacts, wallets]);
 
   // Grouped active accounts
   const groupedAccounts = useMemo(() => {
-    const groups: Record<string, Account[]> = {};
+    const groups: Record<string, SelectableAccount[]> = {};
     GROUP_ORDER.forEach(g => {
       groups[g] = [];
     });
@@ -211,7 +220,7 @@ export function AccountSelectDialog({
                                   <span className="text-sm font-medium text-foreground truncate">
                                     {acc.name}
                                   </span>
-                                  {acc.isDefault && (
+                                  {'isDefault' in acc && acc.isDefault && (
                                     <span className="text-[9px] uppercase font-medium px-1.5 py-0.2 rounded bg-muted text-muted-foreground border border-border/60">
                                       {t('accounts.default', '預設')}
                                     </span>

@@ -163,7 +163,11 @@ export function useBudgets() {
   const budgets = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Budget[]);
-      return db.budgets.filter(b => !b.deleted && b.ledgerId === activeLedgerId).toArray();
+      return db.budgets
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(b => !b.deleted)
+        .toArray();
     },
     [activeLedgerId]
   );
@@ -172,7 +176,11 @@ export function useBudgets() {
   const budgetRules = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as BudgetRule[]);
-      return db.budget_rules.filter(r => !r.deleted && r.ledgerId === activeLedgerId).toArray();
+      return db.budget_rules
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(r => !r.deleted)
+        .toArray();
     },
     [activeLedgerId]
   );
@@ -187,7 +195,9 @@ export function useBudgets() {
 
     try {
       const activeRules = await db.budget_rules
-        .filter(r => !r.deleted && r.isActive && r.ledgerId === activeLedgerId)
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(r => !r.deleted && r.isActive)
         .toArray();
 
       const today = new Date();
@@ -204,7 +214,9 @@ export function useBudgets() {
           const mKey = currentMonthKey;
           // Check if budget instance has EVER been generated for this rule and period (even if deleted)
           const existing = await db.budgets
-            .filter(b => b.ruleId === rule.id && b.periodKey === mKey)
+            .where('ruleId')
+            .equals(rule.id)
+            .filter(b => b.periodKey === mKey)
             .first();
 
           if (!existing) {
@@ -239,7 +251,9 @@ export function useBudgets() {
           const yKey = currentYearKey;
           // Check if budget instance has EVER been generated for this rule and period (even if deleted)
           const existing = await db.budgets
-            .filter(b => b.ruleId === rule.id && b.periodKey === yKey)
+            .where('ruleId')
+            .equals(rule.id)
+            .filter(b => b.periodKey === yKey)
             .first();
 
           if (!existing) {

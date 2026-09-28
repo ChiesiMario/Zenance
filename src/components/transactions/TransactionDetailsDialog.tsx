@@ -40,33 +40,14 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     return transactions.find((tx) => tx.id === activeTxId) || null;
   }, [activeTxId, transactions]);
 
-  // Find all sibling/related transactions in the same group (split, parent-child, or settlement)
+  // Find all sibling/related transactions in the same group (split group or transfer + fee)
   const groupTransactions = useMemo(() => {
     if (!currentTransaction || !transactions) return [];
 
-    // 1. By splitGroupId (AA / Split expense)
+    // By splitGroupId (AA / Split expense or Transfer + Fee)
     if (currentTransaction.splitGroupId) {
       const list = transactions.filter(
         (t) => !t.deleted && t.splitGroupId === currentTransaction.splitGroupId
-      );
-      return sortTransactionsDesc(list);
-    }
-
-    // 2. By parent-child hierarchy
-    const rootId = currentTransaction.parentId || currentTransaction.id;
-    const childTxs = transactions.filter(
-      (t) => !t.deleted && t.parentId === rootId
-    );
-    if (childTxs.length > 0) {
-      const parentTx = transactions.find((t) => !t.deleted && t.id === rootId);
-      const combined = parentTx ? [parentTx, ...childTxs] : childTxs;
-      return sortTransactionsDesc(combined);
-    }
-
-    // 3. By settlementId (batch settlement)
-    if (currentTransaction.settlementId) {
-      const list = transactions.filter(
-        (t) => !t.deleted && t.settlementId === currentTransaction.settlementId
       );
       return sortTransactionsDesc(list);
     }
@@ -148,16 +129,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
   const getCategoryName = (categoryId: string, tx: Transaction) => {
     if (categoryId === 'transfer') return t('add.transfer');
-    if (tx.isWriteOff) {
-      return t('reimbursements.writeOffCategory', '抹零');
-    }
-    if (
-      categoryId === 'advance' ||
-      (tx.type === 'loan' &&
-        (tx.category === 'advance' ||
-          tx.reimbursementContactId ||
-          tx.reimbursementStatus))
-    ) {
+    if (categoryId === 'advance' || (tx.type === 'loan' && tx.category === 'advance')) {
       return t('add.reimburse', '代付');
     }
     if (categoryId === 'loan') {
@@ -234,11 +206,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const handleDelete = async () => {
     if (!activeTxId || !currentTransaction) return;
 
-    const isReimbursementRefund =
-      currentTransaction.type === 'income' && !!currentTransaction.reimbursementContactId;
-    const description = isReimbursementRefund
-      ? t('reimbursements.deleteRefundConfirm')
-      : t('dashboard.deleteTransactionConfirm');
+    const description = t('dashboard.deleteTransactionConfirm');
 
     const confirmed = await confirm({
       title: t('dashboard.deleteTransaction'),
@@ -277,20 +245,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     // Associated contact for this specific card
     const isLend =
       tx.type === 'loan' &&
-      (contacts?.some((c) => c.id === tx.toAccountId) ||
-        accounts?.some((a) => a.id === tx.toAccountId && a.type === 'contact'));
+      Boolean(contacts?.some((c) => c.id === tx.toAccountId));
 
-    let contactObj = null;
-    if (tx.type === 'loan') {
-      const contactId = isLend ? tx.toAccountId : tx.accountId;
-      contactObj =
-        contacts?.find((c) => c.id === contactId) ||
-        accounts?.find((a) => a.id === contactId);
-    } else if (tx.reimbursementContactId) {
-      contactObj =
-        contacts?.find((c) => c.id === tx.reimbursementContactId) ||
-        accounts?.find((a) => a.id === tx.reimbursementContactId);
-    }
+    const contactId = tx.type === 'loan' ? (isLend ? tx.toAccountId : tx.accountId) : undefined;
+    const contactObj = contactId ? (contacts?.find((c) => c.id === contactId) || null) : null;
 
     const fromCurrency =
       accounts?.find((a) => a.id === tx.accountId)?.currency ||
@@ -371,9 +329,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
       cardAmount = isLendLoan ? -tx.amount : tx.amount;
       cardBaseCurrency = activeLedger?.baseCurrency || 'CNY';
     }
-
-    // Parent transaction if child
-    const parentTx = tx.parentId ? transactions?.find((t) => t.id === tx.parentId) : null;
 
     // Note validation
     const cat = allCategories?.find((c) => c.id === tx.category);
@@ -474,11 +429,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               </span>
             )}
 
-            {tx.parentId && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-muted-foreground bg-muted/40 border border-border/60 leading-none shrink-0">
-                {t('dashboard.subTransaction')}
-              </span>
-            )}
             {tx.isGift && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 leading-none shrink-0">
                 {t('add.gift', '贈與')}
@@ -600,23 +550,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               {formatDateTime(tx.updatedAt)}
             </span>
           </div>
-
-          {/* 母交易關聯 */}
-          {tx.parentId && (
-            <div className="flex items-baseline justify-between py-0.5">
-              <span className="text-muted-foreground shrink-0">
-                {t('dashboard.parentTransaction')}
-              </span>
-              <span className="flex-1 mx-2 border-b border-dotted border-border/80 self-center" />
-              <span className="font-medium text-foreground text-right">
-                {parentTx ? (
-                  `#${parentTx.displayId || parentTx.id.split('-')[0].toUpperCase()}`
-                ) : (
-                  `#${tx.parentId.split('-')[0].toUpperCase()}`
-                )}
-              </span>
-            </div>
-          )}
 
           {/* 備註留言區塊 */}
           {hasNote && (

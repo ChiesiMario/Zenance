@@ -30,7 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Budget, Account } from '@/services/db/db';
+import type { Budget, Contact } from '@/services/db/db';
 
 interface Props {
   value: string;
@@ -42,12 +42,10 @@ interface Props {
   budgetId?: string;
   onBudgetChange?: (budgetId: string) => void;
   budgets?: Budget[];
-  reimbursementContactId?: string;
-  onReimbursementContactChange?: (contactId: string | undefined) => void;
   splits?: SplitItem[];
   onSplitsChange?: (splits: SplitItem[]) => void;
   currencySymbol?: string;
-  contacts?: Account[];
+  contacts?: Contact[];
   onFeeClick?: () => void;
   feeAmount?: number;
   isFeeActive?: boolean;
@@ -89,8 +87,6 @@ export function NumericKeypad({
   budgetId,
   onBudgetChange,
   budgets = [],
-  reimbursementContactId,
-  onReimbursementContactChange,
   splits,
   onSplitsChange,
   currencySymbol = '¥',
@@ -157,8 +153,8 @@ export function NumericKeypad({
   // Show budget selector for expense and income
   const showBudgetButton = (type === 'expense' || type === 'income') && Boolean(onBudgetChange);
 
-  // Show reimbursement selector only for expense
-  const showReimburseButton = type === 'expense' && Boolean(onReimbursementContactChange);
+  // Show reimbursement/split selector only for expense
+  const showReimburseButton = type === 'expense' && Boolean(onSplitsChange);
 
   // Match current selected budget
   const matchingBudget = useMemo(() => {
@@ -183,12 +179,8 @@ export function NumericKeypad({
   // 當前代付/分攤清單
   const currentSplits = useMemo(() => {
     if (splits && splits.length > 0) return splits;
-    if (reimbursementContactId) {
-      const amt = parseFloat(safeEvaluate(value)) || 0;
-      return [{ contactId: reimbursementContactId, amount: amt }];
-    }
     return [];
-  }, [splits, reimbursementContactId, value]);
+  }, [splits]);
 
   const isSplitActive = currentSplits.length > 0;
 
@@ -565,11 +557,6 @@ export function NumericKeypad({
                 splits={currentSplits}
                 onConfirm={(newSplits) => {
                   onSplitsChange?.(newSplits);
-                  if (newSplits.length === 1) {
-                    onReimbursementContactChange?.(newSplits[0].contactId);
-                  } else {
-                    onReimbursementContactChange?.(undefined);
-                  }
                 }}
                 contacts={contacts}
               />

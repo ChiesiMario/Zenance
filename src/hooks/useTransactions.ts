@@ -3,6 +3,9 @@ import { db, type Transaction } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '@/store/useAppStore';
 import { sortTransactionsDesc } from '@/lib/utils';
+import { applyHistoricalDelta } from '@/services/balance/snapshotService';
+import { getTxAccountDelta } from '@/lib/currency';
+import { scheduleAutoSync } from '@/services/sync/syncEngine';
 
 export function useTransactions() {
   const { activeLedgerId } = useAppStore();
@@ -11,7 +14,9 @@ export function useTransactions() {
     async () => {
       if (!activeLedgerId) return [] as Transaction[];
       const list = await db.transactions
-        .filter(t => !t.deleted && t.ledgerId === activeLedgerId)
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(t => !t.deleted)
         .toArray();
       return sortTransactionsDesc(list);
     },
@@ -32,107 +37,153 @@ export function useTransactions() {
       updatedAt: new Date().toISOString(),
       deleted: false,
     };
-    await db.transactions.add(newTransaction);
+
+    await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
+      await db.transactions.add(newTransaction);
+
+      // 若補記歷史月份交易，向前連鎖校正月末快照
+      if (newTransaction.accountId) {
+        const fromWallet = await db.accounts.get(newTransaction.accountId);
+        if (fromWallet) {
+          const delta = getTxAccountDelta(newTransaction, fromWallet, () => 1, fromWallet.currency || 'CNY');
+          await applyHistoricalDelta(fromWallet.id, newTransaction.date, delta);
+        }
+      }
+      if (newTransaction.toAccountId) {
+        const toWallet = await db.accounts.get(newTransaction.toAccountId);
+        if (toWallet) {
+          const delta = getTxAccountDelta(newTransaction, toWallet, () => 1, toWallet.currency || 'CNY');
+          await applyHistoricalDelta(toWallet.id, newTransaction.date, delta);
+        }
+      }
+    });
+
+    scheduleAutoSync(3000);
     return id;
   };
 
-  const addChildTransaction = async (
-    parentId: string,
-    data: Omit<Transaction, 'id' | 'ledgerId' | 'parentId' | 'createdAt' | 'updatedAt' | 'deleted'> & { id?: string }
-  ): Promise<string | undefined> => {
-    return addTransaction({
-      ...data,
-      parentId,
+  const addTransactionsAtomic = async (
+    items: Array<Omit<Transaction, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'> & { id?: string }>
+  ): Promise<string[]> => {
+    if (!activeLedgerId || items.length === 0) return [];
+    const result = await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
+      const ids: string[] = [];
+      const now = new Date().toISOString();
+      const records: Transaction[] = items.map((data) => {
+        const id = data.id || uuidv4();
+        ids.push(id);
+        return {
+          ...data,
+          id,
+          displayId: id.split('-')[0].toUpperCase(),
+          ledgerId: activeLedgerId,
+          createdAt: now,
+          updatedAt: now,
+          deleted: false,
+        };
+      });
+      await db.transactions.bulkAdd(records);
+
+      for (const rec of records) {
+        if (rec.accountId) {
+          const fromWallet = await db.accounts.get(rec.accountId);
+          if (fromWallet) {
+            const delta = getTxAccountDelta(rec, fromWallet, () => 1, fromWallet.currency || 'CNY');
+            await applyHistoricalDelta(fromWallet.id, rec.date, delta);
+          }
+        }
+        if (rec.toAccountId) {
+          const toWallet = await db.accounts.get(rec.toAccountId);
+          if (toWallet) {
+            const delta = getTxAccountDelta(rec, toWallet, () => 1, toWallet.currency || 'CNY');
+            await applyHistoricalDelta(toWallet.id, rec.date, delta);
+          }
+        }
+      }
+
+      return ids;
     });
+
+    scheduleAutoSync(3000);
+    return result;
   };
 
   const updateTransaction = async (
     id: string,
     data: Partial<Omit<Transaction, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'>>
   ) => {
-    await db.transactions.update(id, {
-      ...data,
-      updatedAt: new Date().toISOString(),
+    await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
+      const oldTx = await db.transactions.get(id);
+      if (!oldTx) return;
+
+      const newTx: Transaction = {
+        ...oldTx,
+        ...data,
+        updatedAt: new Date().toISOString(),
+      };
+      await db.transactions.update(id, {
+        ...data,
+        updatedAt: newTx.updatedAt,
+      });
+
+      // 歷史差額校正
+      if (oldTx.accountId) {
+        const fromWallet = await db.accounts.get(oldTx.accountId);
+        if (fromWallet) {
+          const oldDelta = getTxAccountDelta(oldTx, fromWallet, () => 1, fromWallet.currency || 'CNY');
+          await applyHistoricalDelta(fromWallet.id, oldTx.date, -oldDelta);
+          const newDelta = getTxAccountDelta(newTx, fromWallet, () => 1, fromWallet.currency || 'CNY');
+          await applyHistoricalDelta(fromWallet.id, newTx.date, newDelta);
+        }
+      }
+      if (oldTx.toAccountId) {
+        const toWallet = await db.accounts.get(oldTx.toAccountId);
+        if (toWallet) {
+          const oldDelta = getTxAccountDelta(oldTx, toWallet, () => 1, toWallet.currency || 'CNY');
+          await applyHistoricalDelta(toWallet.id, oldTx.date, -oldDelta);
+          const newDelta = getTxAccountDelta(newTx, toWallet, () => 1, toWallet.currency || 'CNY');
+          await applyHistoricalDelta(toWallet.id, newTx.date, newDelta);
+        }
+      }
     });
+
+    scheduleAutoSync(3000);
   };
 
   const deleteTransaction = async (id: string) => {
-    const tx = await db.transactions.get(id);
-    const now = new Date().toISOString();
+    await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
+      const tx = await db.transactions.get(id);
+      if (!tx || tx.deleted) return;
 
-    await db.transactions.update(id, {
-      deleted: true,
-      updatedAt: now,
-    });
-
-    // 連帶軟刪除所有子交易
-    const childTxs = await db.transactions
-      .filter(t => !t.deleted && t.parentId === id)
-      .toArray();
-
-    for (const child of childTxs) {
-      await db.transactions.update(child.id, {
+      await db.transactions.update(id, {
         deleted: true,
-        updatedAt: now,
+        updatedAt: new Date().toISOString(),
       });
-    }
 
-    // 若被刪除的交易是報銷回款子交易，檢查並恢復父層支出的報銷狀態
-    if (tx && tx.parentId && tx.type === 'income') {
-      const parentTx = await db.transactions.get(tx.parentId);
-      if (parentTx && parentTx.reimbursementContactId) {
-        const remainingChildRefunds = await db.transactions
-          .filter(t => !t.deleted && t.id !== id && t.parentId === tx.parentId && t.type === 'income')
-          .toArray();
-        const totalStillRefunded = remainingChildRefunds.reduce((sum, t) => sum + t.amount, 0);
-
-        if (totalStillRefunded < parentTx.amount) {
-          await db.transactions.update(parentTx.id, {
-            reimbursementStatus: 'pending',
-            reimbursementSettledAt: undefined,
-            updatedAt: now,
-          });
+      // 撤銷該筆歷史交易在快照中的影響
+      if (tx.accountId) {
+        const fromWallet = await db.accounts.get(tx.accountId);
+        if (fromWallet) {
+          const delta = getTxAccountDelta(tx, fromWallet, () => 1, fromWallet.currency || 'CNY');
+          await applyHistoricalDelta(fromWallet.id, tx.date, -delta);
         }
       }
-    }
-
-    // 若被刪除的交易是抹零支出子交易，還原父層支出的扣減金額並恢復為 pending
-    if (tx && tx.parentId && tx.isWriteOff && tx.type === 'expense') {
-      const parentTx = await db.transactions.get(tx.parentId);
-      if (parentTx) {
-        const restoredAmount = Math.round((parentTx.amount + tx.amount) * 100) / 100;
-        const restoredOriginalAmount = Math.round((parentTx.originalAmount + tx.originalAmount) * 100) / 100;
-        await db.transactions.update(parentTx.id, {
-          amount: restoredAmount,
-          originalAmount: restoredOriginalAmount,
-          reimbursementStatus: 'pending',
-          reimbursementSettledAt: undefined,
-          updatedAt: now,
-        });
+      if (tx.toAccountId) {
+        const toWallet = await db.accounts.get(tx.toAccountId);
+        if (toWallet) {
+          const delta = getTxAccountDelta(tx, toWallet, () => 1, toWallet.currency || 'CNY');
+          await applyHistoricalDelta(toWallet.id, tx.date, -delta);
+        }
       }
-    }
+    });
 
-    // 若被刪除的交易是報銷回款收入（向後相容舊版關聯），將關聯的已報銷支出恢復為 pending
-    if (tx && tx.type === 'income' && tx.reimbursementContactId) {
-      const relatedExpenses = await db.transactions
-        .filter(t => !t.deleted && t.reimbursementIncomeTxId === id)
-        .toArray();
-
-      for (const expense of relatedExpenses) {
-        await db.transactions.update(expense.id, {
-          reimbursementStatus: 'pending',
-          reimbursementSettledAt: undefined,
-          reimbursementIncomeTxId: undefined,
-          updatedAt: now,
-        });
-      }
-    }
+    scheduleAutoSync(3000);
   };
 
   return {
     transactions,
     addTransaction,
-    addChildTransaction,
+    addTransactionsAtomic,
     updateTransaction,
     deleteTransaction,
   };

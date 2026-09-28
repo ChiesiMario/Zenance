@@ -42,7 +42,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
@@ -1114,7 +1113,6 @@ export default function Reports() {
                         <span className="text-xs text-foreground font-medium truncate select-text">
                           {tx.note || inspectCategory.name}
                         </span>
-                        <ReimbursementBadge transaction={tx} />
                       </div>
                       <span className="text-[10px] font-mono text-muted-foreground">
                         {tx.date} • {wallet?.name || ''}

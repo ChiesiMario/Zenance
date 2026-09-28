@@ -7,7 +7,6 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { ChevronRight, User, Building2 } from 'lucide-react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
-import { ReimbursementBadge } from '@/components/transactions/ReimbursementBadge';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import type { Transaction } from '@/services/db/db';
 
@@ -35,29 +34,11 @@ function ContactCapsule({ name, group, maxWidthClass = 'max-w-[120px]' }: Contac
 }
 
 export interface SingleTransactionItem {
-  isSettlementGroup: false;
   isSplitGroup: false;
   tx: Transaction;
 }
 
-export interface SettlementGroupItem {
-  isSettlementGroup: true;
-  isSplitGroup: false;
-  id: string;
-  date: string;
-  transactions: Transaction[];
-  netAmount: number;
-  totalRefund: number;
-  totalWriteOff: number;
-  hasWriteOff: boolean;
-  contactId?: string;
-  contactName?: string;
-  note?: string;
-  latestCreatedAt: string;
-}
-
 export interface SplitGroupItem {
-  isSettlementGroup: false;
   isSplitGroup: true;
   id: string;
   date: string;
@@ -77,7 +58,6 @@ export interface SplitGroupItem {
 
 export type DisplayListItem = 
   | SingleTransactionItem
-  | SettlementGroupItem
   | SplitGroupItem;
 
 export interface GroupedTransactionListProps {
@@ -116,17 +96,7 @@ export function GroupedTransactionList({
   const { activeLedgerId } = useAppStore();
 
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
-  const [expandedSettlementIds, setExpandedSettlementIds] = useState<Set<string>>(new Set());
   const [expandedSplitIds, setExpandedSplitIds] = useState<Set<string>>(new Set());
-
-  const toggleExpandSettlement = (id: string) => {
-    setExpandedSettlementIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const toggleExpandSplit = (id: string) => {
     setExpandedSplitIds(prev => {
@@ -346,14 +316,11 @@ export function GroupedTransactionList({
     }
     if (tx.type === 'transfer') return t('add.transfer');
     if (tx.type === 'loan') {
-      if (tx.category === 'advance' || tx.reimbursementContactId || tx.reimbursementStatus) {
+      if (tx.category === 'advance') {
         return t('add.reimburse', '代付');
       }
       const isLent = contacts?.some(c => c.id === tx.toAccountId);
       return isLent ? t('add.lent') : t('add.borrowed');
-    }
-    if (tx.isWriteOff) {
-      return t('reimbursements.writeOffCategory', '抹零');
     }
     const cat = allCategories?.find(c => c.id === tx.category);
     if (cat?.isSystem) {
@@ -398,12 +365,10 @@ export function GroupedTransactionList({
           // Contact context: Contact-specific flows
           groups[date].forEach(tx => {
             if (tx.isGift) return; // 贈與交易不計入聯絡人借貸變動
-            const isLent = tx.toAccountId === contextContactId;
-            const isReimbExpense = tx.reimbursementContactId === contextContactId && tx.type === 'expense';
-            const isReimbIncome = tx.reimbursementContactId === contextContactId && tx.type === 'income';
-            if (isReimbIncome) balance += tx.amount;
-            else if (isReimbExpense || isLent) balance -= tx.amount;
-            else balance += tx.amount;
+            if (tx.type === 'transfer' || tx.type === 'loan') {
+              if (tx.toAccountId === contextContactId) balance += (tx.transferInAmount ?? tx.amount);
+              if (tx.accountId === contextContactId) balance -= tx.amount;
+            }
           });
         } else if (contextCategoryId) {
           // Category context
@@ -420,9 +385,8 @@ export function GroupedTransactionList({
           });
         }
 
-        // 聚合同一分攤群組與同一結算批次
+        // 聚合同一分攤群組 (多人分攤 / 轉帳手續費)
         const splitMap = new Map<string, Transaction[]>();
-        const settlementMap = new Map<string, Transaction[]>();
         const normalTxs: Transaction[] = [];
 
         groups[date].forEach(tx => {
@@ -433,30 +397,14 @@ export function GroupedTransactionList({
             return;
           }
 
-          const isRefundChild = tx.type === 'income' && !!tx.reimbursementContactId;
-          const isWriteOffChild = tx.type === 'expense' && !!tx.isWriteOff;
-
-          if (tx.settlementId) {
-            const list = settlementMap.get(tx.settlementId) || [];
-            list.push(tx);
-            settlementMap.set(tx.settlementId, list);
-          } else if (isRefundChild || isWriteOffChild) {
-            // 向後相容歷史資料：同日期、同 contactId、同時間窗口建立的視為同一批次
-            const timeKey = tx.createdAt ? tx.createdAt.slice(0, 16) : 'same_time';
-            const fallbackKey = `hist_${tx.date}_${tx.reimbursementContactId || 'none'}_${timeKey}`;
-            const list = settlementMap.get(fallbackKey) || [];
-            list.push(tx);
-            settlementMap.set(fallbackKey, list);
-          } else {
-            normalTxs.push(tx);
-          }
+          normalTxs.push(tx);
         });
 
         const displayItems: DisplayListItem[] = [];
 
         // 加入普通交易
         normalTxs.forEach(tx => {
-          displayItems.push({ isSettlementGroup: false, isSplitGroup: false, tx });
+          displayItems.push({ isSplitGroup: false, tx });
         });
 
         // 加入組合群組項目 (多人分攤 / 轉帳手續費)
@@ -503,7 +451,6 @@ export function GroupedTransactionList({
           const latestCreatedAt = sortedBatch[0]?.createdAt || sortedBatch[0]?.date;
 
           displayItems.push({
-            isSettlementGroup: false,
             isSplitGroup: true,
             id: groupId,
             date,
@@ -522,39 +469,10 @@ export function GroupedTransactionList({
           });
         });
 
-        // 加入結算批次組合項目
-        settlementMap.forEach((batchTxs, groupId) => {
-          if (batchTxs.length === 0) return;
-          const sortedBatch = sortTransactionsDesc(batchTxs);
-          const totalRefund = batchTxs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-          const totalWriteOff = batchTxs.filter(t => t.type === 'expense' && t.isWriteOff).reduce((sum, t) => sum + t.amount, 0);
-          const netAmount = Math.round((totalRefund - totalWriteOff) * 100) / 100;
-          const contactId = batchTxs.find(t => t.reimbursementContactId)?.reimbursementContactId;
-          const contact = contacts?.find(c => c.id === contactId);
-          const note = batchTxs.find(t => t.note)?.note;
-          const latestCreatedAt = sortedBatch[0]?.createdAt || sortedBatch[0]?.date;
-
-          displayItems.push({
-            isSettlementGroup: true,
-            isSplitGroup: false,
-            id: groupId,
-            date,
-            transactions: sortedBatch,
-            netAmount,
-            totalRefund,
-            totalWriteOff,
-            hasWriteOff: totalWriteOff > 0,
-            contactId,
-            contactName: contact?.name,
-            note,
-            latestCreatedAt,
-          });
-        });
-
         // 依照時間倒序排序
         displayItems.sort((a, b) => {
-          const timeA = (a.isSettlementGroup || a.isSplitGroup) ? a.latestCreatedAt : (a.tx.createdAt || a.tx.date);
-          const timeB = (b.isSettlementGroup || b.isSplitGroup) ? b.latestCreatedAt : (b.tx.createdAt || b.tx.date);
+          const timeA = a.isSplitGroup ? a.latestCreatedAt : (a.tx.createdAt || a.tx.date);
+          const timeB = b.isSplitGroup ? b.latestCreatedAt : (b.tx.createdAt || b.tx.date);
           return timeB.localeCompare(timeA);
         });
 
@@ -612,7 +530,7 @@ export function GroupedTransactionList({
               {/* Transactions List */}
               <div className="divide-y divide-border">
                 {group.displayItems.map((item) => {
-                  if (!item.isSettlementGroup && !item.isSplitGroup) {
+                  if (!item.isSplitGroup) {
                     const tx = item.tx;
                     return (
                       <button
@@ -648,7 +566,7 @@ export function GroupedTransactionList({
                                   </div>
                                 );
                               })()
-                            ) : tx.type === 'loan' && !(tx.category === 'advance' || tx.reimbursementContactId || tx.reimbursementStatus) ? (
+                            ) : tx.type === 'loan' && tx.category !== 'advance' ? (
                               (() => {
                                 const isLent = contacts?.some(c => c.id === tx.toAccountId) || archivedContacts?.some(c => c.id === tx.toAccountId);
                                 const contactId = isLent ? tx.toAccountId : tx.accountId;
@@ -666,17 +584,13 @@ export function GroupedTransactionList({
                                   </div>
                                 );
                               })()
-                            ) : (tx.type !== 'income' && (tx.category === 'advance' || !!tx.reimbursementContactId || (tx.type === 'loan' && !!tx.reimbursementStatus))) ? (
+                            ) : tx.type === 'loan' ? (
                               (() => {
-                                const advanceContactId = tx.reimbursementContactId || tx.toAccountId;
-                                const contactObj = contacts?.find(c => c.id === advanceContactId)
-                                  || archivedContacts?.find(c => c.id === advanceContactId)
-                                  || accounts?.find(a => a.id === advanceContactId);
-                                const categoryTitle = (tx.category === 'advance' || tx.type === 'loan')
-                                  ? t('add.reimburse', '代付')
-                                  : (contextCategoryId
-                                      ? allCategories?.find(c => c.id === contextCategoryId)?.name || getCategoryName(tx)
-                                      : getCategoryName(tx));
+                                const isLent = contacts?.some(c => c.id === tx.toAccountId) || archivedContacts?.some(c => c.id === tx.toAccountId);
+                                const contactId = isLent ? tx.toAccountId : tx.accountId;
+                                const contactObj = contacts?.find(c => c.id === contactId)
+                                  || archivedContacts?.find(c => c.id === contactId);
+                                const categoryTitle = isLent ? t('add.lent') : t('add.borrowed');
 
                                 return (
                                   <div className="h-5 flex items-center gap-1.5 min-w-0">
@@ -686,30 +600,16 @@ export function GroupedTransactionList({
                                     {contactObj?.name && (
                                       <ContactCapsule name={contactObj.name} group={contactObj?.group} />
                                     )}
-                                    {tx.reimbursementStatus && tx.reimbursementStatus !== 'pending' && (
-                                      <ReimbursementBadge transaction={tx} />
-                                    )}
                                   </div>
                                 );
                               })()
                             ) : (
                               <div className="h-5 flex items-center gap-1.5 min-w-0">
                                 <span className="text-sm font-medium leading-none truncate">
-                                  {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income'
-                                    ? t('reimbursements.reimbursementRefund', '代付回款')
-                                    : (contextCategoryId
-                                        ? allCategories?.find(c => c.id === contextCategoryId)?.name || getCategoryName(tx)
-                                        : getCategoryName(tx))}
+                                  {contextCategoryId
+                                    ? allCategories?.find(c => c.id === contextCategoryId)?.name || getCategoryName(tx)
+                                    : getCategoryName(tx)}
                                 </span>
-                                
-                                {/* Reimbursement Badges */}
-                                {contextContactId && tx.reimbursementContactId === contextContactId && tx.type === 'income' ? (
-                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shrink-0">
-                                    {t('contacts.refundIncome', '回款入帳')}
-                                  </span>
-                                ) : (
-                                  <ReimbursementBadge transaction={tx} />
-                                )}
                               </div>
                             )}
 
@@ -786,35 +686,6 @@ export function GroupedTransactionList({
                                 })()
                               ) : contextContactId ? (
                                 (() => {
-                                  const isReimbExpense = tx.reimbursementContactId === contextContactId && tx.type === 'expense';
-                                  const isReimbIncome = tx.reimbursementContactId === contextContactId && tx.type === 'income';
-
-                                  if (isReimbExpense) {
-                                    return (
-                                      <AmountDisplay
-                                        amount={tx.amount}
-                                        originalCurrency={tx.originalCurrency}
-                                        baseCurrency={activeLedger?.baseCurrency}
-                                        type="expense"
-                                        className="text-sm font-mono leading-none"
-                                        showSign={true}
-                                      />
-                                    );
-                                  }
-
-                                  if (isReimbIncome) {
-                                    return (
-                                      <AmountDisplay
-                                        amount={tx.amount}
-                                        originalCurrency={tx.originalCurrency}
-                                        baseCurrency={activeLedger?.baseCurrency}
-                                        type="income"
-                                        className="text-sm font-mono leading-none"
-                                        showSign={true}
-                                      />
-                                    );
-                                  }
-
                                   const isLending = (tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextContactId;
                                   const isBorrowing = (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextContactId;
                                   const contactAmt = tx.originalAmount ?? (isLending ? (tx.transferInAmount ?? tx.amount) : tx.amount);
@@ -1047,9 +918,6 @@ export function GroupedTransactionList({
                                           name={targetContactName}
                                           group={targetContact?.group}
                                         />
-                                        {subTx.reimbursementStatus && subTx.reimbursementStatus !== 'pending' && (
-                                          <ReimbursementBadge transaction={subTx} />
-                                        )}
                                       </>
                                     )}
                                   </div>
@@ -1111,127 +979,7 @@ export function GroupedTransactionList({
                       </div>
                     );
                   }
-
-                  // 結算批次組合項目 (SettlementGroupItem)
-                  const isExpanded = expandedSettlementIds.has(item.id);
-                  return (
-                    <div key={item.id} className="bg-card">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpandSettlement(item.id)}
-                        className="w-full h-16 flex items-center justify-between px-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left"
-                      >
-                        {/* 左側：前置折疊指示箭頭 + 標題、標籤與次行資訊 */}
-                        <div className="flex items-center gap-3 min-w-0 pr-3 overflow-hidden">
-                          <div className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors shrink-0">
-                            <ChevronRight className={cn(
-                              "w-3.5 h-3.5 transition-transform duration-200",
-                              isExpanded && "rotate-90 text-foreground"
-                            )} />
-                          </div>
-
-                          <div className="flex flex-col justify-center min-w-0 overflow-hidden">
-                            <div className="h-5 flex items-center gap-1.5 min-w-0">
-                              <span className="text-sm font-medium leading-none truncate">
-                                {t('reimbursements.settlementGroupTitle', '代付回款')}
-                              </span>
-                              
-                              {/* 回款入帳標籤 */}
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shrink-0">
-                                {t('contacts.refundIncome', '回款入帳')}
-                              </span>
-
-                              {/* 若含抹零，顯示含抹零標籤 */}
-                              {item.hasWriteOff && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono bg-muted text-muted-foreground border-border shrink-0">
-                                  {t('reimbursements.includesWriteOff', '含抹零')}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* 次行備註或明細說明 */}
-                            <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
-                              {item.note ? (
-                                item.note
-                              ) : item.contactName ? (
-                                `${item.contactName} • ${item.transactions.length} ${t('reimbursements.items', { count: item.transactions.length })}`
-                              ) : (
-                                `${item.transactions.length} ${t('reimbursements.items', { count: item.transactions.length })}`
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 右側：實收回款與抹零淨額（完全右對齊） */}
-                        <div className="flex flex-col items-end justify-center shrink-0">
-                          <div className="h-5 flex items-center justify-end">
-                            <AmountDisplay
-                              amount={item.netAmount}
-                              baseCurrency={activeLedger?.baseCurrency}
-                              type="income"
-                              showSign={true}
-                              className="text-sm font-mono leading-none"
-                            />
-                          </div>
-                          {!contextAccountId && (() => {
-                            const incomeTx = item.transactions.find(t => t.type === 'income') || item.transactions[0];
-                            const wallet = wallets?.find(w => w.id === incomeTx?.accountId);
-                            if (!wallet?.name) return null;
-                            return (
-                              <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
-                                {wallet.name}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </button>
-
-                      {/* 手風琴展開抽屜（Vercel 簡約扁平子表格風格） */}
-                      {isExpanded && (
-                        <div className="bg-muted/20 border-t border-border divide-y divide-border/50 animate-in slide-in-from-top-1 duration-150">
-                          {item.transactions.map(subTx => {
-                            const isWriteOff = subTx.isWriteOff;
-                            return (
-                              <button
-                                key={subTx.id}
-                                type="button"
-                                onClick={() => handleRowClick(subTx)}
-                                className="w-full h-12 flex items-center justify-between pl-12 pr-4 transition-colors hover:bg-muted/40 text-left group cursor-pointer"
-                              >
-                                {/* 左側：類型標籤 + 帳戶 + 單號 */}
-                                <div className="flex items-center gap-2 min-w-0 pr-3">
-                                  <span className={cn(
-                                    "text-[10px] font-medium px-1.5 py-0.5 rounded border leading-none font-mono shrink-0",
-                                    isWriteOff
-                                      ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                                      : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                  )}>
-                                    {isWriteOff ? t('reimbursements.writeOffItem', '抹零') : t('reimbursements.refundItem', '回款入帳')}
-                                  </span>
-
-                                  <span className="text-[10px] font-mono text-muted-foreground/60">
-                                    #{subTx.displayId || subTx.id.split('-')[0].toUpperCase()}
-                                  </span>
-                                </div>
-
-                                {/* 右側：金額（精準對齊外層右邊界） */}
-                                <div className="flex items-center shrink-0">
-                                  <AmountDisplay
-                                    amount={subTx.amount}
-                                    originalCurrency={subTx.originalCurrency}
-                                    baseCurrency={activeLedger?.baseCurrency}
-                                    type={isWriteOff ? 'expense' : 'income'}
-                                    showSign={true}
-                                    className="text-sm font-mono"
-                                  />
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
+                  return null;
                 })}
               </div>
             </div>

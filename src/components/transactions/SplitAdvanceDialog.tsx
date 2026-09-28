@@ -7,7 +7,7 @@ import { AmountInput } from '@/components/ui/AmountInput';
 import { Plus, Users, UserCheck, RotateCcw, Search, X, Check } from 'lucide-react';
 import { cn, sanitizeAmountInput } from '@/lib/utils';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
-import type { Account } from '@/services/db/db';
+import type { Contact } from '@/services/db/db';
 
 export interface SplitItem {
   contactId: string;
@@ -21,13 +21,13 @@ interface SplitAdvanceDialogProps {
   currencySymbol?: string;
   splits: SplitItem[];
   onConfirm: (newSplits: SplitItem[]) => void;
-  contacts?: Account[];
+  contacts?: Contact[];
 }
 
 interface SelectContactsModalProps {
   open: boolean;
   onClose: () => void;
-  availableContacts: Account[];
+  availableContacts: Contact[];
   onConfirmAdd: (selectedContactIds: string[]) => void;
 }
 

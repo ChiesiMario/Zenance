@@ -25,7 +25,11 @@ export function useCategories() {
   const categories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && !c.archived && !c.isSystem && c.ledgerId === activeLedgerId).toArray();
+      return db.categories
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(c => !c.deleted && !c.archived && !c.isSystem)
+        .toArray();
     },
     [activeLedgerId]
   );
@@ -33,7 +37,11 @@ export function useCategories() {
   const archivedCategories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && c.archived === true && !c.isSystem && c.ledgerId === activeLedgerId).toArray();
+      return db.categories
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(c => !c.deleted && c.archived === true && !c.isSystem)
+        .toArray();
     },
     [activeLedgerId]
   );
@@ -41,7 +49,11 @@ export function useCategories() {
   const allCategories = useLiveQuery(
     () => {
       if (!activeLedgerId) return Promise.resolve([] as Category[]);
-      return db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).toArray();
+      return db.categories
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(c => !c.deleted)
+        .toArray();
     },
     [activeLedgerId]
   );
@@ -85,7 +97,9 @@ export function useCategories() {
 
   const deleteCategory = async (id: string): Promise<{ success: boolean; reason?: string }> => {
     const txCount = await db.transactions
-      .filter(t => !t.deleted && t.category === id)
+      .where('category')
+      .equals(id)
+      .filter(t => !t.deleted)
       .count();
 
     if (txCount > 0) {
@@ -111,7 +125,11 @@ export function useCategories() {
       'Salary', 'Investments', 'Freelance', 'Gifts', 'Other Income'
     ];
 
-    const currentCount = await db.categories.filter(c => !c.deleted && c.ledgerId === activeLedgerId).count();
+    const currentCount = await db.categories
+      .where('ledgerId')
+      .equals(activeLedgerId)
+      .filter(c => !c.deleted)
+      .count();
     
     if (currentCount === 0) {
       const categoriesToAdd = [
@@ -136,14 +154,18 @@ export function useCategories() {
           deleted: false,
         }))
       ];
-      
+
       await db.categories.bulkAdd(categoriesToAdd);
     }
   };
 
   const getOrCreateSystemBalanceAdjustmentCategory = async (type: 'income' | 'expense', name: string) => {
     if (!activeLedgerId) return null;
-    const existing = await db.categories.filter(c => !c.deleted && c.isSystem === true && c.type === type && c.ledgerId === activeLedgerId).first();
+    const existing = await db.categories
+      .where('ledgerId')
+      .equals(activeLedgerId)
+      .filter(c => !c.deleted && c.isSystem === true && c.type === type)
+      .first();
     if (existing) {
       if (existing.name !== name) {
         await updateCategory(existing.id, name);

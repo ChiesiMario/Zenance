@@ -15,16 +15,9 @@ export interface Transaction {
   id: string;
   displayId?: string; // Human-readable serial number
   ledgerId: string;
-  parentId?: string; // Optional ID of parent transaction if this is a sub-transaction
-  settlementId?: string; // Optional batch identifier for a reimbursement settlement session
   splitGroupId?: string; // Optional identifier for a multi-person advance / split expense group
-  isWriteOff?: boolean; // True if this is a write-off / absorption child transaction (does not affect account balance)
   isGift?: boolean; // True if this loan transaction is a gift / grant (does not create debt / receivable / payable)
   budgetId?: string; // Optional manual budget assignment ('none' or budget id)
-  reimbursementStatus?: 'pending' | 'reimbursed' | 'none'; // Reimbursement status
-  reimbursementContactId?: string; // Target contact ID for reimbursement
-  reimbursementSettledAt?: string; // ISO datetime when settled
-  reimbursementIncomeTxId?: string; // ID of the generated income transaction upon settlement
   amount: number; // Base currency amount
   originalAmount: number; // Original currency amount
   originalCurrency: string; // The currency code for this transaction
@@ -60,11 +53,11 @@ export interface Category {
   isSystem?: boolean;
 }
 
-export interface Account {
+export interface Wallet {
   id: string;
   ledgerId: string;
   name: string;
-  type?: 'wallet' | 'contact';
+  type?: 'wallet';
   group?: string; // e.g., 'cash', 'debit', 'credit', 'investment', 'credit_pay', 'other'
   isDefault: boolean;
   initialBalance?: number;
@@ -78,6 +71,34 @@ export interface Account {
   updatedAt: string;
   deleted: boolean;
 }
+
+export interface Contact {
+  id: string;
+  ledgerId: string;
+  name: string;
+  group?: string; // e.g., 'personal', 'organization', 'family', 'friend', 'colleague', 'business', 'other'
+  currency?: string;
+  note?: string;
+  archived?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+export interface BalanceSnapshot {
+  id: string; // 複合識別碼: `${walletId}_${periodKey}`
+  ledgerId: string;
+  walletId: string;
+  periodKey: string; // 月度標識: "YYYY-MM" (如 "2026-05")
+  closingBalance: number; // 該月末以錢包原生幣種計的收盤餘額
+  currency: string; // 錢包原生幣種代碼
+  snapshotDate: string; // 該月最後一日日期: "YYYY-MM-DD" (如 "2026-05-31")
+  transactionCount: number; // 截至該月累計參與計算的交易總筆數
+  updatedAt: string;
+}
+
+// 向後相容別名：Account 即為資產錢包 (Wallet)
+export type Account = Wallet;
 
 export type BudgetPeriodType = 'monthly' | 'yearly' | 'custom' | 'unlimited';
 
@@ -117,10 +138,17 @@ export class ZenanceDatabase extends Dexie {
   ledgers!: Table<Ledger>;
   transactions!: Table<Transaction>;
   categories!: Table<Category>;
-  accounts!: Table<Account>;
+  accounts!: Table<Wallet>;
+  contacts!: Table<Contact>;
   budgets!: Table<Budget>;
   budget_rules!: Table<BudgetRule>;
   exchange_rates!: Table<ExchangeRate>;
+  balance_snapshots!: Table<BalanceSnapshot>;
+
+  // 語義化別名：db.wallets 直接指向實體錢包表 db.accounts
+  get wallets(): Table<Wallet> {
+    return this.accounts;
+  }
 
   constructor() {
     super('ZenanceDB');
@@ -422,6 +450,53 @@ export class ZenanceDatabase extends Dexie {
 
     this.version(19).stores({
       transactions: 'id, displayId, ledgerId, parentId, settlementId, splitGroupId, budgetId, reimbursementStatus, reimbursementContactId, date, type, accountId, toAccountId, updatedAt, deleted',
+    });
+
+    this.version(20).stores({
+      transactions: 'id, displayId, ledgerId, category, parentId, settlementId, splitGroupId, budgetId, reimbursementStatus, reimbursementContactId, reimbursementIncomeTxId, date, type, accountId, toAccountId, updatedAt, deleted, [ledgerId+date], [ledgerId+type], [ledgerId+category]',
+      categories: 'id, ledgerId, type, isDefault, archived, isSystem, updatedAt, deleted, [ledgerId+type], [ledgerId+archived]',
+      accounts: 'id, ledgerId, type, group, isDefault, archived, updatedAt, deleted, [ledgerId+type], [ledgerId+archived]',
+      budgets: 'id, ledgerId, ruleId, periodType, periodKey, startDate, endDate, updatedAt, deleted, [ledgerId+periodKey], [ruleId+periodKey]',
+      budget_rules: 'id, ledgerId, periodType, isActive, updatedAt, deleted, [ledgerId+isActive]',
+    });
+
+    this.version(21).stores({
+      contacts: 'id, ledgerId, name, group, currency, archived, updatedAt, deleted, [ledgerId+archived]',
+    }).upgrade(async tx => {
+      // 自動將舊 accounts 表中 type === 'contact' 的聯絡人遷移至獨立 contacts 表
+      const allAccounts = await tx.table('accounts').toArray();
+      const contactRecords: any[] = [];
+      const contactIdsToDelete: string[] = [];
+
+      for (const acc of allAccounts) {
+        if (acc.type === 'contact') {
+          contactRecords.push({
+            id: acc.id,
+            ledgerId: acc.ledgerId,
+            name: acc.name,
+            group: acc.group || 'personal',
+            currency: acc.currency,
+            archived: acc.archived || false,
+            createdAt: acc.createdAt || new Date().toISOString(),
+            updatedAt: acc.updatedAt || new Date().toISOString(),
+            deleted: acc.deleted || false,
+          });
+          contactIdsToDelete.push(acc.id);
+        }
+      }
+
+      if (contactRecords.length > 0) {
+        await tx.table('contacts').bulkAdd(contactRecords);
+        await tx.table('accounts').bulkDelete(contactIdsToDelete);
+      }
+    });
+
+    this.version(22).stores({
+      transactions: 'id, displayId, ledgerId, category, splitGroupId, budgetId, date, type, accountId, toAccountId, updatedAt, deleted, [ledgerId+date], [ledgerId+type], [ledgerId+category]',
+    });
+
+    this.version(23).stores({
+      balance_snapshots: 'id, ledgerId, walletId, periodKey, [ledgerId+periodKey], [walletId+periodKey]',
     });
   }
 }

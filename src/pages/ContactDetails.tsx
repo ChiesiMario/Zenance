@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAccounts } from '@/hooks/useAccounts';
+import { useContacts } from '@/hooks/useContacts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
@@ -18,7 +18,7 @@ export default function ContactDetails() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  const { contacts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
+  const { contacts, updateContact, deleteContact, archiveContact } = useContacts();
   const { transactions } = useTransactions();
   const { activeLedgerId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
@@ -41,26 +41,13 @@ export default function ContactDetails() {
     }
   }, [contact, isEditDialogOpen]);
 
-  // Include transactions associated with this contact:
-  // 1. Where accountId or toAccountId is the contact (loans & transfers)
-  // 2. Where reimbursementContactId is the contact (reimbursements & refunds)
+  // Include transactions associated with this contact (loans & transfers)
   const contactTransactions = useMemo(() => {
     const list = transactions?.filter(tx => 
-      !tx.deleted && (tx.accountId === id || tx.toAccountId === id || tx.reimbursementContactId === id)
+      !tx.deleted && (tx.accountId === id || tx.toAccountId === id)
     ) || [];
     return sortTransactionsDesc(list);
   }, [transactions, id]);
-
-  // 建立 parentId -> 子回款總額 map
-  const childRefundsMap = useMemo(() => {
-    const map: Record<string, number> = {};
-    transactions?.forEach(t => {
-      if (!t.deleted && t.parentId && t.type === 'income') {
-        map[t.parentId] = (map[t.parentId] || 0) + t.amount;
-      }
-    });
-    return map;
-  }, [transactions]);
 
   const {
     totalLent,
@@ -70,57 +57,30 @@ export default function ContactDetails() {
     let bal = 0;
     let lent = 0;
     let borrowed = 0;
-    let pendingReimb = 0;
-    let settledReimb = 0;
-    const pendingList: (typeof contactTransactions[0] & { remainingAmount?: number })[] = [];
     
     contactTransactions.forEach(tx => {
-      const isAdvance = (tx.reimbursementContactId === id || tx.toAccountId === id) && !!tx.reimbursementStatus;
-
-      if (isAdvance) {
-        lent += tx.amount;
-        const refunded = childRefundsMap[tx.id] || 0;
-        const remaining = Math.max(0, Math.round((tx.amount - refunded) * 100) / 100);
-
-        if (tx.reimbursementStatus === 'pending') {
-          if (remaining > 0) {
-            pendingReimb += remaining;
-            pendingList.push({
-              ...tx,
-              remainingAmount: remaining,
-            });
-          }
-          settledReimb += refunded;
-        } else if (tx.reimbursementStatus === 'reimbursed') {
-          settledReimb += tx.amount;
-        }
-      } else if (tx.type === 'transfer' || tx.type === 'loan') {
-        if (tx.isGift) {
-          // 贈與不計入應收與應還
-          return;
-        }
-        if (tx.accountId === id) { // transfer FROM contact
-          bal -= tx.amount;
-          borrowed += tx.amount;
-        }
-        if (tx.toAccountId === id) { // transfer TO contact
-          const inAmt = tx.transferInAmount ?? tx.amount;
+      if (tx.deleted || tx.isGift) return;
+      if (tx.type === 'transfer' || tx.type === 'loan') {
+        if (tx.toAccountId === id) { // transfer / loan TO contact (lent/advanced)
+          const inAmt = tx.transferInAmount ?? tx.originalAmount ?? tx.amount;
           bal += inAmt;
           lent += inAmt;
+        }
+        if (tx.accountId === id) { // transfer / loan FROM contact (repaid/borrowed)
+          const outAmt = tx.originalAmount ?? tx.amount;
+          bal -= outAmt;
+          borrowed += outAmt;
         }
       }
     });
 
     return {
       loanBalance: bal,
-      totalLent: lent,
-      totalBorrowed: borrowed,
-      pendingReimbursement: Math.round(pendingReimb * 100) / 100,
-      totalReimbursed: Math.round(settledReimb * 100) / 100,
-      netBalance: Math.round((bal + pendingReimb) * 100) / 100,
-      pendingTxs: pendingList,
+      totalLent: Math.round(lent * 100) / 100,
+      totalBorrowed: Math.round(borrowed * 100) / 100,
+      netBalance: Math.round(bal * 100) / 100,
     };
-  }, [contactTransactions, childRefundsMap, id]);
+  }, [contactTransactions, id]);
 
   if (!contact && contacts && contacts.length > 0) {
     return (
@@ -133,7 +93,7 @@ export default function ContactDetails() {
 
   const handleUpdate = async () => {
     if (!editName.trim() || !id) return;
-    await updateAccount(id, {
+    await updateContact(id, {
       name: editName.trim(),
       group: editGroup
     });
@@ -142,7 +102,7 @@ export default function ContactDetails() {
 
   const handleDelete = async () => {
     if (!id) return;
-    const res = await deleteAccount(id);
+    const res = await deleteContact(id);
     if (!res.success) {
       setDeleteError(res.reason === 'has_transactions' ? t('contacts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.') : t('common.error'));
     } else {
@@ -152,7 +112,7 @@ export default function ContactDetails() {
   
   const handleArchive = async () => {
     if (!id) return;
-    await archiveAccount(id);
+    await archiveContact(id);
     navigate('/contacts');
   };
 

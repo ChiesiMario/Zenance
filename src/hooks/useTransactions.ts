@@ -6,6 +6,7 @@ import { sortTransactionsDesc } from '@/lib/utils';
 import { applyHistoricalDelta } from '@/services/balance/snapshotService';
 import { getTxAccountDelta } from '@/lib/currency';
 import { scheduleAutoSync } from '@/services/sync/syncEngine';
+import { getSafeMonotonicTimestamp } from '@/lib/clock';
 
 export function useTransactions() {
   const { activeLedgerId } = useAppStore();
@@ -28,13 +29,15 @@ export function useTransactions() {
   ): Promise<string | undefined> => {
     if (!activeLedgerId) return;
     const id = data.id || uuidv4();
+    const now = getSafeMonotonicTimestamp();
     const newTransaction: Transaction = {
       ...data,
       id,
       displayId: id.split('-')[0].toUpperCase(),
       ledgerId: activeLedgerId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+      rev: 1,
       deleted: false,
     };
 
@@ -68,7 +71,7 @@ export function useTransactions() {
     if (!activeLedgerId || items.length === 0) return [];
     const result = await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
       const ids: string[] = [];
-      const now = new Date().toISOString();
+      const now = getSafeMonotonicTimestamp();
       const records: Transaction[] = items.map((data) => {
         const id = data.id || uuidv4();
         ids.push(id);
@@ -79,6 +82,7 @@ export function useTransactions() {
           ledgerId: activeLedgerId,
           createdAt: now,
           updatedAt: now,
+          rev: 1,
           deleted: false,
         };
       });
@@ -116,14 +120,18 @@ export function useTransactions() {
       const oldTx = await db.transactions.get(id);
       if (!oldTx) return;
 
+      const now = getSafeMonotonicTimestamp();
+      const newRev = (oldTx.rev || 1) + 1;
       const newTx: Transaction = {
         ...oldTx,
         ...data,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
+        rev: newRev,
       };
       await db.transactions.update(id, {
         ...data,
-        updatedAt: newTx.updatedAt,
+        updatedAt: now,
+        rev: newRev,
       });
 
       // 歷史差額校正
@@ -155,9 +163,12 @@ export function useTransactions() {
       const tx = await db.transactions.get(id);
       if (!tx || tx.deleted) return;
 
+      const now = getSafeMonotonicTimestamp();
+      const newRev = (tx.rev || 1) + 1;
       await db.transactions.update(id, {
         deleted: true,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
+        rev: newRev,
       });
 
       // 撤銷該筆歷史交易在快照中的影響

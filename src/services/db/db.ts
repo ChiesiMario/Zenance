@@ -9,6 +9,7 @@ export interface Ledger {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
+  rev?: number; // 單調遞增邏輯版本號 (防範多設備系統時鐘偏差)
 }
 
 export interface Transaction {
@@ -32,11 +33,14 @@ export interface Transaction {
   createdAt: string; // ISO datetime
   updatedAt: string; // ISO datetime
   deleted: boolean; // Soft delete flag for sync
+  rev?: number; // 單調遞增邏輯版本號 (防範多設備系統時鐘偏差)
 }
 
 export interface ExchangeRate {
+  id?: string;
   currency: string;
   rate: number; // Rate relative to USD (1 USD = X Currency)
+  date?: string; // Optional "YYYY-MM-DD" for historical rates
   updatedAt: string;
 }
 
@@ -51,6 +55,7 @@ export interface Category {
   deleted: boolean;
   archived?: boolean;
   isSystem?: boolean;
+  rev?: number;
 }
 
 export interface Wallet {
@@ -70,6 +75,7 @@ export interface Wallet {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
+  rev?: number;
 }
 
 export interface Contact {
@@ -83,6 +89,7 @@ export interface Contact {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
+  rev?: number;
 }
 
 export interface BalanceSnapshot {
@@ -114,6 +121,7 @@ export interface BudgetRule {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
+  rev?: number;
 }
 
 export interface Budget {
@@ -132,6 +140,7 @@ export interface Budget {
   deleted: boolean;
   isEnded?: boolean;
   endedAt?: string; // YYYY-MM-DD when ended manually
+  rev?: number;
 }
 
 export class ZenanceDatabase extends Dexie {

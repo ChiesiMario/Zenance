@@ -16,6 +16,7 @@ import {
 } from './dropboxClient';
 import { isDropboxConnected } from './dropboxAuth';
 import { getE2EEConfig } from '../crypto/e2eeManager';
+import { recordObservedTimestamp } from '@/lib/clock';
 
 const LAST_SYNC_KEY = 'zenance_dropbox_last_sync';
 const CACHED_REVS_KEY = 'zenance_dropbox_cached_revs';
@@ -95,9 +96,10 @@ function setPushedTimes(times: Record<string, string>): void {
 }
 
 /**
- * 核心演算法：記錄級最後寫入勝出 (Record-level LWW Merge)
+ * 核心演算法：支援邏輯版本號 (rev) 與時間戳雙重防護的 LWW 合併
+ * 優先依據 rev 裁決，徹底免疫多設備系統時鐘偏差
  */
-function mergeEntities<T extends { id: string; updatedAt?: string; deleted?: boolean }>(
+function mergeEntities<T extends { id: string; updatedAt?: string; rev?: number; deleted?: boolean }>(
   localList: T[],
   remoteList: T[]
 ): { merged: T[]; hasLocalChanges: boolean; hasRemoteChanges: boolean } {
@@ -114,23 +116,38 @@ function mergeEntities<T extends { id: string; updatedAt?: string; deleted?: boo
       mergedMap.set(localItem.id, localItem);
       hasRemoteChanges = true;
     } else {
+      const localRev = localItem.rev || 1;
+      const remoteRev = remoteItem.rev || 1;
       const localTime = localItem.updatedAt || '';
       const remoteTime = remoteItem.updatedAt || '';
 
-      if (remoteTime > localTime) {
+      if (remoteTime) recordObservedTimestamp(remoteTime);
+
+      // 1. 優先比對單調遞增邏輯版本號裁決 (防範時鐘快慢偏差)
+      if (remoteRev > localRev) {
         mergedMap.set(localItem.id, remoteItem);
         hasLocalChanges = true;
-      } else if (localTime > remoteTime) {
+      } else if (localRev > remoteRev) {
         mergedMap.set(localItem.id, localItem);
         hasRemoteChanges = true;
       } else {
-        mergedMap.set(localItem.id, localItem);
+        // 2. 版本號相同時（如並行編輯同一初始版本），以安全時間戳為仲裁依據
+        if (remoteTime > localTime) {
+          mergedMap.set(localItem.id, remoteItem);
+          hasLocalChanges = true;
+        } else if (localTime > remoteTime) {
+          mergedMap.set(localItem.id, localItem);
+          hasRemoteChanges = true;
+        } else {
+          mergedMap.set(localItem.id, localItem);
+        }
       }
     }
   }
 
   for (const remoteItem of remoteList) {
     if (!localMap.has(remoteItem.id)) {
+      if (remoteItem.updatedAt) recordObservedTimestamp(remoteItem.updatedAt);
       mergedMap.set(remoteItem.id, remoteItem);
       hasLocalChanges = true;
     }

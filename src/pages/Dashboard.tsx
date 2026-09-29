@@ -1,4 +1,3 @@
-import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -30,10 +29,10 @@ import {
 } from "@/components/ui/select";
 import { useNavigate, Link } from 'react-router-dom';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
+import { useMonthTransactions } from '@/hooks/useMonthTransactions';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { transactions } = useTransactions();
   const { allCategories } = useCategories();
   const { getActiveBudgetsForMonth } = useBudgets();
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
@@ -95,7 +94,9 @@ export default function Dashboard() {
   };
 
   const currentMonthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-  
+  const { transactions: monthTransactions } = useMonthTransactions(currentMonthPrefix);
+  const filteredTransactions = monthTransactions || [];
+
   const currentMonthBudgets = useMemo(() => {
     const today = new Date();
     const isCurrentMonth =
@@ -103,10 +104,6 @@ export default function Dashboard() {
       currentMonth.getMonth() === today.getMonth();
     return getActiveBudgetsForMonth(currentMonth, isCurrentMonth ? 3 : 6);
   }, [getActiveBudgetsForMonth, currentMonth]);
-
-  const filteredTransactions = useMemo(() => {
-    return transactions?.filter(t => t.date.startsWith(currentMonthPrefix)) || [];
-  }, [transactions, currentMonthPrefix]);
 
   const isBalanceAdjustment = (tx: any) => {
     if (tx.type !== 'income' && tx.type !== 'expense') return false;

@@ -27,8 +27,8 @@ import {
   getWeek,
   parseISO,
 } from 'date-fns';
-import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
+import { useDateRangeTransactions } from '@/hooks/useMonthTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
@@ -90,7 +90,6 @@ export default function Reports() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
 
-  const { transactions } = useTransactions();
   const { allCategories } = useCategories();
   const { wallets } = useAccounts();
   const { activeLedgerId } = useAppStore();
@@ -158,24 +157,22 @@ export default function Reports() {
     setActiveBucketIdx(null);
   };
 
+  const startStr = useMemo(() => format(startDate, 'yyyy-MM-dd'), [startDate]);
+  const endStr = useMemo(() => format(endDate, 'yyyy-MM-dd'), [endDate]);
+  const { transactions: rangeTransactions } = useDateRangeTransactions(startStr, endStr);
+
   // Filter transactions in this period
   const periodTransactions = useMemo(() => {
-    if (!transactions) return [];
-    const startStr = format(startDate, 'yyyy-MM-dd');
-    const endStr = format(endDate, 'yyyy-MM-dd');
+    if (!rangeTransactions) return [];
 
-    return transactions.filter(tx => {
-      if (tx.deleted || tx.ledgerId !== activeLedgerId) return false;
-      const txDate = tx.date.split('T')[0];
-      if (txDate < startStr || txDate > endStr) return false;
-
+    return rangeTransactions.filter(tx => {
       // Exclude balance adjustments
       const cat = allCategories?.find(c => c.id === tx.category);
       if (cat?.isSystem) return false;
 
       return true;
     });
-  }, [transactions, startDate, endDate, activeLedgerId, allCategories]);
+  }, [rangeTransactions, allCategories]);
 
   // Key Totals
   const { totalExpense, totalIncome, netBalance } = useMemo(() => {

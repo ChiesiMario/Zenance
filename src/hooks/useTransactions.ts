@@ -7,6 +7,7 @@ import { applyHistoricalDelta } from '@/services/balance/snapshotService';
 import { getTxAccountDelta } from '@/lib/currency';
 import { scheduleAutoSync } from '@/services/sync/syncEngine';
 import { getSafeMonotonicTimestamp } from '@/lib/clock';
+import { scheduleRollingBackup } from '@/services/storage/opfsBackupService';
 
 export function useTransactions() {
   const { activeLedgerId } = useAppStore();
@@ -62,6 +63,7 @@ export function useTransactions() {
     });
 
     scheduleAutoSync(3000);
+    scheduleRollingBackup(12000);
     return id;
   };
 
@@ -109,6 +111,7 @@ export function useTransactions() {
     });
 
     scheduleAutoSync(3000);
+    scheduleRollingBackup(12000);
     return result;
   };
 
@@ -156,6 +159,7 @@ export function useTransactions() {
     });
 
     scheduleAutoSync(3000);
+    scheduleRollingBackup(12000);
   };
 
   const deleteTransaction = async (id: string) => {
@@ -189,6 +193,7 @@ export function useTransactions() {
     });
 
     scheduleAutoSync(3000);
+    scheduleRollingBackup(12000);
   };
 
   return {

@@ -25,7 +25,11 @@ import {
   Check,
   Database,
   HardDrive,
+  Activity,
+  RotateCcw,
+  History,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,7 +49,10 @@ import { useCategories } from '@/hooks/useCategories';
 import { useDropboxSync } from '@/hooks/useDropboxSync';
 import { useAppLockStore } from '@/store/useAppLockStore';
 import { useStorageStatus } from '@/hooks/useStorageStatus';
+import { useDatabaseHealth } from '@/hooks/useDatabaseHealth';
+import { DatabaseHealthModal } from '@/components/fsck/DatabaseHealthModal';
 import { isE2EEEnabled, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
+import { useRollingBackups } from '@/hooks/useRollingBackups';
 import {
   db,
   type Ledger,
@@ -125,6 +132,26 @@ export default function Settings() {
   // Browser Storage & Persistent storage status
   const { isPersisted, estimate, requestPersistence } = useStorageStatus();
 
+  // Database Health (FSCK)
+  const [isHealthModalOpen, setIsHealthModalOpen] = useState(false);
+  const {
+    report: healthReport,
+    isScanning: isHealthScanning,
+    isHealing: isHealthHealing,
+    runScan: runHealthScan,
+    runHeal: runHealthHeal,
+  } = useDatabaseHealth();
+
+  // OPFS Rolling Backups (Time Machine)
+  const {
+    isSupported: isOpfsSupported,
+    isBackingUp: isOpfsBackingUp,
+    snapshots: opfsSnapshots,
+    triggerBackup: triggerOpfsBackup,
+    exportBackupFile: exportOpfsBackupFile,
+    loadBackupForRestore: loadOpfsBackupForRestore,
+  } = useRollingBackups();
+
   // E2EE modal states
   const [e2eeActive, setE2eeActive] = useState<boolean>(isE2EEEnabled());
   const [isE2eeModalOpen, setIsE2eeModalOpen] = useState(false);
@@ -197,6 +224,27 @@ export default function Settings() {
   const handleRequestPersistence = async () => {
     const granted = await requestPersistence();
     toast.show(granted ? '已獲得瀏覽器持久化儲存授權！' : '瀏覽器未授權持久化，將依設備容量自動管理');
+  };
+
+  const handleRestoreFromOpfs = async (filename: string) => {
+    try {
+      const parsed = await loadOpfsBackupForRestore(filename);
+      if (!parsed) {
+        toast.show('解析時光機快照失敗');
+        return;
+      }
+      setPendingBackup(parsed as any);
+      setIsRestoreModalOpen(true);
+    } catch {
+      toast.show('讀取快照失敗');
+    }
+  };
+
+  const handleExportOpfs = async (filename: string) => {
+    const success = await exportOpfsBackupFile(filename);
+    if (!success) {
+      toast.show('導出檔案失敗');
+    }
   };
 
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
@@ -977,6 +1025,46 @@ export default function Settings() {
             </div>
           </div>
 
+          {/* 資料庫健康自檢與修復 (FSCK) */}
+          <div className="p-4 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3 pl-2">
+              <Activity className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+              <div>
+                <span className="font-medium block">資料庫健康自檢與修復</span>
+                <span className="text-xs text-muted-foreground">
+                  深度校驗懸掛外鍵、浮點精度與快照對帳
+                </span>
+              </div>
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs cursor-pointer gap-1.5"
+                onClick={() => {
+                  setIsHealthModalOpen(true);
+                  if (!healthReport) {
+                    runHealthScan();
+                  }
+                }}
+              >
+                {healthReport ? (
+                  healthReport.score === 100 ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">
+                      100分 · 良好
+                    </span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400 font-mono font-medium">
+                      {healthReport.score}分 · 需修復
+                    </span>
+                  )
+                ) : (
+                  <span>立即體檢</span>
+                )}
+              </Button>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => {
@@ -994,11 +1082,99 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* 5. 本機時光機自動滾動備份 (OPFS Rolling Backup) */}
+      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3 pl-2">
+            <History className="h-5 w-5 text-primary" strokeWidth={1.5} />
+            <div>
+              <h3 className="font-medium text-sm">本機時光機備份 (OPFS)</h3>
+              <p className="text-xs text-muted-foreground">
+                由瀏覽器私有磁碟自動保留最近 3 份歷史存檔，零彈窗靜默守護
+              </p>
+            </div>
+          </div>
+          <div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs cursor-pointer gap-1.5"
+              disabled={isOpfsBackingUp || !isOpfsSupported}
+              onClick={async () => {
+                const ok = await triggerOpfsBackup(true);
+                toast.show(ok ? '已成功生成最新本機快照！' : '快照建立失敗');
+              }}
+            >
+              <RefreshCw className={cn("size-3.5", isOpfsBackingUp && "animate-spin")} />
+              <span>立即建立快照</span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="divide-y divide-border text-sm">
+          {!isOpfsSupported ? (
+            <div className="p-4 text-xs text-muted-foreground text-center">
+              當前瀏覽器環境不支援 OPFS 私有磁碟存取
+            </div>
+          ) : opfsSnapshots.length === 0 ? (
+            <div className="p-4 text-xs text-muted-foreground text-center">
+              目前尚無歷史快照。記帳後將自動於閒置時生成，或可點擊右上角手動建立。
+            </div>
+          ) : (
+            opfsSnapshots.map((snap) => (
+              <div key={snap.id} className="p-4 flex items-center justify-between">
+                <div>
+                  <span className="font-medium block">{snap.title}</span>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {snap.date} · {snap.sizeFormatted}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs cursor-pointer gap-1"
+                    title="導出為 ZIP 檔案下載到電腦"
+                    onClick={() => handleExportOpfs(snap.filename)}
+                  >
+                    <Download className="size-3.5 text-muted-foreground" />
+                    <span>導出</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs cursor-pointer gap-1 text-primary hover:text-primary"
+                    title="從此快照還原帳本"
+                    onClick={() => handleRestoreFromOpfs(snap.filename)}
+                  >
+                    <RotateCcw className="size-3.5" />
+                    <span>還原</span>
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       {/* App Branding Footer */}
       <div className="flex flex-col items-center justify-center gap-2 pt-6">
         <Logo size={28} />
         <span className="text-xs text-muted-foreground font-mono">Zenance v1.0.0</span>
       </div>
+
+      {/* 資料庫健康診斷與自癒彈窗 (FSCK) */}
+      <DatabaseHealthModal
+        open={isHealthModalOpen}
+        onOpenChange={setIsHealthModalOpen}
+        report={healthReport}
+        isScanning={isHealthScanning}
+        isHealing={isHealthHealing}
+        onScan={() => runHealthScan()}
+        onHeal={async () => {
+          await runHealthHeal();
+        }}
+      />
 
       {/* 首次連線資料衝突選擇彈窗 (Q1 選項 B) */}
       <Dialog open={firstConnectModalOpen} onOpenChange={setFirstConnectModalOpen}>

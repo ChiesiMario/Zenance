@@ -21,7 +21,6 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import {
   Plus,
-  Target,
   Pencil,
   Trash2,
   Calendar,
@@ -30,10 +29,9 @@ import {
   Power,
   Clock,
   ChevronDown,
+  ChevronRight,
   Archive,
   Infinity as InfinityIcon,
-  Play,
-  Pause,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
@@ -401,6 +399,12 @@ export default function Budgets() {
         options={[
           {
             value: 'budgets',
+            icon:
+              currentBudgetFilter === 'ended' ? (
+                <Archive className="h-3.5 w-3.5" />
+              ) : (
+                <Clock className="h-3.5 w-3.5" />
+              ),
             label: (
               <span className="flex items-center gap-1">
                 <span>
@@ -417,7 +421,10 @@ export default function Budgets() {
                   className="flex items-center justify-between cursor-pointer"
                   onClick={() => handleBudgetFilterChange('ongoing')}
                 >
-                  <span>{t('budgets.tabOngoing')}</span>
+                  <span className="flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{t('budgets.tabOngoing')}</span>
+                  </span>
                   {currentBudgetFilter === 'ongoing' && activeSection === 'budgets' && (
                     <Check className="h-3.5 w-3.5 ml-2" />
                   )}
@@ -426,7 +433,10 @@ export default function Budgets() {
                   className="flex items-center justify-between cursor-pointer"
                   onClick={() => handleBudgetFilterChange('ended')}
                 >
-                  <span>{t('budgets.tabEnded')}</span>
+                  <span className="flex items-center gap-2">
+                    <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{t('budgets.tabEnded')}</span>
+                  </span>
                   {currentBudgetFilter === 'ended' && activeSection === 'budgets' && (
                     <Check className="h-3.5 w-3.5 ml-2" />
                   )}
@@ -483,98 +493,125 @@ export default function Budgets() {
                   : daysInfo.status === 'ongoing'
                     ? daysInfo.days === 0
                       ? t('budgets.dueToday', '今日到期')
-                      : t('budgets.daysRemaining', { count: daysInfo.days, defaultValue: `剩餘 ${daysInfo.days} 天` })
+                      : `剩 ${daysInfo.days} 天`
                     : t('budgets.startsInDays', { count: daysInfo.days, defaultValue: `${daysInfo.days} 天後開始` });
+
+              const showDaily = !isOver && daysInfo.status === 'ongoing' && daysInfo.days > 0;
 
               return (
                 <div
                   key={budget.id}
                   onClick={() => navigate(`/budgets/${budget.id}`)}
-                  className="border border-border rounded-lg px-5 pb-5 pt-3 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors cursor-pointer hover:border-foreground/40"
+                  className={cn(
+                    'border rounded-lg p-4 bg-card text-card-foreground transition-all cursor-pointer group space-y-3',
+                    isOver
+                      ? 'border-destructive/30 hover:border-destructive/50'
+                      : 'border-border hover:border-foreground/30'
+                  )}
                 >
-                  <div className="absolute -right-6 -top-6 text-muted/10 transition-transform group-hover:scale-110 duration-500 pointer-events-none">
-                    <Target className="h-32 w-32" />
-                  </div>
-
-                  <div className="relative z-10 space-y-3">
-                    {/* Top Pill Bar with Divider */}
-                    <div className="flex items-center gap-1.5 flex-wrap pb-3 border-b border-border/50">
-                      <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                        <Calendar className="h-2.5 w-2.5 opacity-70" />
-                        <span>{dateRangeLabel}</span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                        <Clock className="h-2.5 w-2.5 opacity-70" />
-                        <span>{countdownLabel}</span>
-                      </span>
-                      {budget.ruleId && (
-                        <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                          <Zap className="h-2.5 w-2.5 opacity-70" />
-                          <span>{t('budgets.ruleBadge')}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Title & Amount Row */}
-                    <div className="flex justify-between items-center gap-3">
-                      <h3 className="text-base font-semibold leading-none group-hover:text-primary transition-colors truncate">
+                  {/* Top Line: Title + Subtitle | Remaining Amount */}
+                  <div className="flex justify-between items-baseline gap-2">
+                    <div className="space-y-0.5 truncate">
+                      <h3
+                        className={cn(
+                          'text-sm font-semibold tracking-tight transition-colors truncate',
+                          isOver ? 'text-destructive' : 'text-foreground group-hover:text-primary'
+                        )}
+                      >
                         {budget.name}
                       </h3>
-
-                      <div className="text-right shrink-0">
-                        <AmountDisplay
-                          amount={spent}
-                          baseCurrency={activeLedger?.baseCurrency}
-                          type="neutral"
-                          className={cn(
-                            'text-xl font-mono tracking-tight font-medium',
-                            isOver ? 'text-destructive' : 'text-foreground'
-                          )}
-                        />
-                        <span className="text-sm text-muted-foreground ml-1 font-mono">
-                          /{' '}
-                          <AmountDisplay
-                            amount={effectiveAmount}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="neutral"
-                          />
-                        </span>
-                      </div>
+                      <p
+                        className={cn(
+                          'text-[11px] font-mono',
+                          isOver ? 'text-destructive/80' : 'text-muted-foreground'
+                        )}
+                      >
+                        {dateRangeLabel}
+                        {countdownLabel ? ` · ${countdownLabel}` : ''}
+                        {showDaily && (
+                          <>
+                            {' · 每日 '}
+                            <AmountDisplay
+                              amount={Math.round(remaining / daysInfo.days)}
+                              baseCurrency={activeLedger?.baseCurrency}
+                              type="neutral"
+                            />
+                          </>
+                        )}
+                      </p>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                    <div className="text-right shrink-0 font-mono">
                       <div
                         className={cn(
-                          'h-full transition-all duration-700 ease-out',
-                          isOver ? 'bg-destructive' : 'bg-primary'
+                          'text-base font-semibold tracking-tight',
+                          isOver ? 'text-destructive' : 'text-foreground'
                         )}
-                        style={{ width: `${percentage}%` }}
-                      />
+                      >
+                        {isOver ? (
+                          <>
+                            {t('budgets.overBudget', '超支')}{' '}
+                            <AmountDisplay
+                              amount={spent - effectiveAmount}
+                              baseCurrency={activeLedger?.baseCurrency}
+                              type="neutral"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            {t('budgets.remaining', '剩餘')}{' '}
+                            <AmountDisplay
+                              amount={remaining}
+                              baseCurrency={activeLedger?.baseCurrency}
+                              type="neutral"
+                            />
+                          </>
+                        )}
+                      </div>
+                      <div
+                        className={cn(
+                          'text-[11px]',
+                          isOver ? 'text-destructive/80' : 'text-muted-foreground'
+                        )}
+                      >
+                        {percentage.toFixed(0)}%
+                      </div>
                     </div>
+                  </div>
 
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      {isOver ? (
-                        <span className="text-destructive font-semibold">
-                          {t('budgets.overBudget')}:{' '}
-                          <AmountDisplay
-                            amount={spent - effectiveAmount}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="neutral"
-                          />
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {t('budgets.remaining')}:{' '}
-                          <AmountDisplay
-                            amount={remaining}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="neutral"
-                          />
-                        </span>
+                  {/* Progress Bar */}
+                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-500 ease-out rounded-full',
+                        isOver ? 'bg-destructive' : 'bg-foreground'
                       )}
-                      <span className="text-muted-foreground font-mono">{percentage.toFixed(0)}%</span>
-                    </div>
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+
+                  {/* Bottom Line: Spent / Budget | Chevron */}
+                  <div className="flex justify-between items-center text-xs font-mono text-muted-foreground">
+                    <span>
+                      {t('budgets.spent', '已支出')}{' '}
+                      <AmountDisplay
+                        amount={spent}
+                        baseCurrency={activeLedger?.baseCurrency}
+                        type="neutral"
+                      />
+                      {' / '}
+                      <AmountDisplay
+                        amount={effectiveAmount}
+                        baseCurrency={activeLedger?.baseCurrency}
+                        type="neutral"
+                      />
+                    </span>
+                    <ChevronRight
+                      className={cn(
+                        'size-3.5 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all',
+                        isOver ? 'text-destructive' : 'text-muted-foreground'
+                      )}
+                    />
                   </div>
                 </div>
               );
@@ -601,108 +638,105 @@ export default function Budgets() {
                 <div
                   key={budget.id}
                   onClick={() => navigate(`/budgets/${budget.id}`)}
-                  className="border border-border rounded-lg px-5 pb-5 pt-3 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors cursor-pointer hover:border-foreground/40"
+                  className={cn(
+                    'border rounded-lg p-4 bg-card text-card-foreground transition-all cursor-pointer group space-y-3',
+                    isOver
+                      ? 'border-destructive/30 hover:border-destructive/50'
+                      : 'border-border hover:border-foreground/30'
+                  )}
                 >
-                  <div className="space-y-3">
-                    {/* Top Pill Bar with Actions & Divider */}
-                    <div className="flex items-center justify-between pb-3 border-b border-border/50">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                          <Calendar className="h-2.5 w-2.5 opacity-70" />
-                          <span>
-                            {formatBudgetDisplayRange(budget.startDate, budget.endDate, {
-                              isEnded: budget.isEnded,
-                              endedAt: budget.endedAt,
-                              language: i18n.language,
-                              t,
-                            })}
-                          </span>
-                        </span>
-                        {budget.ruleId && (
-                          <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                            <Zap className="h-2.5 w-2.5 opacity-70" />
-                            <span>{t('budgets.ruleBadge')}</span>
-                          </span>
+                  <div className="flex justify-between items-baseline gap-2">
+                    <div className="space-y-0.5 truncate">
+                      <h3
+                        className={cn(
+                          'text-sm font-semibold tracking-tight transition-colors truncate',
+                          isOver ? 'text-destructive' : 'text-foreground group-hover:text-primary'
                         )}
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0 -mr-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setBudgetToDelete(budget);
-                          }}
-                          title={t('budgets.deleteBudget')}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Title & Amount Row */}
-                    <div className="flex justify-between items-center gap-3">
-                      <h3 className="text-base font-semibold leading-none group-hover:text-primary transition-colors truncate">
+                      >
                         {budget.name}
                       </h3>
-
-                      <div className="text-right shrink-0">
-                        <AmountDisplay
-                          amount={spent}
-                          baseCurrency={activeLedger?.baseCurrency}
-                          type="neutral"
-                          className={cn(
-                            'text-xl font-mono tracking-tight font-medium',
-                            isOver ? 'text-destructive' : 'text-foreground'
-                          )}
-                        />
-                        <span className="text-sm text-muted-foreground ml-1 font-mono">
-                          /{' '}
-                          <AmountDisplay
-                            amount={effectiveAmount}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="neutral"
-                          />
-                        </span>
-                      </div>
+                      <p className="text-[11px] font-mono text-muted-foreground">
+                        {formatBudgetDisplayRange(budget.startDate, budget.endDate, {
+                          isEnded: budget.isEnded,
+                          endedAt: budget.endedAt,
+                          language: i18n.language,
+                          t,
+                        })}
+                        {' · '}
+                        {t('budgets.tabEnded', '已結束')}
+                      </p>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                    <div className="text-right shrink-0 font-mono">
                       <div
                         className={cn(
-                          'h-full transition-all duration-700 ease-out',
-                          isOver ? 'bg-destructive' : 'bg-primary'
+                          'text-base font-semibold tracking-tight',
+                          isOver ? 'text-destructive' : 'text-foreground'
                         )}
-                        style={{ width: `${percentage}%` }}
-                      />
+                      >
+                        {isOver ? (
+                          <>
+                            {t('budgets.overBudget', '超支')}{' '}
+                            <AmountDisplay
+                              amount={spent - effectiveAmount}
+                              baseCurrency={activeLedger?.baseCurrency}
+                              type="neutral"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            {t('budgets.saved', '結餘')}{' '}
+                            <AmountDisplay
+                              amount={effectiveAmount - spent}
+                              baseCurrency={activeLedger?.baseCurrency}
+                              type="neutral"
+                            />
+                          </>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono">
+                        {percentage.toFixed(0)}%
+                      </div>
                     </div>
+                  </div>
 
-                    {/* Result Row */}
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      {isOver ? (
-                        <span className="text-destructive font-semibold">
-                          {t('budgets.overBudget')}:{' '}
-                          <AmountDisplay
-                            amount={spent - effectiveAmount}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="neutral"
-                          />
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {t('budgets.saved')}:{' '}
-                          <AmountDisplay
-                            amount={effectiveAmount - spent}
-                            baseCurrency={activeLedger?.baseCurrency}
-                            type="neutral"
-                          />
-                        </span>
+                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-500 ease-out rounded-full',
+                        isOver ? 'bg-destructive' : 'bg-muted-foreground/60'
                       )}
-                      <span className="text-muted-foreground font-mono">{percentage.toFixed(0)}%</span>
-                    </div>
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs font-mono text-muted-foreground">
+                    <span>
+                      {t('budgets.spent', '已支出')}{' '}
+                      <AmountDisplay
+                        amount={spent}
+                        baseCurrency={activeLedger?.baseCurrency}
+                        type="neutral"
+                      />
+                      {' / '}
+                      <AmountDisplay
+                        amount={effectiveAmount}
+                        baseCurrency={activeLedger?.baseCurrency}
+                        type="neutral"
+                      />
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer -mr-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBudgetToDelete(budget);
+                      }}
+                      title={t('budgets.deleteBudget')}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               );
@@ -742,97 +776,78 @@ export default function Budgets() {
               return (
                 <div
                   key={rule.id}
-                  className="border border-border rounded-lg px-5 pb-5 pt-3 bg-card text-card-foreground flex flex-col justify-between relative overflow-hidden group transition-colors"
+                  className="border border-border rounded-lg p-4 bg-card text-card-foreground transition-all space-y-3"
                 >
-                  <div className="space-y-3">
-                    {/* Top Pill Bar with Actions & Divider */}
-                    <div className="flex items-center justify-between pb-3 border-b border-border/50">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <div className="space-y-0.5 truncate">
+                      <div className="flex items-center gap-2">
                         <span
                           className={cn(
-                            'inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border shrink-0',
-                            rule.isActive
-                              ? 'bg-muted/60 text-muted-foreground border-border'
-                              : 'bg-muted/30 text-muted-foreground/60 border-border/60'
+                            'size-2 rounded-full shrink-0',
+                            rule.isActive ? 'bg-emerald-500' : 'bg-muted-foreground/40'
                           )}
-                        >
-                          {rule.isActive ? (
-                            <Play className="h-2.5 w-2.5 opacity-70" />
-                          ) : (
-                            <Pause className="h-2.5 w-2.5 opacity-70" />
-                          )}
-                          <span>{rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}</span>
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                          <Calendar className="h-2.5 w-2.5 opacity-70" />
-                          <span>{rule.periodType === 'monthly' ? t('budgets.cycleMonthly') : t('budgets.cycleYearly')}</span>
-                        </span>
+                        />
+                        <h3 className="text-sm font-semibold tracking-tight text-foreground truncate">
+                          {rule.name}
+                        </h3>
                       </div>
-
-                      <div className="flex items-center gap-1 shrink-0 -mr-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            'h-7 w-7 cursor-pointer',
-                            rule.isActive ? 'text-primary hover:text-primary/80' : 'text-muted-foreground'
-                          )}
-                          onClick={() => toggleBudgetRuleActive(rule.id, !rule.isActive)}
-                          title={rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}
-                        >
-                          <Power className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer"
-                          onClick={() => handleOpenEditRule(rule)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer"
-                          onClick={() => setRuleToDelete(rule)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <p className="text-[11px] font-mono text-muted-foreground pl-4">
+                        {rule.periodType === 'monthly' ? t('budgets.cycleMonthly', '每月週期') : t('budgets.cycleYearly', '年度週期')}
+                        {ruleCategoryNames.length > 0 && ` · ${ruleCategoryNames.join(', ')}`}
+                      </p>
                     </div>
 
-                    {/* Title & Amount Row */}
-                    <div className="flex justify-between items-center gap-3">
-                      <h3 className="text-base font-semibold leading-none truncate">{rule.name}</h3>
-                      <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 font-mono">
+                      <div className="text-base font-semibold tracking-tight text-foreground">
                         <AmountDisplay
                           amount={rule.amount}
                           baseCurrency={activeLedger?.baseCurrency}
                           type="neutral"
-                          className="text-xl font-mono tracking-tight font-medium"
                         />
                       </div>
+                      <div className="text-[11px] text-muted-foreground font-mono">
+                        {rule.isActive ? t('budgets.ruleActive', '運行中') : t('budgets.ruleInactive', '已暫停')}
+                      </div>
                     </div>
+                  </div>
 
-                    {/* Monitored Categories */}
-                    <div className="flex flex-wrap gap-1.5 items-center">
-                      <span className="text-[11px] text-muted-foreground mr-1">
-                        {t('budgets.monitoredCategories')}:
-                      </span>
-                      {ruleCategoryNames.length === 0 ? (
-                        <span className="text-[11px] text-muted-foreground/70">
-                          {t('budgets.none', '無')}
-                        </span>
-                      ) : (
-                        ruleCategoryNames.map((name, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[11px] px-2 py-0.5 rounded border border-border bg-muted/40 text-foreground font-medium"
-                          >
-                            {name}
-                          </span>
-                        ))
-                      )}
+                  <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs font-mono text-muted-foreground">
+                    <span>
+                      {rule.periodType === 'monthly'
+                        ? t('budgets.monthlyRuleDesc', '每月 1 號自動生成')
+                        : t('budgets.yearlyRuleDesc', '每年 1 號自動生成')}
+                    </span>
+                    <div className="flex items-center gap-1 -mr-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'h-7 w-7 cursor-pointer',
+                          rule.isActive ? 'text-primary hover:text-primary/80' : 'text-muted-foreground'
+                        )}
+                        onClick={() => toggleBudgetRuleActive(rule.id, !rule.isActive)}
+                        title={rule.isActive ? t('budgets.ruleActive') : t('budgets.ruleInactive')}
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground cursor-pointer"
+                        onClick={() => handleOpenEditRule(rule)}
+                        title={t('common.edit', '編輯')}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer"
+                        onClick={() => setRuleToDelete(rule)}
+                        title={t('common.delete', '刪除')}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 </div>

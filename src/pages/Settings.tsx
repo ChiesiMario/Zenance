@@ -6,16 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Cloud,
-  CloudOff,
   RefreshCw,
-  Globe,
-  Moon,
-  Tags,
-  SlidersHorizontal,
   Download,
   Upload,
-  UploadCloud,
-  Trash2,
   GitMerge,
   AlertTriangle,
   ShieldCheck,
@@ -23,10 +16,6 @@ import {
   KeyRound,
   Copy,
   Check,
-  Database,
-  HardDrive,
-  Activity,
-  RotateCcw,
   History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -42,7 +31,6 @@ import {
 } from '@/components/ui/dialog';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/components/ui/toast';
-import { Logo } from '@/components/ui/Logo';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAppStore } from '@/store/useAppStore';
 import { useCategories } from '@/hooks/useCategories';
@@ -152,6 +140,10 @@ export default function Settings() {
     loadBackupForRestore: loadOpfsBackupForRestore,
   } = useRollingBackups();
 
+  // Modals for minimalist sub-views
+  const [isDropboxModalOpen, setIsDropboxModalOpen] = useState(false);
+  const [isTimeMachineModalOpen, setIsTimeMachineModalOpen] = useState(false);
+
   // E2EE modal states
   const [e2eeActive, setE2eeActive] = useState<boolean>(isE2EEEnabled());
   const [isE2eeModalOpen, setIsE2eeModalOpen] = useState(false);
@@ -162,6 +154,7 @@ export default function Settings() {
 
   // App Lock modal states
   const [isLockSetupModalOpen, setIsLockSetupModalOpen] = useState(false);
+  const [isLockSettingsModalOpen, setIsLockSettingsModalOpen] = useState(false);
   const [lockPinInput, setLockPinInput] = useState('');
   const [lockPinConfirm, setLockPinConfirm] = useState('');
   const [lockEnableBio, setLockEnableBio] = useState(true);
@@ -191,6 +184,15 @@ export default function Settings() {
   };
 
   const handleDisableE2EE = async () => {
+    const isConfirmed = await confirm({
+      title: t('settings.disableE2eeConfirmTitle', '確定要停用端到端加密嗎？'),
+      description: t('settings.disableE2eeConfirmDesc', '停用後，未來雲端同步將不再使用金鑰加密，且現有雲端資料將覆蓋為標準明文格式。'),
+      confirmText: t('settings.disableE2eeConfirmBtn', '確認停用'),
+      cancelText: t('common.cancel', '取消'),
+      variant: 'destructive',
+    });
+    if (!isConfirmed) return;
+
     disableE2EE();
     setE2eeActive(false);
     toast.show('已停用端到端加密');
@@ -261,6 +263,32 @@ export default function Settings() {
     if (tVal === 'light') return t('settings.themeLight');
     if (tVal === 'dark') return t('settings.themeDark');
     return t('settings.themeSystem');
+  };
+
+  const getLockTimeoutLabel = (minutes: number = 0, full: boolean = false) => {
+    switch (minutes) {
+      case 0:
+        return '立即';
+      case 1:
+        return full ? '閒置 1 分鐘' : '1 分鐘';
+      case 5:
+        return full ? '閒置 5 分鐘' : '5 分鐘';
+      case 15:
+        return full ? '閒置 15 分鐘' : '15 分鐘';
+      default:
+        return full ? `閒置 ${minutes} 分鐘` : `${minutes} 分鐘`;
+    }
+  };
+
+  const format24Time = (timestamp: number | string | Date, includeSeconds = false) => {
+    const d = new Date(timestamp);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const hh = pad(d.getHours());
+    const mm = pad(d.getMinutes());
+    if (includeSeconds) {
+      return `${hh}:${mm}:${pad(d.getSeconds())}`;
+    }
+    return `${hh}:${mm}`;
   };
 
   // Required exact confirmation phrase for factory reset
@@ -636,7 +664,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
+    <div className="animate-in fade-in duration-500 w-full max-w-md mx-auto space-y-6 pb-20">
       {/* Hidden File Input for Backup Import */}
       <input
         ref={fileInputRef}
@@ -647,7 +675,7 @@ export default function Settings() {
       />
 
       {/* Header Row */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 px-1">
         <Button
           variant="ghost"
           size="icon"
@@ -656,238 +684,27 @@ export default function Settings() {
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-xl font-semibold tracking-tight">{t('settings.settings')}</h2>
+        <h2 className="text-lg font-medium tracking-tight text-foreground">{t('settings.settings')}</h2>
       </div>
 
-      {/* 1. Dropbox Container */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        {/* Header row */}
-        <div className="p-6 border-b border-border flex items-center gap-3">
-          {isAuthenticated ? (
-            <Cloud className="h-6 w-6 text-primary" strokeWidth={1.5} />
-          ) : (
-            <CloudOff className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
-          )}
-          <div>
-            <h3 className="font-medium">{t('settings.dropboxSync')}</h3>
-            <p className="text-sm text-muted-foreground">{t('settings.backupAndSync')}</p>
-          </div>
+      {/* ========================================== */}
+      {/* SECTION 1: 偏好設定                        */}
+      {/* ========================================== */}
+      <div>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground px-1 mb-2">
+          {t('settings.preferencesSection', '偏好設定')}
         </div>
-
-        {/* Status List */}
-        <div className="divide-y divide-border">
-          <div className="p-4 flex items-center justify-between">
-            <span className="text-sm font-medium">{t('settings.status')}</span>
-            <span className={`text-sm ${isAuthenticated ? 'text-primary' : 'text-muted-foreground'}`}>
-              {!isOnline
-                ? '離線中（連線後自動同步）'
-                : isSyncing
-                ? t('settings.syncing')
-                : isAuthenticated
-                ? t('settings.connected')
-                : t('settings.disconnected')}
-            </span>
-          </div>
-
-          {isAuthenticated && (
-            <div className="p-4 flex items-center justify-between">
-              <span className="text-sm font-medium">{t('settings.lastSync')}</span>
-              <span className="text-sm font-mono text-muted-foreground">
-                {lastSyncTime
-                  ? new Date(lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                  : t('settings.never')}
-              </span>
-            </div>
-          )}
-
-          {isAuthenticated && (
-            <div className="p-4 flex items-center justify-between">
-              <div>
-                <span className="text-sm font-medium block">端到端加密 (E2EE)</span>
-                <span className="text-xs text-muted-foreground">
-                  {e2eeActive ? '已啟用 AES-256-GCM 雲端加密保護' : '未啟用，資料以明文存放於雲端'}
-                </span>
-              </div>
-              <div>
-                {!e2eeActive ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer text-xs h-8"
-                    onClick={() => {
-                      setE2eePassphrase('');
-                      setE2eeConfirmPassphrase('');
-                      setGeneratedRecoveryKey('');
-                      setIsE2eeModalOpen(true);
-                    }}
-                  >
-                    啟用加密
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="cursor-pointer text-xs h-8 text-destructive hover:text-destructive"
-                    onClick={handleDisableE2EE}
-                  >
-                    停用
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="p-4 bg-muted/10">
-            {!isAuthenticated ? (
-              <Button
-                className="w-full cursor-pointer"
-                disabled={isSyncing}
-                onClick={connectDropbox}
-              >
-                {t('settings.connectDropbox')}
-              </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 cursor-pointer"
-                  disabled={isSyncing || !isOnline}
-                  onClick={() => syncNow()}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? t('settings.syncing') : t('settings.syncNow')}
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="flex-1 cursor-pointer"
-                  disabled={isSyncing}
-                  onClick={disconnectDropbox}
-                >
-                  {t('settings.disconnect')}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Security & Privacy Container */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="p-4 border-b border-border flex items-center gap-3">
-          <ShieldCheck className="h-5 w-5 text-primary" strokeWidth={1.5} />
-          <div>
-            <h3 className="font-medium text-sm">隱私與安全鎖</h3>
-            <p className="text-xs text-muted-foreground">保護本機記帳資料與防止窺探</p>
-          </div>
-        </div>
-
-        <div className="divide-y divide-border text-sm">
-          <div className="p-4 flex items-center justify-between">
-            <div>
-              <span className="font-medium block">應用程式安全鎖</span>
-              <span className="text-xs text-muted-foreground">
-                {isLockConfigured ? '已開啟 PIN 碼保護' : '未開啟'}
-              </span>
-            </div>
-            <div>
-              {!isLockConfigured ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="cursor-pointer text-xs h-8"
-                  onClick={() => {
-                    setLockPinInput('');
-                    setLockPinConfirm('');
-                    setIsLockSetupModalOpen(true);
-                  }}
-                >
-                  設定 PIN 碼
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="cursor-pointer text-xs h-8 text-destructive hover:text-destructive"
-                  onClick={disableLock}
-                >
-                  關閉安全鎖
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {isLockConfigured && (
-            <>
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <span className="font-medium block">自動鎖定時間</span>
-                  <span className="text-xs text-muted-foreground">閒置或切換至後台後自動鎖定</span>
-                </div>
-                <Select
-                  value={String(appLockConfig?.timeoutMinutes ?? 0)}
-                  onValueChange={(val) => {
-                    if (val) {
-                      updateLockSettings({ timeoutMinutes: parseInt(val, 10) });
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-[130px] h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">立即 (切換即鎖)</SelectItem>
-                    <SelectItem value="1">閒置 1 分鐘</SelectItem>
-                    <SelectItem value="5">閒置 5 分鐘</SelectItem>
-                    <SelectItem value="15">閒置 15 分鐘</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {hasBiometricHardware && (
-                <div className="p-4 flex items-center justify-between">
-                  <div>
-                    <span className="font-medium block flex items-center gap-1.5">
-                      <Fingerprint className="size-4 text-primary" />
-                      <span>Touch ID / FaceID 解鎖</span>
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      使用本機生物辨識快速解鎖
-                    </span>
-                  </div>
-                  <div>
-                    <Button
-                      variant={appLockConfig?.biometricEnabled ? 'default' : 'outline'}
-                      size="sm"
-                      className="cursor-pointer text-xs h-8"
-                      onClick={() => {
-                        updateLockSettings({ biometricEnabled: !appLockConfig?.biometricEnabled });
-                      }}
-                    >
-                      {appLockConfig?.biometricEnabled ? '已開啟' : '未開啟'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 3. Preferences Container (Theme, Language) */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="divide-y divide-border">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3 pl-2">
-              <Moon className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium">{t('settings.theme')}</span>
-            </div>
+        <div className="border border-border rounded-lg overflow-hidden bg-card divide-y divide-border">
+          {/* 外觀主題 */}
+          <div className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors">
+            <span className="text-sm font-normal text-foreground">{t('settings.theme')}</span>
             <Select value={theme} onValueChange={(v) => setTheme(v as any)}>
-              <SelectTrigger className="w-[140px] border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-2 text-sm">
+              <SelectTrigger className="border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-1 text-xs font-mono text-muted-foreground hover:text-foreground h-auto p-0 cursor-pointer">
                 <SelectValue className="flex-none text-right">
                   {getThemeLabel(theme)}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent align="end">
                 <SelectItem value="light">{t('settings.themeLight')}</SelectItem>
                 <SelectItem value="dark">{t('settings.themeDark')}</SelectItem>
                 <SelectItem value="system">{t('settings.themeSystem')}</SelectItem>
@@ -895,210 +712,375 @@ export default function Settings() {
             </Select>
           </div>
 
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3 pl-2">
-              <Globe className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium">{t('settings.language')}</span>
-            </div>
+          {/* 介面語言 */}
+          <div className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors">
+            <span className="text-sm font-normal text-foreground">{t('settings.language')}</span>
             <Select
               value={currentLang}
               onValueChange={(v) => i18n.changeLanguage(v || 'en')}
             >
-              <SelectTrigger className="w-[140px] border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-2 text-sm">
+              <SelectTrigger className="border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-1 text-xs font-mono text-muted-foreground hover:text-foreground h-auto p-0 cursor-pointer">
                 <SelectValue className="flex-none text-right">
                   {getLanguageLabel(currentLang)}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent align="end">
                 <SelectItem value="zh-TW">繁體中文</SelectItem>
                 <SelectItem value="zh-CN">简体中文</SelectItem>
                 <SelectItem value="en">English</SelectItem>
               </SelectContent>
             </Select>
           </div>
-        </div>
-      </div>
 
-      {/* 3. Category Management Container (Overview & Link) */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="divide-y divide-border">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3 pl-2">
-              <Tags className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium">{t('settings.categoryOverview')}</span>
-            </div>
-            <span className="text-xs font-mono text-muted-foreground pr-2">
-              {t('settings.activeAndArchived', { active: activeCount, archived: archivedCount })}
-            </span>
-          </div>
-
+          {/* 收支分類管理 */}
           <Link
             to="/settings/categories"
-            className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer"
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors group cursor-pointer"
           >
-            <div className="flex items-center gap-3 pl-2">
-              <SlidersHorizontal className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium">{t('settings.manageCategories')}</span>
+            <span className="text-sm font-normal text-foreground">{t('settings.manageCategories')}</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              <span>{activeCount} 活躍{archivedCount > 0 ? ` · ${archivedCount} 封存` : ''}</span>
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground mr-2" />
           </Link>
         </div>
       </div>
 
-      {/* 4. Data Management Container */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="divide-y divide-border">
-          <button
-            type="button"
-            onClick={handleExport}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer text-left"
+      {/* ========================================== */}
+      {/* SECTION 2: 雲端與安全                      */}
+      {/* ========================================== */}
+      <div>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground px-1 mb-2">
+          {t('settings.syncSecuritySection', '雲端與安全')}
+        </div>
+        <div className="border border-border rounded-lg overflow-hidden bg-card divide-y divide-border">
+          {/* Dropbox 同步 */}
+          <div
+            onClick={() => setIsDropboxModalOpen(true)}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
-            <div className="flex items-center gap-3 pl-2">
-              <Download className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium">{t('settings.exportData')}</span>
+            <span className="text-sm font-normal text-foreground">{t('settings.dropboxSync')}</span>
+            <div className="flex items-center gap-2 text-xs font-mono">
+              {!isAuthenticated ? (
+                <span className="text-muted-foreground">{t('settings.disconnected')}</span>
+              ) : isSyncing ? (
+                <span className="text-primary">{t('settings.syncing')}</span>
+              ) : !isOnline ? (
+                <span className="text-amber-500">離線</span>
+              ) : (
+                <span className="text-emerald-500">{t('settings.connected')}</span>
+              )}
+              {lastSyncTime && (
+                <>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="text-muted-foreground">
+                    {format24Time(lastSyncTime)}
+                  </span>
+                </>
+              )}
+              <ChevronRight className="size-3.5 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
             </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground mr-2" />
-          </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer text-left"
+          {/* 端到端加密 E2EE */}
+          <div
+            onClick={() => {
+              if (!e2eeActive) {
+                setE2eePassphrase('');
+                setE2eeConfirmPassphrase('');
+                setGeneratedRecoveryKey('');
+                setIsE2eeModalOpen(true);
+              } else {
+                handleDisableE2EE();
+              }
+            }}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
-            <div className="flex items-center gap-3 pl-2">
-              <UploadCloud className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <span className="text-sm font-medium">{t('settings.importData')}</span>
+            <span className="text-sm font-normal text-foreground">端到端加密 (E2EE)</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              {e2eeActive ? (
+                <span className="text-emerald-500">AES-256</span>
+              ) : (
+                <span>未啟用</span>
+              )}
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground mr-2" />
-          </button>
+          </div>
 
-          {/* 資料庫持久化保護 */}
-          <div className="p-4 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-3 pl-2">
-              <HardDrive className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <div>
-                <span className="font-medium block">資料庫持久化保護</span>
-                <span className="text-xs text-muted-foreground">
-                  防止瀏覽器在低儲存或長期閒置時自動清空帳本
-                </span>
-              </div>
-            </div>
-            <div>
-              {isPersisted ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  <Check className="size-3" />
-                  <span>已受保護</span>
+          {/* 應用程式安全鎖 */}
+          <div
+            onClick={() => {
+              if (!isLockConfigured) {
+                setLockPinInput('');
+                setLockPinConfirm('');
+                setIsLockSetupModalOpen(true);
+              } else {
+                setIsLockSettingsModalOpen(true);
+              }
+            }}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+          >
+            <span className="text-sm font-normal text-foreground">應用程式安全鎖</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              {isLockConfigured ? (
+                <span className="text-emerald-500">
+                  PIN 碼 · {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0)}
                 </span>
               ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs cursor-pointer"
-                  onClick={handleRequestPersistence}
-                >
-                  申請保護
-                </Button>
+                <span>未開啟</span>
               )}
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* 本機儲存空間佔用 */}
-          <div className="p-4 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-3 pl-2">
-              <Database className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <div>
-                <span className="font-medium block">本機儲存空間佔用</span>
-                <span className="text-xs text-muted-foreground">
-                  IndexedDB 資料庫與離線快取總容量
-                </span>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-xs font-mono font-medium text-foreground block">
-                {estimate ? `${estimate.usageFormatted} / ${estimate.quotaFormatted}` : '計算中...'}
-              </span>
-              {estimate && (
-                <span className="text-[10px] text-muted-foreground font-mono block">
-                  已用 {estimate.percentUsed}%
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 資料庫健康自檢與修復 (FSCK) */}
-          <div className="p-4 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-3 pl-2">
-              <Activity className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-              <div>
-                <span className="font-medium block">資料庫健康自檢與修復</span>
-                <span className="text-xs text-muted-foreground">
-                  深度校驗懸掛外鍵、浮點精度與快照對帳
-                </span>
-              </div>
-            </div>
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs cursor-pointer gap-1.5"
-                onClick={() => {
-                  setIsHealthModalOpen(true);
-                  if (!healthReport) {
-                    runHealthScan();
-                  }
-                }}
-              >
-                {healthReport ? (
-                  healthReport.score === 100 ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">
-                      100分 · 良好
-                    </span>
-                  ) : (
-                    <span className="text-amber-600 dark:text-amber-400 font-mono font-medium">
-                      {healthReport.score}分 · 需修復
-                    </span>
-                  )
+      {/* ========================================== */}
+      {/* SECTION 3: 資料與儲存                      */}
+      {/* ========================================== */}
+      <div>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-muted-foreground px-1 mb-2">
+          {t('settings.dataVaultSection', '資料與儲存')}
+        </div>
+        <div className="border border-border rounded-lg overflow-hidden bg-card divide-y divide-border">
+          {/* 資料庫健康自檢 (FSCK) */}
+          <div
+            onClick={() => {
+              setIsHealthModalOpen(true);
+              if (!healthReport) runHealthScan();
+            }}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+          >
+            <span className="text-sm font-normal text-foreground">資料庫健康診斷</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              {healthReport ? (
+                healthReport.score === 100 ? (
+                  <span className="text-emerald-500">100分 · 良好</span>
                 ) : (
-                  <span>立即體檢</span>
-                )}
-              </Button>
+                  <span className="text-amber-500">{healthReport.score}分 · 需修復</span>
+                )
+              ) : (
+                <span>立即體檢</span>
+              )}
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
 
-          <button
-            type="button"
+          {/* 持久化存儲 */}
+          <div
+            onClick={() => {
+              if (!isPersisted) handleRequestPersistence();
+            }}
+            className={cn(
+              "h-12 px-4 flex items-center justify-between transition-colors",
+              !isPersisted && "cursor-pointer hover:bg-muted/40"
+            )}
+          >
+            <span className="text-sm font-normal text-foreground">本機持久化保護</span>
+            <div className="flex items-center gap-2 text-xs font-mono">
+              {isPersisted ? (
+                <span className="text-emerald-500">已保護</span>
+              ) : (
+                <span className="text-amber-500">申請保護</span>
+              )}
+              {estimate && (
+                <>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="text-muted-foreground">{estimate.usageFormatted}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 本機時光機快照 */}
+          <div
+            onClick={() => setIsTimeMachineModalOpen(true)}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+          >
+            <span className="text-sm font-normal text-foreground">本機時光機備份</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              <span>{opfsSnapshots.length} 份快照</span>
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </div>
+
+          {/* 匯出備份 */}
+          <div
+            onClick={handleExport}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+          >
+            <span className="text-sm font-normal text-foreground">{t('settings.exportData')}</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              <span>ZIP</span>
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </div>
+
+          {/* 匯入還原 */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+          >
+            <span className="text-sm font-normal text-foreground">{t('settings.importData')}</span>
+            <ChevronRight className="size-3.5 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================== */}
+      {/* SECTION 4: 危險區域                        */}
+      {/* ========================================== */}
+      <div>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-destructive/80 px-1 mb-2">
+          {t('settings.dangerZoneSection', '危險操作')}
+        </div>
+        <div className="border border-destructive/25 rounded-lg overflow-hidden bg-card">
+          <div
             onClick={() => {
               setClearConfirmationInput('');
               setIsClearModalOpen(true);
             }}
-            className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer text-left"
+            className="h-12 px-4 flex items-center justify-between hover:bg-destructive/5 transition-colors cursor-pointer group"
           >
-            <div className="flex items-center gap-3 pl-2">
-              <Trash2 className="h-5 w-5 text-destructive" strokeWidth={1.5} />
-              <span className="text-sm font-medium text-destructive">{t('settings.clearData')}</span>
+            <span className="text-sm font-normal text-destructive">{t('settings.clearData')}</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-destructive/70 group-hover:text-destructive">
+              <span>重置</span>
+              <ChevronRight className="size-3.5 opacity-70" />
             </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground mr-2" />
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* 5. 本機時光機自動滾動備份 (OPFS Rolling Backup) */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-        <div className="p-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3 pl-2">
-            <History className="h-5 w-5 text-primary" strokeWidth={1.5} />
-            <div>
-              <h3 className="font-medium text-sm">本機時光機備份 (OPFS)</h3>
-              <p className="text-xs text-muted-foreground">
-                由瀏覽器私有磁碟自動保留最近 3 份歷史存檔，零彈窗靜默守護
-              </p>
+      {/* Clean Monospace Footer */}
+      <div className="pt-4 text-center font-mono text-xs text-muted-foreground/50">
+        Zenance v1.0.0
+      </div>
+
+      {/* Dropbox 快速管理彈窗 */}
+      <Dialog open={isDropboxModalOpen} onOpenChange={setIsDropboxModalOpen}>
+        <DialogContent className="sm:max-w-[340px] max-w-[340px] p-5 gap-4">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <Cloud className="size-5 text-primary" />
+              <span>Dropbox 雲端同步</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
+            <div className="p-3 flex justify-between">
+              <span className="text-muted-foreground font-sans">{t('settings.status')}</span>
+              <span className={isAuthenticated ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
+                {isAuthenticated ? t('settings.connected') : t('settings.disconnected')}
+              </span>
             </div>
+            {isAuthenticated && (
+              <div className="p-3 flex justify-between">
+                <span className="text-muted-foreground font-sans">{t('settings.lastSync')}</span>
+                <span className="text-foreground">
+                  {lastSyncTime
+                    ? format24Time(lastSyncTime, true)
+                    : t('settings.never')}
+                </span>
+              </div>
+            )}
           </div>
-          <div>
+
+          <div className="flex gap-2 pt-1">
+            {!isAuthenticated ? (
+              <Button
+                className="w-full h-9 text-xs cursor-pointer"
+                disabled={isSyncing}
+                onClick={() => {
+                  setIsDropboxModalOpen(false);
+                  connectDropbox();
+                }}
+              >
+                {t('settings.connectDropbox')}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  className="flex-1 h-9 text-xs cursor-pointer"
+                  disabled={isSyncing || !isOnline}
+                  onClick={async () => {
+                    await syncNow();
+                  }}
+                >
+                  <RefreshCw className={cn("size-3.5 mr-1.5", isSyncing && "animate-spin")} />
+                  <span>{isSyncing ? t('settings.syncing') : t('settings.syncNow')}</span>
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1 h-9 text-xs cursor-pointer"
+                  disabled={isSyncing}
+                  onClick={() => {
+                    setIsDropboxModalOpen(false);
+                    disconnectDropbox();
+                  }}
+                >
+                  {t('settings.disconnect')}
+                </Button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 本機時光機彈窗 */}
+      <Dialog open={isTimeMachineModalOpen} onOpenChange={setIsTimeMachineModalOpen}>
+        <DialogContent className="sm:max-w-[360px] max-w-[360px] p-5 gap-4">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <History className="size-5 text-primary" />
+              <span>本機時光機快照</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
+              由瀏覽器私有磁碟 (OPFS) 靜默輪換保留最近 3 份歷史存檔。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
+            {opfsSnapshots.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground font-sans">
+                目前尚無快照，記帳後將自動於閒置時生成。
+              </div>
+            ) : (
+              opfsSnapshots.map((snap) => (
+                <div key={snap.id} className="p-3 flex items-center justify-between">
+                  <div>
+                    <span className="font-sans font-medium text-foreground block">{snap.title}</span>
+                    <span className="text-[10px] text-muted-foreground">{snap.date} · {snap.sizeFormatted}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleExportOpfs(snap.filename)}
+                      className="text-muted-foreground hover:text-foreground cursor-pointer text-xs"
+                    >
+                      導出
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsTimeMachineModalOpen(false);
+                        handleRestoreFromOpfs(snap.filename);
+                      }}
+                      className="text-emerald-500 hover:underline cursor-pointer text-xs font-medium"
+                    >
+                      還原
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-1">
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs cursor-pointer gap-1.5"
+              className="w-full h-8 text-xs cursor-pointer gap-1.5"
               disabled={isOpfsBackingUp || !isOpfsSupported}
               onClick={async () => {
                 const ok = await triggerOpfsBackup(true);
@@ -1109,59 +1091,8 @@ export default function Settings() {
               <span>立即建立快照</span>
             </Button>
           </div>
-        </div>
-
-        <div className="divide-y divide-border text-sm">
-          {!isOpfsSupported ? (
-            <div className="p-4 text-xs text-muted-foreground text-center">
-              當前瀏覽器環境不支援 OPFS 私有磁碟存取
-            </div>
-          ) : opfsSnapshots.length === 0 ? (
-            <div className="p-4 text-xs text-muted-foreground text-center">
-              目前尚無歷史快照。記帳後將自動於閒置時生成，或可點擊右上角手動建立。
-            </div>
-          ) : (
-            opfsSnapshots.map((snap) => (
-              <div key={snap.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <span className="font-medium block">{snap.title}</span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {snap.date} · {snap.sizeFormatted}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs cursor-pointer gap-1"
-                    title="導出為 ZIP 檔案下載到電腦"
-                    onClick={() => handleExportOpfs(snap.filename)}
-                  >
-                    <Download className="size-3.5 text-muted-foreground" />
-                    <span>導出</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-xs cursor-pointer gap-1 text-primary hover:text-primary"
-                    title="從此快照還原帳本"
-                    onClick={() => handleRestoreFromOpfs(snap.filename)}
-                  >
-                    <RotateCcw className="size-3.5" />
-                    <span>還原</span>
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* App Branding Footer */}
-      <div className="flex flex-col items-center justify-center gap-2 pt-6">
-        <Logo size={28} />
-        <span className="text-xs text-muted-foreground font-mono">Zenance v1.0.0</span>
-      </div>
+        </DialogContent>
+      </Dialog>
 
       {/* 資料庫健康診斷與自癒彈窗 (FSCK) */}
       <DatabaseHealthModal
@@ -1401,6 +1332,80 @@ export default function Settings() {
               onClick={handleSavePinLock}
             >
               確認開啟
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 應用程式安全鎖管理彈窗 */}
+      <Dialog open={isLockSettingsModalOpen} onOpenChange={setIsLockSettingsModalOpen}>
+        <DialogContent className="sm:max-w-[340px] max-w-[340px] p-5 gap-4">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <ShieldCheck className="size-5 text-primary" />
+              <span>應用程式安全鎖</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
+            <div className="p-3 flex items-center justify-between">
+              <span className="text-muted-foreground font-sans">狀態</span>
+              <span className="text-emerald-500 font-medium">已啟用 PIN 碼保護</span>
+            </div>
+
+            <div className="p-3 flex items-center justify-between">
+              <span className="text-muted-foreground font-sans">自動鎖定</span>
+              <Select
+                value={String(appLockConfig?.timeoutMinutes ?? 0)}
+                onValueChange={(val) => {
+                  if (val) {
+                    updateLockSettings({ timeoutMinutes: parseInt(val, 10) });
+                  }
+                }}
+              >
+                <SelectTrigger className="border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-1 text-xs font-mono h-auto p-0 cursor-pointer text-foreground">
+                  <SelectValue className="flex-none text-right">
+                    {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0, true)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="0">立即</SelectItem>
+                  <SelectItem value="1">閒置 1 分鐘</SelectItem>
+                  <SelectItem value="5">閒置 5 分鐘</SelectItem>
+                  <SelectItem value="15">閒置 15 分鐘</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {hasBiometricHardware && (
+              <div className="p-3 flex items-center justify-between">
+                <span className="text-muted-foreground font-sans flex items-center gap-1.5">
+                  <Fingerprint className="size-3.5 text-primary" />
+                  <span>生物辨識解鎖</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={appLockConfig?.biometricEnabled ?? false}
+                  onChange={(e) => {
+                    updateLockSettings({ biometricEnabled: e.target.checked });
+                  }}
+                  className="size-4 rounded accent-primary cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button
+              variant="destructive"
+              className="w-full h-9 text-xs cursor-pointer"
+              onClick={() => {
+                disableLock();
+                setIsLockSettingsModalOpen(false);
+                toast.show('已關閉安全鎖');
+              }}
+            >
+              關閉安全鎖
             </Button>
           </div>
         </DialogContent>

@@ -334,7 +334,7 @@ export function getAvailableRollingSnapshots(): Array<{
   if (meta.daily) {
     list.push({
       id: 'daily',
-      title: '昨日快照 (每日輪換)',
+      title: '昨日快照',
       filename: meta.daily.filename,
       date: meta.daily.date,
       sizeFormatted: meta.daily.sizeFormatted,
@@ -345,7 +345,7 @@ export function getAvailableRollingSnapshots(): Array<{
   if (meta.weekly) {
     list.push({
       id: 'weekly',
-      title: '上週快照 (週度輪換)',
+      title: '上週快照',
       filename: meta.weekly.filename,
       date: meta.weekly.date,
       sizeFormatted: meta.weekly.sizeFormatted,
@@ -356,7 +356,7 @@ export function getAvailableRollingSnapshots(): Array<{
   if (meta.monthly) {
     list.push({
       id: 'monthly',
-      title: '上月快照 (月度輪換)',
+      title: '上月快照',
       filename: meta.monthly.filename,
       date: meta.monthly.date,
       sizeFormatted: meta.monthly.sizeFormatted,

@@ -47,21 +47,28 @@ export function ContactGroupCard({
               <div
                 key={contact.id}
                 onClick={() => navigate(`/contacts/${contact.id}`)}
-                className="flex flex-col items-center justify-center p-3 bg-transparent border-r border-b border-border transition-colors hover:bg-muted/30 group min-h-[128px] cursor-pointer"
+                className="flex flex-col items-center justify-center py-3 bg-transparent border-r border-b border-border transition-colors hover:bg-muted/30 group min-h-[128px] cursor-pointer"
               >
-                {/* Top: Avatar and Name */}
-                <div className="flex flex-col items-center gap-1.5 text-center w-full">
-                  <ContactAvatar 
-                    group={contact.group} 
-                    className="w-10 h-10" 
-                    iconClassName="w-5 h-5 text-muted-foreground" 
-                    title={contact.name} 
-                  />
-                  <div className="text-sm font-medium leading-none truncate w-full px-1">{contact.name}</div>
+                {/* 1. Avatar */}
+                <ContactAvatar 
+                  group={contact.group} 
+                  className="w-10 h-10 shrink-0" 
+                  iconClassName="w-5 h-5 text-muted-foreground" 
+                  title={contact.name} 
+                />
+
+                {/* [留白 1] 2. Name */}
+                <div className="w-full text-center px-3 mt-2">
+                  <div className="text-xs font-medium leading-none truncate w-full px-1">{contact.name}</div>
                 </div>
                 
-                {/* Bottom: Status & Amount (Fixed 30px slot, strictly aligned across all cards) */}
-                <div className="h-[30px] flex flex-col items-center justify-center text-center w-full mt-1.5">
+                {/* [留白 2] 3. Divider (Spanning full width with 20px margin on both sides) */}
+                <div className="w-full px-5 mt-2 shrink-0">
+                  <div className="w-full border-t border-border/60" />
+                </div>
+
+                {/* [留白 3] 4. Bottom: Status & Amount (Fixed slot, strictly aligned across all cards) */}
+                <div className="h-[28px] flex flex-col items-center justify-center text-center w-full px-3 mt-2">
                   {netReceivable === 0 ? (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted/40 text-muted-foreground/60 border border-border/60 leading-none">
                       {t('contacts.settled')}
@@ -71,7 +78,7 @@ export function ContactGroupCard({
                       <span className="text-[9px] uppercase tracking-widest text-muted-foreground/80 block leading-none mb-1">
                         {t('contacts.toCollect')}
                       </span>
-                      <span className="text-sm font-mono font-medium tracking-tight text-emerald-500 block truncate leading-none">
+                      <span className="text-xs font-mono font-medium tracking-tight text-emerald-500 block truncate leading-none">
                         {sym}{absAmt}
                       </span>
                     </div>
@@ -80,7 +87,7 @@ export function ContactGroupCard({
                       <span className="text-[9px] uppercase tracking-widest text-muted-foreground/80 block leading-none mb-1">
                         {t('contacts.toPay')}
                       </span>
-                      <span className="text-sm font-mono font-medium tracking-tight text-rose-500 block truncate leading-none">
+                      <span className="text-xs font-mono font-medium tracking-tight text-rose-500 block truncate leading-none">
                         {sym}{absAmt}
                       </span>
                     </div>

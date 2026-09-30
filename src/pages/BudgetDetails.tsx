@@ -23,6 +23,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/AmountInput';
@@ -450,15 +451,13 @@ export default function BudgetDetails() {
         </div>
 
         {/* Progress Bar */}
-        <div className="h-2 w-full bg-muted overflow-hidden rounded-full">
-          <div
-            className={cn(
-              'h-full transition-all duration-500 ease-out',
-              isOver ? 'bg-destructive' : 'bg-primary'
-            )}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
+        <BudgetProgressBar
+          budgetKey={budget?.id || id || ''}
+          percentage={percentage}
+          isOver={isOver}
+          variant="primary"
+          heightClass="h-2"
+        />
 
         {/* Monitored Categories Chips */}
         {monitoredCategoryList.length > 0 && (

@@ -18,12 +18,12 @@ export default function ContactDetails() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  const { contacts, updateContact, deleteContact, archiveContact } = useContacts();
+  const { allContacts, updateContact, deleteContact, archiveContact, unarchiveContact } = useContacts();
   const { transactions } = useTransactions();
   const { activeLedgerId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
   
-  const contact = contacts?.find(a => a.id === id);
+  const contact = allContacts?.find(a => a.id === id);
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
   const currency = contact?.currency || baseCurrency;
@@ -82,7 +82,7 @@ export default function ContactDetails() {
     };
   }, [contactTransactions, id]);
 
-  if (!contact && contacts && contacts.length > 0) {
+  if (allContacts !== undefined && !contact) {
     return (
       <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
         <p>{t('contacts.contactNotFound', 'Contact not found.')}</p>
@@ -112,7 +112,11 @@ export default function ContactDetails() {
   
   const handleArchive = async () => {
     if (!id) return;
-    await archiveContact(id);
+    if (contact?.archived) {
+      await unarchiveContact(id);
+    } else {
+      await archiveContact(id);
+    }
     navigate('/contacts');
   };
 
@@ -131,6 +135,11 @@ export default function ContactDetails() {
             <User className="w-5 h-5 text-muted-foreground shrink-0" />
           )}
           <h2 className="text-xl font-semibold tracking-tight truncate">{contact?.name}</h2>
+          {contact?.archived && (
+            <span className="text-[10px] uppercase tracking-wider bg-muted text-muted-foreground px-2 py-0.5 rounded-sm font-normal shrink-0">
+              {t('contacts.archived', '已歸檔')}
+            </span>
+          )}
         </div>
         <Button 
           variant="ghost" 
@@ -149,7 +158,16 @@ export default function ContactDetails() {
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
             {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
           </p>
-          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", netBalance === 0 ? 'text-muted-foreground/50' : netBalance > 0 ? 'text-foreground' : 'text-muted-foreground')}>
+          <div
+            className={cn(
+              "text-6xl font-mono tracking-tighter font-medium break-all px-4",
+              netBalance === 0
+                ? "text-muted-foreground/50"
+                : netBalance > 0
+                  ? "text-emerald-500"
+                  : "text-rose-500"
+            )}
+          >
             <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={currency} type="neutral" />
           </div>
         </div>
@@ -158,13 +176,13 @@ export default function ContactDetails() {
         <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
-            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalLent === 0 ? "text-muted-foreground/50" : "text-foreground")}>
+            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalLent === 0 ? "text-muted-foreground/50" : "text-emerald-500")}>
               <AmountDisplay amount={totalLent} baseCurrency={currency} type="neutral" />
             </p>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
-            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalBorrowed === 0 ? "text-muted-foreground/50" : "text-foreground")}>
+            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalBorrowed === 0 ? "text-muted-foreground/50" : "text-rose-500")}>
               <AmountDisplay amount={totalBorrowed} baseCurrency={currency} type="neutral" />
             </p>
           </div>

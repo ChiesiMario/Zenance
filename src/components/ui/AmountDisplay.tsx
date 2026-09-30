@@ -5,7 +5,7 @@ export interface AmountDisplayProps {
   originalCurrency?: string;
   baseCurrency?: string;
   isApproximate?: boolean;
-  type?: 'income' | 'expense' | 'transfer' | 'loan' | 'neutral';
+  type?: 'income' | 'expense' | 'transfer' | 'loan' | 'neutral' | 'balance';
   showSign?: boolean;
   className?: string;
 }
@@ -43,6 +43,17 @@ export function AmountDisplay({
       sign = showSign ? '-' : '';
     } else {
       colorClass = 'text-emerald-500';
+      sign = '';
+    }
+  } else if (type === 'balance') {
+    if (amount > 0) {
+      colorClass = 'text-emerald-500';
+      sign = '';
+    } else if (amount < 0) {
+      colorClass = 'text-rose-500';
+      sign = showSign ? '-' : '';
+    } else {
+      colorClass = 'text-foreground';
       sign = '';
     }
   } else if (type === 'neutral') {

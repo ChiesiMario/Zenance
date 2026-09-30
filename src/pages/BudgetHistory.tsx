@@ -22,6 +22,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { cn } from '@/lib/utils';
 import { type Budget } from '@/services/db/db';
 
@@ -250,15 +251,12 @@ export default function BudgetHistory() {
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
-                    <div
-                      className={cn(
-                        'h-full transition-all duration-700 ease-out',
-                        isOver ? 'bg-destructive' : 'bg-primary'
-                      )}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+                  <BudgetProgressBar
+                    budgetKey={budget.id}
+                    percentage={percentage}
+                    isOver={isOver}
+                    variant="primary"
+                  />
 
                   {/* Remaining / Over Details */}
                   <div className="flex justify-between items-center text-xs font-mono">

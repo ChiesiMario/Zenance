@@ -23,7 +23,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const confirm = useConfirm();
   const { transactions, deleteTransaction } = useTransactions();
   const { allCategories } = useCategories();
-  const { accounts, contacts } = useAccounts();
+  const { accounts, wallets, allWallets, contacts, allContacts } = useAccounts();
   const { activeLedgerId, setEditingTransactionId } = useAppStore();
   const { ledgers } = useLedgers();
 
@@ -123,9 +123,19 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
   const activeLedger = ledgers?.find((l) => l.id === activeLedgerId);
 
-  const getAccountName = (accountId: string) => {
-    return accounts?.find((a) => a.id === accountId)?.name || accountId;
-  };
+  const getAccountName = useCallback((id?: string) => {
+    if (!id) return '';
+    const wallet = (allWallets || wallets || accounts)?.find((a) => a.id === id);
+    if (wallet) return wallet.name;
+    const contact = (allContacts || contacts)?.find((c) => c.id === id);
+    if (contact) return contact.name;
+    return id;
+  }, [allWallets, wallets, accounts, allContacts, contacts]);
+
+  const getContact = useCallback((id?: string) => {
+    if (!id) return undefined;
+    return (allContacts || contacts)?.find((c) => c.id === id);
+  }, [allContacts, contacts]);
 
   const getCategoryName = (categoryId: string, tx: Transaction) => {
     if (categoryId === 'transfer') return t('add.transfer');
@@ -134,7 +144,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     }
     if (categoryId === 'loan') {
       if (tx.type === 'loan') {
-        const isLent = contacts?.some((c) => c.id === tx.toAccountId);
+        const isLent = (allContacts || contacts)?.some((c) => c.id === tx.toAccountId);
         return isLent ? t('add.lent') : t('add.borrowed');
       }
       return t('add.loan');
@@ -243,23 +253,26 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     const barcode = getBarcodeBars(displayRef + tx.id);
 
     // Associated contact for this specific card
+    const walletList = allWallets || wallets || accounts;
+    const contactList = allContacts || contacts;
+
     const isLend =
       tx.type === 'loan' &&
-      Boolean(contacts?.some((c) => c.id === tx.toAccountId));
+      Boolean(contactList?.some((c) => c.id === tx.toAccountId));
 
     const contactId = tx.type === 'loan' ? (isLend ? tx.toAccountId : tx.accountId) : undefined;
-    const contactObj = contactId ? (contacts?.find((c) => c.id === contactId) || null) : null;
+    const contactObj = contactId ? (contactList?.find((c) => c.id === contactId) || null) : null;
 
     const fromCurrency =
-      accounts?.find((a) => a.id === tx.accountId)?.currency ||
-      contacts?.find((c) => c.id === tx.accountId)?.currency ||
+      walletList?.find((a) => a.id === tx.accountId)?.currency ||
+      contactList?.find((c) => c.id === tx.accountId)?.currency ||
       tx.originalCurrency ||
       activeLedger?.baseCurrency ||
       'CNY';
 
     const toCurrency =
-      accounts?.find((a) => a.id === tx.toAccountId)?.currency ||
-      contacts?.find((c) => c.id === tx.toAccountId)?.currency ||
+      walletList?.find((a) => a.id === tx.toAccountId)?.currency ||
+      contactList?.find((c) => c.id === tx.toAccountId)?.currency ||
       activeLedger?.baseCurrency ||
       'CNY';
 
@@ -470,8 +483,15 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           <div className="flex items-baseline justify-between py-0.5">
             <span className="text-muted-foreground shrink-0">{t('add.lendFrom', '出款')}</span>
             <span className="flex-1 mx-2 border-b border-dotted border-border/80 self-center" />
-            <span className="font-medium text-foreground truncate max-w-[140px] text-right">
-              {getAccountName(tx.accountId)}
+            <span className="font-medium text-foreground truncate max-w-[140px] text-right inline-flex items-center justify-end gap-1">
+              {getContact(tx.accountId) && (
+                <ContactAvatar
+                  group={getContact(tx.accountId)?.group}
+                  className="size-3 border-none bg-transparent p-0 shrink-0"
+                  iconClassName="size-3 text-muted-foreground/70"
+                />
+              )}
+              <span className="truncate">{getAccountName(tx.accountId)}</span>
             </span>
           </div>
 
@@ -480,8 +500,15 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
             <div className="flex items-baseline justify-between py-0.5">
               <span className="text-muted-foreground shrink-0">{t('add.borrowTo', '入款')}</span>
               <span className="flex-1 mx-2 border-b border-dotted border-border/80 self-center" />
-              <span className="font-medium text-foreground truncate max-w-[140px] text-right">
-                {getAccountName(tx.toAccountId)}
+              <span className="font-medium text-foreground truncate max-w-[140px] text-right inline-flex items-center justify-end gap-1">
+                {getContact(tx.toAccountId) && (
+                  <ContactAvatar
+                    group={getContact(tx.toAccountId)?.group}
+                    className="size-3 border-none bg-transparent p-0 shrink-0"
+                    iconClassName="size-3 text-muted-foreground/70"
+                  />
+                )}
+                <span className="truncate">{getAccountName(tx.toAccountId)}</span>
               </span>
             </div>
           )}

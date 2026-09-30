@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { type Budget, type BudgetRule } from '@/services/db/db';
 
 export default function Budgets() {
@@ -581,15 +582,12 @@ export default function Budgets() {
                   </div>
 
                   {/* Progress Bar */}
-                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
-                    <div
-                      className={cn(
-                        'h-full transition-all duration-500 ease-out rounded-full',
-                        isOver ? 'bg-destructive' : 'bg-foreground'
-                      )}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+                  <BudgetProgressBar
+                    budgetKey={budget.id}
+                    percentage={percentage}
+                    isOver={isOver}
+                    variant="foreground"
+                  />
 
                   {/* Bottom Line: Spent / Budget | Chevron */}
                   <div className="flex justify-between items-center text-xs font-mono text-muted-foreground">
@@ -703,15 +701,12 @@ export default function Budgets() {
                     </div>
                   </div>
 
-                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
-                    <div
-                      className={cn(
-                        'h-full transition-all duration-500 ease-out rounded-full',
-                        isOver ? 'bg-destructive' : 'bg-muted-foreground/60'
-                      )}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+                  <BudgetProgressBar
+                    budgetKey={budget.id}
+                    percentage={percentage}
+                    isOver={isOver}
+                    variant="muted"
+                  />
 
                   <div className="flex justify-between items-center text-xs font-mono text-muted-foreground">
                     <span>

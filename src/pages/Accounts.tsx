@@ -25,7 +25,7 @@ import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
 
 export default function Accounts() {
   const { t } = useTranslation();
-  const { accounts, wallets, archivedWallets, contacts, addAccount, unarchiveAccount } = useAccounts();
+  const { wallets, archivedWallets, allContacts, addAccount, unarchiveAccount } = useAccounts();
   const { transactions } = useTransactions();
   const { getRate } = useExchangeRates();
   const { latestSnapshotsMap } = useBalanceSnapshots();
@@ -47,11 +47,20 @@ export default function Accounts() {
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
   const selectedCurrency = newAccountCurrency || baseCurrency;
 
-  // 計算所有帳戶在各自原生幣種下的餘額 (支援月度餘額快照加速)
+  // 匯總所有錢包實體（含已歸檔）與往來對象（含已歸檔），用於全面計算原生餘額
+  const allAccountsAndContacts = useMemo(() => {
+    const list: any[] = [];
+    if (wallets) list.push(...wallets);
+    if (archivedWallets) list.push(...archivedWallets);
+    if (allContacts) list.push(...allContacts);
+    return list;
+  }, [wallets, archivedWallets, allContacts]);
+
+  // 計算所有帳戶與往來對象在各自原生幣種下的餘額 (支援月度餘額快照加速)
   const accountBalances = useMemo(() => {
-    if (!accounts) return {};
-    return calculateAccountBalances(accounts, transactions || [], getRate, baseCurrency, latestSnapshotsMap);
-  }, [accounts, transactions, getRate, baseCurrency, latestSnapshotsMap]);
+    if (!allAccountsAndContacts || allAccountsAndContacts.length === 0) return {};
+    return calculateAccountBalances(allAccountsAndContacts, transactions || [], getRate, baseCurrency, latestSnapshotsMap);
+  }, [allAccountsAndContacts, transactions, getRate, baseCurrency, latestSnapshotsMap]);
 
   const groupedAccounts = useMemo(() => {
     const groups: Record<string, typeof wallets> = {
@@ -89,8 +98,10 @@ export default function Accounts() {
   }, [wallets, baseCurrency]);
 
   const hasForeignLoans = useMemo(() => {
-    return (contacts || []).some(c => (c.currency || baseCurrency) !== baseCurrency);
-  }, [contacts, baseCurrency]);
+    return (allContacts || []).some(
+      c => (c.currency || baseCurrency) !== baseCurrency && (accountBalances[c.id] || 0) !== 0
+    );
+  }, [allContacts, baseCurrency, accountBalances]);
 
   const hasForeignCurrency = hasForeignWallets || hasForeignLoans;
 
@@ -106,7 +117,7 @@ export default function Accounts() {
       walletsSum += convertAmount(raw, curr, baseCurrency, getRate);
     });
 
-    contacts?.forEach(c => {
+    allContacts?.forEach(c => {
       const raw = accountBalances[c.id] || 0;
       const curr = c.currency || baseCurrency;
       loansSum += convertAmount(raw, curr, baseCurrency, getRate);
@@ -117,7 +128,7 @@ export default function Accounts() {
       totalLoans: Math.round(loansSum * 100) / 100,
       netWorth: Math.round((walletsSum + loansSum) * 100) / 100,
     };
-  }, [wallets, contacts, accountBalances, baseCurrency, getRate]);
+  }, [wallets, allContacts, accountBalances, baseCurrency, getRate]);
 
   const handleAddAccount = async () => {
     if (!newAccountName.trim()) return;
@@ -349,11 +360,11 @@ export default function Accounts() {
                 </span>
               )}
             </div>
-            <div className="text-5xl font-mono tracking-tighter font-medium text-foreground">
+            <div className="text-5xl font-mono tracking-tighter font-medium">
               <AmountDisplay 
                 amount={netWorth} 
                 baseCurrency={baseCurrency} 
-                type="neutral" 
+                type="balance" 
               />
             </div>
           </div>

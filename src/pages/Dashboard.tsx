@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNavigate, Link } from 'react-router-dom';
+import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 import { useMonthTransactions } from '@/hooks/useMonthTransactions';
 
@@ -379,8 +380,8 @@ export default function Dashboard() {
         {/* Top Summary row */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('dashboard.netBalance')}</p>
-          <p className="text-4xl font-mono tracking-tighter font-medium text-foreground">
-            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+          <p className="text-4xl font-mono tracking-tighter font-medium">
+            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="balance" />
           </p>
         </div>
 
@@ -434,15 +435,12 @@ export default function Dashboard() {
                     </div>
                   </div>
                   {/* Progress Bar */}
-                  <div className="h-1.5 w-full bg-muted overflow-hidden rounded-full">
-                    <div 
-                      className={cn(
-                        "h-full transition-all duration-700 ease-out",
-                        isOver ? "bg-destructive" : "bg-primary"
-                      )}
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+                  <BudgetProgressBar
+                    budgetKey={budget.id}
+                    percentage={percentage}
+                    isOver={isOver}
+                    variant="primary"
+                  />
                 </button>
               );
             })}

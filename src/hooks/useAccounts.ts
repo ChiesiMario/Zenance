@@ -42,9 +42,22 @@ export function useAccounts() {
     [activeLedgerId]
   );
 
+  const allWallets = useLiveQuery(
+    () => {
+      if (!activeLedgerId) return Promise.resolve([] as Wallet[]);
+      return db.accounts
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(a => !a.deleted)
+        .toArray();
+    },
+    [activeLedgerId]
+  );
+
   // 向後相容別名
   const accounts = wallets;
   const archivedAccounts = archivedWallets;
+  const allAccounts = allWallets;
 
   const addAccount = async (
     name: string,
@@ -161,8 +174,10 @@ export function useAccounts() {
   return {
     accounts,
     archivedAccounts,
+    allAccounts,
     wallets,
     archivedWallets,
+    allWallets,
     contacts,
     archivedContacts,
     allContacts,

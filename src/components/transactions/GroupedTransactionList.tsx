@@ -102,7 +102,7 @@ export function GroupedTransactionList({
   className,
 }: GroupedTransactionListProps) {
   const { t, i18n } = useTranslation();
-  const { contacts, archivedContacts, wallets, accounts, archivedAccounts } = useAccounts();
+  const { contacts, archivedContacts, allContacts, wallets, accounts, archivedAccounts, allWallets } = useAccounts();
   const { allCategories } = useCategories();
   const { ledgers } = useLedgers();
   const { activeLedgerId } = useAppStore();
@@ -138,13 +138,13 @@ export function GroupedTransactionList({
 
   const accountCurrencies = useMemo(() => {
     const map = new Map<string, string>();
-    wallets?.forEach((w) => {
+    (allWallets || wallets)?.forEach((w) => {
       if (w.currency) map.set(w.id, w.currency);
     });
     accounts?.forEach((a) => {
       if (a.currency) map.set(a.id, a.currency);
     });
-    contacts?.forEach((c) => {
+    (allContacts || contacts)?.forEach((c) => {
       if (c.currency) map.set(c.id, c.currency);
     });
     archivedAccounts?.forEach((a) => {
@@ -154,7 +154,7 @@ export function GroupedTransactionList({
       if (c.currency) map.set(c.id, c.currency);
     });
     return map;
-  }, [wallets, accounts, contacts, archivedAccounts, archivedContacts]);
+  }, [allWallets, wallets, accounts, allContacts, contacts, archivedAccounts, archivedContacts]);
 
   const getDisplayAmountInfo = useCallback(
     (tx: Transaction, baseCurr: string) => {
@@ -409,22 +409,8 @@ export function GroupedTransactionList({
           if (Math.abs(rounded) >= 0.005) {
             dailyTotals.push({ currency: accCurr, amount: rounded });
           }
-        } else if (contextContactId) {
-          // Contact context: Contact-specific flows
-          let contactBalance = 0;
-          groups[date].forEach(tx => {
-            if (tx.isGift) return; // 贈與交易不計入聯絡人借貸變動
-            if (tx.type === 'transfer' || tx.type === 'loan') {
-              if (tx.toAccountId === contextContactId) contactBalance += (tx.transferInAmount ?? tx.amount);
-              if (tx.accountId === contextContactId) contactBalance -= tx.amount;
-            }
-          });
-          const rounded = Math.round(contactBalance * 100) / 100;
-          if (Math.abs(rounded) >= 0.005) {
-            dailyTotals.push({ currency: effectiveBaseCurr, amount: rounded });
-          }
         } else {
-          // Default Dashboard / Category context: Group directly by original currency
+          // Default Dashboard / Contact / Category context: Group directly by original currency
           const currencyMap = new Map<string, number>();
           groups[date].forEach(t => processTxFlow(t, currencyMap));
 
@@ -752,29 +738,6 @@ export function GroupedTransactionList({
                                     />
                                   );
                                 })()
-                              ) : contextContactId ? (
-                                (() => {
-                                  const isLending = (tx.type === 'transfer' || tx.type === 'loan') && tx.toAccountId === contextContactId;
-                                  const isBorrowing = (tx.type === 'transfer' || tx.type === 'loan') && tx.accountId === contextContactId;
-                                  const contactAmt = tx.originalAmount ?? (isLending ? (tx.transferInAmount ?? tx.amount) : tx.amount);
-
-                                  return (
-                                    <AmountDisplay
-                                      amount={isLending ? -contactAmt : contactAmt}
-                                      baseCurrency={tx.originalCurrency || activeLedger?.baseCurrency}
-                                      isApproximate={false}
-                                      type={
-                                        isLending
-                                          ? 'expense'
-                                          : isBorrowing
-                                          ? 'income'
-                                          : (tx.type as any)
-                                      }
-                                      className="text-sm font-mono leading-none"
-                                      showSign={true}
-                                    />
-                                  );
-                                })()
                               ) : (
                                 (() => {
                                   const info = getDisplayAmountInfo(
@@ -796,7 +759,8 @@ export function GroupedTransactionList({
                             </div>
 
                             {!contextAccountId && tx.type !== 'transfer' && (() => {
-                              const wallet = wallets?.find(w => w.id === tx.accountId) || wallets?.find(w => w.id === tx.toAccountId);
+                              const walletList = allWallets || wallets;
+                              const wallet = walletList?.find(w => w.id === tx.accountId) || walletList?.find(w => w.id === tx.toAccountId);
                               if (!wallet?.name) return null;
                               return (
                                 <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">

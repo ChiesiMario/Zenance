@@ -23,13 +23,13 @@ export default function AccountDetails() {
   const { t } = useTranslation();
   const { getRate } = useExchangeRates();
   
-  const { accounts, updateAccount, deleteAccount, archiveAccount } = useAccounts();
+  const { allAccounts, updateAccount, deleteAccount, archiveAccount, unarchiveAccount } = useAccounts();
   const { transactions, addTransaction } = useTransactions();
   const { getOrCreateSystemBalanceAdjustmentCategory } = useCategories();
   const { activeLedgerId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
   
-  const account = accounts?.find(a => a.id === id);
+  const account = allAccounts?.find(a => a.id === id);
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
   const currency = account?.currency || baseCurrency;
@@ -106,7 +106,7 @@ export default function AccountDetails() {
     }
   }, [isAdjustBalanceDialogOpen, balance]);
 
-  if (!account && accounts && accounts.length > 0) {
+  if (allAccounts !== undefined && !account) {
     return (
       <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
         <p>{t('accounts.accountNotFound', 'Account not found.')}</p>
@@ -175,7 +175,11 @@ export default function AccountDetails() {
   
   const handleArchive = async () => {
     if (!id) return;
-    await archiveAccount(id);
+    if (account?.archived) {
+      await unarchiveAccount(id);
+    } else {
+      await archiveAccount(id);
+    }
     navigate('/accounts');
   };
 
@@ -195,7 +199,14 @@ export default function AccountDetails() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/accounts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-xl font-semibold tracking-tight truncate px-2">{account?.name}</h2>
+        <div className="flex items-center gap-2 px-2 min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight truncate">{account?.name}</h2>
+          {account?.archived && (
+            <span className="text-[10px] uppercase tracking-wider bg-muted text-muted-foreground px-2 py-0.5 rounded-sm font-normal shrink-0">
+              {t('accounts.archived', '已歸檔')}
+            </span>
+          )}
+        </div>
         <div className="w-8"></div>
       </div>
 
@@ -509,7 +520,7 @@ export default function AccountDetails() {
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <ArchiveRestore className="h-3.5 w-3.5" />
-                <span>{t('accounts.archiveAccount')}</span>
+                <span>{account?.archived ? t('settings.unarchive', '取消歸檔') : t('accounts.archiveAccount')}</span>
               </button>
               
               <span className="text-border select-none">·</span>

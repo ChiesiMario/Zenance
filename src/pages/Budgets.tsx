@@ -535,6 +535,7 @@ export default function Budgets() {
                               amount={Math.round(remaining / daysInfo.days)}
                               baseCurrency={activeLedger?.baseCurrency}
                               type="neutral"
+                              className="font-normal"
                             />
                           </>
                         )}
@@ -598,12 +599,14 @@ export default function Budgets() {
                         amount={spent}
                         baseCurrency={activeLedger?.baseCurrency}
                         type="neutral"
+                        className="font-normal"
                       />
                       {' / '}
                       <AmountDisplay
                         amount={effectiveAmount}
                         baseCurrency={activeLedger?.baseCurrency}
                         type="neutral"
+                        className="font-normal"
                       />
                     </span>
                     <ChevronRight
@@ -717,12 +720,14 @@ export default function Budgets() {
                         amount={spent}
                         baseCurrency={activeLedger?.baseCurrency}
                         type="neutral"
+                        className="font-normal"
                       />
                       {' / '}
                       <AmountDisplay
                         amount={effectiveAmount}
                         baseCurrency={activeLedger?.baseCurrency}
                         type="neutral"
+                        className="font-normal"
                       />
                     </span>
                     <Button

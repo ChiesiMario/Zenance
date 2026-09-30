@@ -330,15 +330,10 @@ export default function BudgetDetails() {
               )}
 
               {budget?.ruleId && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/budgets?tab=rules')}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest border border-border bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
-                  title={t('budgets.tabRules')}
-                >
-                  <Zap className="h-2.5 w-2.5 text-amber-500" />
+                <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest border border-border bg-muted/60 text-muted-foreground shrink-0">
+                  <Zap className="h-2.5 w-2.5 opacity-70" />
                   <span>{t('budgets.ruleStrategy')}</span>
-                </button>
+                </span>
               )}
             </div>
           </div>

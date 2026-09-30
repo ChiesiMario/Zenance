@@ -287,23 +287,23 @@ export function AddTransactionModal({
       return selectedFromAccount?.currency || baseCurrency;
     }
     if (type === 'loan') {
-      return loanType === 'lend' ? (loanWallet?.currency || baseCurrency) : baseCurrency;
+      return loanWallet?.currency || baseCurrency;
     }
     return selectedAccount?.currency || baseCurrency;
-  }, [type, loanType, selectedFromAccount, loanWallet, selectedAccount, baseCurrency]);
+  }, [type, selectedFromAccount, loanWallet, selectedAccount, baseCurrency]);
 
   const toCurrency = useMemo(() => {
     if (type === 'transfer') {
       return accounts?.find(a => a.id === selectedToAccountId)?.currency || baseCurrency;
     }
     if (type === 'loan') {
-      return loanType === 'lend' ? baseCurrency : (loanWallet?.currency || baseCurrency);
+      return loanWallet?.currency || baseCurrency;
     }
     return baseCurrency;
-  }, [type, loanType, selectedToAccountId, accounts, loanWallet, baseCurrency]);
+  }, [type, selectedToAccountId, accounts, loanWallet, baseCurrency]);
 
   const isCrossCurrency = useMemo(() => {
-    if (type === 'transfer' || type === 'loan') {
+    if (type === 'transfer') {
       return fromCurrency !== toCurrency;
     }
     return false;
@@ -537,16 +537,10 @@ export function AddTransactionModal({
 
     if (type === 'loan') {
       const loanAmount = data.amount;
-      const targetInAmount = isCrossCurrency
-        ? (data.transferInAmount ?? loanAmount)
-        : loanAmount;
-      const loanRate = (isCrossCurrency && loanAmount > 0)
-        ? (targetInAmount / loanAmount)
-        : 1;
-
-      const loanBaseAmount = isCrossCurrency
-        ? (loanType === 'lend' ? targetInAmount : loanAmount)
-        : (loanAmount * rateToBase);
+      const loanCurrency = loanWallet?.currency || baseCurrency;
+      const isForeignLoan = loanCurrency !== baseCurrency;
+      const loanRate = isForeignLoan ? rateToBase : 1;
+      const loanBaseAmount = loanAmount * loanRate;
 
       if (transactionToEdit && transactionToEdit.splitGroupId) {
         const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
@@ -557,9 +551,9 @@ export function AddTransactionModal({
 
       const mainTx = {
         originalAmount: loanAmount,
-        originalCurrency: fromCurrency,
+        originalCurrency: loanCurrency,
         exchangeRate: loanRate,
-        transferInAmount: isCrossCurrency ? targetInAmount : undefined,
+        transferInAmount: undefined,
         amount: loanBaseAmount,
         type: 'loan' as const,
         category: 'loan',

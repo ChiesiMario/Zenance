@@ -72,7 +72,12 @@
       "subTransaction": "Sub-transaction",
       "close": "Close",
       "edit": "Edit",
-      "save": "Save"
+      "save": "Save",
+      "multiCurrencyBreakdownTitle": "Multi-Currency Breakdown",
+      "baseCurrencyTotal": "Converted Net Total",
+      "convertedByRecordedRate": "Converted at recorded exchange rates",
+      "baseCurrencyLabel": "Base Currency (1.00)",
+      "equalsBase": "Approx."
     },
     "add": {
       "addExpense": "Add Expense",

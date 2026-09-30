@@ -72,7 +72,12 @@
       "subTransaction": "子交易",
       "close": "關閉",
       "edit": "編輯",
-      "save": "儲存"
+      "save": "儲存",
+      "multiCurrencyBreakdownTitle": "多幣種收支折算",
+      "baseCurrencyTotal": "折算本位幣淨值",
+      "convertedByRecordedRate": "依記帳時匯率折算總計",
+      "baseCurrencyLabel": "本位幣 (1.00)",
+      "equalsBase": "折合"
     },
     "add": {
       "addExpense": "新增支出",

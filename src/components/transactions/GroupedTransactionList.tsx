@@ -60,6 +60,18 @@ export type DisplayListItem =
   | SingleTransactionItem
   | SplitGroupItem;
 
+export interface DailyCurrencyTotal {
+  currency: string;
+  amount: number;
+}
+
+export interface DailyTransactionGroup {
+  date: string;
+  transactions: Transaction[];
+  displayItems: DisplayListItem[];
+  dailyTotals: DailyCurrencyTotal[];
+}
+
 export interface GroupedTransactionListProps {
   transactions: Transaction[];
   title?: React.ReactNode;
@@ -344,44 +356,93 @@ export function GroupedTransactionList({
     return Object.keys(groups)
       .sort((a, b) => b.localeCompare(a))
       .map(date => {
-        let balance = 0;
+        const effectiveBaseCurr = contextAccountId
+          ? accountCurrencies.get(contextAccountId) || activeLedger?.baseCurrency || 'CNY'
+          : activeLedger?.baseCurrency || 'CNY';
+
+        const dailyTotals: DailyCurrencyTotal[] = [];
+
+        const processTxFlow = (t: Transaction, currencyMap: Map<string, number>) => {
+          if (isBalanceAdjustment(t)) return;
+          const info = getDisplayAmountInfo(t, effectiveBaseCurr);
+          if (info.type === 'transfer' || info.type === 'neutral') return;
+
+          const isIncomeFlow = info.type === 'income' || info.amount > 0;
+          const isExpenseFlow = info.type === 'expense' || info.amount < 0;
+          if (!isIncomeFlow && !isExpenseFlow) return;
+
+          const txCurr = info.currency;
+          const prev = currencyMap.get(txCurr) || 0;
+          currencyMap.set(txCurr, prev + info.amount);
+        };
+
         if (calcDailyBalance) {
-          balance = calcDailyBalance(groups[date]);
+          const bal = calcDailyBalance(groups[date]);
+          if (Math.abs(bal) >= 0.005) {
+            dailyTotals.push({
+              currency: effectiveBaseCurr,
+              amount: Math.round(bal * 100) / 100,
+            });
+          }
         } else if (contextAccountId) {
-          // Account context: Inflow - Outflow
+          // Account context: Inflow - Outflow for this account in this account's currency
+          const accCurr = accountCurrencies.get(contextAccountId) || effectiveBaseCurr;
+          let accBalance = 0;
           groups[date].forEach(tx => {
-            if (tx.type === 'income' && tx.accountId === contextAccountId) balance += tx.amount;
-            else if (tx.type === 'expense' && tx.accountId === contextAccountId) balance -= tx.amount;
+            const txAmt = tx.originalCurrency === accCurr ? (tx.originalAmount ?? tx.amount) : tx.amount;
+
+            if (tx.type === 'income' && tx.accountId === contextAccountId) accBalance += txAmt;
+            else if (tx.type === 'expense' && tx.accountId === contextAccountId) accBalance -= txAmt;
             else if (tx.type === 'transfer' || tx.type === 'loan') {
               if (tx.type === 'loan' && tx.isGift) {
                 const isContact = contacts?.some(c => c.id === contextAccountId);
                 if (isContact) return;
               }
-              if (tx.accountId === contextAccountId) balance -= tx.amount;
-              if (tx.toAccountId === contextAccountId) balance += (tx.transferInAmount ?? tx.amount);
+              if (tx.accountId === contextAccountId) accBalance -= txAmt;
+              if (tx.toAccountId === contextAccountId) {
+                const inAmt = tx.transferInAmount ?? (tx.originalCurrency === accCurr ? (tx.originalAmount ?? tx.amount) : tx.amount);
+                accBalance += inAmt;
+              }
             }
           });
+          const rounded = Math.round(accBalance * 100) / 100;
+          if (Math.abs(rounded) >= 0.005) {
+            dailyTotals.push({ currency: accCurr, amount: rounded });
+          }
         } else if (contextContactId) {
           // Contact context: Contact-specific flows
+          let contactBalance = 0;
           groups[date].forEach(tx => {
             if (tx.isGift) return; // 贈與交易不計入聯絡人借貸變動
             if (tx.type === 'transfer' || tx.type === 'loan') {
-              if (tx.toAccountId === contextContactId) balance += (tx.transferInAmount ?? tx.amount);
-              if (tx.accountId === contextContactId) balance -= tx.amount;
+              if (tx.toAccountId === contextContactId) contactBalance += (tx.transferInAmount ?? tx.amount);
+              if (tx.accountId === contextContactId) contactBalance -= tx.amount;
             }
           });
-        } else if (contextCategoryId) {
-          // Category context
-          groups[date].forEach(tx => {
-            if (tx.type === 'income') balance += tx.amount;
-            else if (tx.type === 'expense') balance -= tx.amount;
-          });
+          const rounded = Math.round(contactBalance * 100) / 100;
+          if (Math.abs(rounded) >= 0.005) {
+            dailyTotals.push({ currency: effectiveBaseCurr, amount: rounded });
+          }
         } else {
-          // Default Dashboard context
-          groups[date].forEach(t => {
-            if (isBalanceAdjustment(t)) return;
-            if (t.type === 'income') balance += t.amount;
-            else if (t.type === 'expense') balance -= t.amount;
+          // Default Dashboard / Category context: Group directly by original currency
+          const currencyMap = new Map<string, number>();
+          groups[date].forEach(t => processTxFlow(t, currencyMap));
+
+          currencyMap.forEach((netAmount, currCode) => {
+            const rounded = Math.round(netAmount * 100) / 100;
+            if (Math.abs(rounded) >= 0.005) {
+              dailyTotals.push({
+                currency: currCode,
+                amount: rounded,
+              });
+            }
+          });
+
+          // Base currency first, then other currencies alphabetically
+          dailyTotals.sort((a, b) => {
+            if (a.currency === effectiveBaseCurr && b.currency !== effectiveBaseCurr) return -1;
+            if (a.currency !== effectiveBaseCurr && b.currency === effectiveBaseCurr) return 1;
+            return a.currency.localeCompare(b.currency);
           });
         }
 
@@ -480,7 +541,7 @@ export function GroupedTransactionList({
           date,
           transactions: sortTransactionsDesc(groups[date]),
           displayItems,
-          dailyBalance: balance,
+          dailyTotals,
         };
       });
   }, [transactions, calcDailyBalance, contextAccountId, contextContactId, contextCategoryId, contacts, archivedContacts, accounts, getCategoryName, isBalanceAdjustment]);
@@ -517,13 +578,20 @@ export function GroupedTransactionList({
               {/* Sticky Glassmorphic Date Header */}
               <div className="sticky top-0 z-10 p-4 bg-background/80 backdrop-blur-md border-b border-border text-xs uppercase tracking-widest text-muted-foreground flex justify-between items-center">
                 <span>{formatDateHeader(group.date)}</span>
-                {showDailyBalance && group.dailyBalance !== 0 && (
-                  <AmountDisplay
-                    amount={group.dailyBalance}
-                    baseCurrency={activeLedger?.baseCurrency}
-                    type="neutral"
-                    className="opacity-50 font-normal"
-                  />
+                {showDailyBalance && group.dailyTotals.length > 0 && (
+                  <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground font-normal">
+                    {group.dailyTotals.map((item, idx) => (
+                      <React.Fragment key={item.currency}>
+                        {idx > 0 && <span className="opacity-30">·</span>}
+                        <AmountDisplay
+                          amount={item.amount}
+                          baseCurrency={item.currency}
+                          type="neutral"
+                          className="opacity-70 font-normal"
+                        />
+                      </React.Fragment>
+                    ))}
+                  </div>
                 )}
               </div>
 

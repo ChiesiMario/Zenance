@@ -12,6 +12,7 @@ import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
+import { triggerHaptic } from '@/lib/haptics';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useBudgets } from '@/hooks/useBudgets';
@@ -87,6 +88,7 @@ export function AddTransactionModal({
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerCategoryWarning = () => {
+    triggerHaptic('warning');
     setIsCategoryWarning(false);
     if (warningTimeoutRef.current) {
       clearTimeout(warningTimeoutRef.current);
@@ -104,6 +106,10 @@ export function AddTransactionModal({
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     };
   }, []);
+
+  const TYPE_KEYS = ['expense', 'income', 'transfer', 'lend', 'borrow'] as const;
+  const activeTypeKey = type === 'loan' ? (loanType === 'lend' ? 'lend' : 'borrow') : type;
+  const activeTypeIndex = TYPE_KEYS.indexOf(activeTypeKey);
 
   const formSchema = z.object({
     amount: z.number({ message: t('add.errors.amountRequired') }).positive(t('add.errors.amountPositive')),
@@ -254,6 +260,7 @@ export function AddTransactionModal({
 
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer' | 'loan', newLoanType?: 'borrow' | 'lend') => {
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;
+    triggerHaptic('selection');
     setType(newType);
     reset();
     setValue('budgetId', newType === 'income' ? 'none' : 'auto');
@@ -269,6 +276,7 @@ export function AddTransactionModal({
   };
 
   const toggleLoanType = () => {
+    triggerHaptic('selection');
     const nextLoanType = loanType === 'lend' ? 'borrow' : 'lend';
     setLoanType(nextLoanType);
     setFocusedField('out');
@@ -374,13 +382,59 @@ export function AddTransactionModal({
     : parsedAmount;
   const showTransferBubbles = type === 'transfer' && (parsedFeeAmount > 0 || isCrossCurrency);
 
+  // 智慧分類記憶排序 (Smart Category Frequency & Recency)
+  const categoryFrequencyStats = useMemo(() => {
+    const stats: Record<string, { recentCount: number; totalCount: number; lastUsedTime: number }> = {};
+    if (!transactions) return stats;
+
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    transactions.forEach(t => {
+      if (t.deleted || !t.category || t.type !== type) return;
+
+      if (!stats[t.category]) {
+        stats[t.category] = { recentCount: 0, totalCount: 0, lastUsedTime: 0 };
+      }
+
+      stats[t.category].totalCount += 1;
+      const txTime = new Date(t.date).getTime();
+      if (txTime >= thirtyDaysAgo) {
+        stats[t.category].recentCount += 1;
+      }
+      if (txTime > stats[t.category].lastUsedTime) {
+        stats[t.category].lastUsedTime = txTime;
+      }
+    });
+
+    return stats;
+  }, [transactions, type]);
+
   const frequentCategories = useMemo(() => {
     return [...filteredCategories].sort((a, b) => {
-      const totalA = categoryMonthlyTotals[a.id] || 0;
-      const totalB = categoryMonthlyTotals[b.id] || 0;
-      return totalB - totalA;
+      const statA = categoryFrequencyStats[a.id];
+      const statB = categoryFrequencyStats[b.id];
+
+      // 綜合頻率評分：近 30 天使用次數權重 x3 + 歷史總次數
+      const scoreA = (statA?.recentCount || 0) * 3 + (statA?.totalCount || 0);
+      const scoreB = (statB?.recentCount || 0) * 3 + (statB?.totalCount || 0);
+
+      if (scoreA !== scoreB) {
+        return scoreB - scoreA;
+      }
+
+      // 頻率相同時，以最後使用日期（Recency）優先
+      const lastA = statA?.lastUsedTime || 0;
+      const lastB = statB?.lastUsedTime || 0;
+      if (lastA !== lastB) {
+        return lastB - lastA;
+      }
+
+      // 未曾使用過時，預設分類優先，再按名稱自然排序
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return a.name.localeCompare(b.name);
     });
-  }, [filteredCategories, categoryMonthlyTotals]);
+  }, [filteredCategories, categoryFrequencyStats]);
 
   const displayedPills = useMemo(() => {
     const top = frequentCategories.slice(0, 6);
@@ -701,6 +755,7 @@ export function AddTransactionModal({
       await addTransaction(txData);
     }
     
+    triggerHaptic('success');
     onClose();
   };
 
@@ -778,13 +833,24 @@ export function AddTransactionModal({
         <div className="w-full min-h-full flex flex-col gap-2.5 sm:gap-3">
           {/* 1. Top Bar: Segmented Control & Close Button (h-9 / 36px, Sticky Top) */}
           <div className="sticky top-0 z-20 w-full flex items-center justify-between gap-2 shrink-0 bg-background/95 sm:bg-card/95 backdrop-blur-md py-1 -mt-1">
-            <div className="h-9 flex-1 bg-muted/80 border border-border p-0.5 rounded-full flex items-center justify-between text-xs font-medium">
+            <div className="relative h-9 flex-1 bg-muted/80 border border-border p-0.5 rounded-full flex items-center justify-between text-xs font-medium select-none overflow-hidden">
+              {/* Sliding Segmented Indicator */}
+              <div
+                className="absolute inset-y-0.5 rounded-full bg-primary pointer-events-none z-0 shadow-none transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                style={{
+                  left: '2px',
+                  width: 'calc((100% - 4px) / 5)',
+                  transform: `translate3d(${activeTypeIndex * 100}%, 0, 0)`,
+                }}
+                aria-hidden="true"
+              />
+
               <button 
                 type="button"
                 onClick={() => handleTypeChange('expense')}
                 className={cn(
-                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
-                  type === 'expense' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                  "relative z-10 h-full flex-1 rounded-full flex items-center justify-center text-center transition-colors cursor-pointer",
+                  activeTypeKey === 'expense' ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t('add.expense')}
@@ -793,8 +859,8 @@ export function AddTransactionModal({
                 type="button"
                 onClick={() => handleTypeChange('income')}
                 className={cn(
-                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
-                  type === 'income' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                  "relative z-10 h-full flex-1 rounded-full flex items-center justify-center text-center transition-colors cursor-pointer",
+                  activeTypeKey === 'income' ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t('add.income')}
@@ -809,9 +875,9 @@ export function AddTransactionModal({
                   handleTypeChange('transfer');
                 }}
                 className={cn(
-                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
-                  walletCount < 2 && type !== 'transfer' && "opacity-40 cursor-not-allowed",
-                  type === 'transfer' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                  "relative z-10 h-full flex-1 rounded-full flex items-center justify-center text-center transition-colors cursor-pointer",
+                  walletCount < 2 && activeTypeKey !== 'transfer' && "opacity-40 cursor-not-allowed",
+                  activeTypeKey === 'transfer' ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t('add.transfer')}
@@ -820,8 +886,8 @@ export function AddTransactionModal({
                 type="button"
                 onClick={() => handleTypeChange('loan', 'lend')}
                 className={cn(
-                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
-                  type === 'loan' && loanType === 'lend' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                  "relative z-10 h-full flex-1 rounded-full flex items-center justify-center text-center transition-colors cursor-pointer",
+                  activeTypeKey === 'lend' ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t('add.lend')}
@@ -830,8 +896,8 @@ export function AddTransactionModal({
                 type="button"
                 onClick={() => handleTypeChange('loan', 'borrow')}
                 className={cn(
-                  "h-full flex-1 rounded-full flex items-center justify-center text-center transition-all cursor-pointer",
-                  type === 'loan' && loanType === 'borrow' ? "bg-primary text-primary-foreground font-semibold shadow-none" : "text-muted-foreground hover:text-foreground"
+                  "relative z-10 h-full flex-1 rounded-full flex items-center justify-center text-center transition-colors cursor-pointer",
+                  activeTypeKey === 'borrow' ? "text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {t('add.borrow')}
@@ -1357,6 +1423,7 @@ export function AddTransactionModal({
                     key={cat.id}
                     type="button"
                     onClick={() => {
+                      triggerHaptic('selection');
                       setValue('categoryId', cat.id, { shouldValidate: true });
                       setIsCategoryWarning(false);
                     }}
@@ -1471,7 +1538,7 @@ export function AddTransactionModal({
               </DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto no-scrollbar py-2">
-              {filteredCategories.map(cat => {
+              {frequentCategories.map(cat => {
                 const isSelected = selectedCategoryId === cat.id;
                 const total = categoryMonthlyTotals[cat.id] || 0;
                 return (
@@ -1479,6 +1546,7 @@ export function AddTransactionModal({
                     key={cat.id}
                     type="button"
                     onClick={() => {
+                      triggerHaptic('selection');
                       setValue('categoryId', cat.id);
                       setIsCatPickerOpen(false);
                     }}

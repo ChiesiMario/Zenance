@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { triggerHaptic } from '@/lib/haptics';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
 import { toast } from '@/components/ui/toast';
@@ -113,19 +114,23 @@ export function NumericKeypad({
 
   const handleKeyPress = (key: string) => {
     if (key === 'C') {
+      triggerHaptic('medium');
       onChange('');
       return;
     }
     
     if (key === 'DEL') {
+      triggerHaptic('medium');
       onChange(value.slice(0, -1));
       return;
     }
 
     if (key === '=') {
       if (isExpression) {
+        triggerHaptic('medium');
         onChange(safeEvaluate(value));
       } else {
+        triggerHaptic('success');
         onSubmit();
       }
       return;
@@ -135,15 +140,18 @@ export function NumericKeypad({
     
     // Prevent multiple operators in a row
     if (operators.includes(key) && operators.includes(value.slice(-1))) {
+      triggerHaptic('light');
       onChange(value.slice(0, -1) + key);
       return;
     }
     
     // Prevent starting with an operator (except minus)
     if (value === '' && operators.includes(key) && key !== '-') {
+      triggerHaptic('warning');
       return;
     }
 
+    triggerHaptic('light');
     onChange(value + key);
   };
 

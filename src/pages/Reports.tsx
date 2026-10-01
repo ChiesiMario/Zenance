@@ -167,7 +167,8 @@ export default function Reports() {
     if (!rangeTransactions) return [];
 
     return rangeTransactions.filter(tx => {
-      // Exclude balance adjustments
+      // Exclude regular balance adjustments, but keep refund sub-transactions
+      if (tx.parentId) return true;
       const cat = allCategories?.find(c => c.id === tx.category);
       if (cat?.isSystem) return false;
 
@@ -175,17 +176,23 @@ export default function Reports() {
     });
   }, [rangeTransactions, allCategories]);
 
-  // Key Totals
+  // Key Totals (with refund contra-accounting)
   const { totalExpense, totalIncome, netBalance } = useMemo(() => {
     let exp = 0;
     let inc = 0;
     periodTransactions.forEach(tx => {
+      if (tx.parentId) {
+        // 支出退款直接扣除支出，收入退款直接扣除收入
+        if (tx.type === 'income') exp -= tx.amount;
+        else if (tx.type === 'expense') inc -= tx.amount;
+        return;
+      }
       if (tx.type === 'expense') exp += tx.amount;
       else if (tx.type === 'income') inc += tx.amount;
     });
     return {
-      totalExpense: exp,
-      totalIncome: inc,
+      totalExpense: Math.max(0, exp),
+      totalIncome: Math.max(0, inc),
       netBalance: inc - exp,
     };
   }, [periodTransactions]);
@@ -207,20 +214,23 @@ export default function Reports() {
 
   // Single peak expense transaction
   const peakExpenseTx = useMemo(() => {
-    const expenseList = periodTransactions.filter(tx => tx.type === 'expense');
+    const expenseList = periodTransactions.filter(tx => tx.type === 'expense' && !tx.parentId);
     if (expenseList.length === 0) return null;
     return expenseList.reduce((max, tx) => (tx.amount > max.amount ? tx : max), expenseList[0]);
   }, [periodTransactions]);
 
-  // Category breakdown generator
+  // Category breakdown generator (with contra-accounting deduction)
   const getCategoryBreakdown = useMemo(() => {
     return (type: 'expense' | 'income'): CategoryGroup[] => {
-      const list = periodTransactions.filter(tx => tx.type === type);
+      const mainList = periodTransactions.filter(tx => tx.type === type && !tx.parentId);
+      const refundList = periodTransactions.filter(
+        tx => tx.parentId && (type === 'expense' ? tx.type === 'income' : tx.type === 'expense')
+      );
       const total = type === 'expense' ? totalExpense : totalIncome;
 
       const grouped: Record<string, { categoryId: string; name: string; amount: number; transactions: Transaction[] }> = {};
 
-      list.forEach(tx => {
+      mainList.forEach(tx => {
         const catId = tx.category || 'unknown';
         if (!grouped[catId]) {
           const cat = allCategories?.find(c => c.id === catId);
@@ -235,22 +245,33 @@ export default function Reports() {
         grouped[catId].transactions.push(tx);
       });
 
+      // 沖抵扣減對應主交易分類金額
+      refundList.forEach(refTx => {
+        const parentTx = rangeTransactions?.find(t => t.id === refTx.parentId);
+        const targetCatId = parentTx?.category || refTx.category || 'unknown';
+        if (grouped[targetCatId]) {
+          grouped[targetCatId].amount = Math.max(0, grouped[targetCatId].amount - refTx.amount);
+          grouped[targetCatId].transactions.push(refTx);
+        }
+      });
+
       return Object.values(grouped)
+        .filter(item => item.amount > 0 || item.transactions.length > 0)
         .map(item => ({
           ...item,
-          percentage: total > 0 ? (item.amount / total) * 100 : 0,
+          percentage: total > 0 ? Math.min(100, Math.max(0, (item.amount / total) * 100)) : 0,
           transactions: sortTransactionsDesc(item.transactions),
         }))
         .sort((a, b) => b.amount - a.amount);
     };
-  }, [periodTransactions, totalExpense, totalIncome, allCategories, t]);
+  }, [periodTransactions, rangeTransactions, totalExpense, totalIncome, allCategories, t]);
 
   const expenseBreakdown = useMemo(() => getCategoryBreakdown('expense'), [getCategoryBreakdown]);
   const incomeBreakdown = useMemo(() => getCategoryBreakdown('income'), [getCategoryBreakdown]);
   const currentBreakdown = breakdownType === 'expense' ? expenseBreakdown : incomeBreakdown;
   const currentTotal = breakdownType === 'expense' ? totalExpense : totalIncome;
 
-  // Trend data generator
+  // Trend data generator (with contra-accounting per day/month)
   const trendData = useMemo(() => {
     interface TrendPoint {
       label: string;
@@ -262,26 +283,35 @@ export default function Reports() {
 
     const points: TrendPoint[] = [];
 
+    const calculateDayTotals = (txList: Transaction[]) => {
+      let exp = 0;
+      let inc = 0;
+      txList.forEach(tx => {
+        if (tx.parentId) {
+          if (tx.type === 'income') exp -= tx.amount;
+          else if (tx.type === 'expense') inc -= tx.amount;
+          return;
+        }
+        if (tx.type === 'expense') exp += tx.amount;
+        else if (tx.type === 'income') inc += tx.amount;
+      });
+      return { expense: Math.max(0, exp), income: Math.max(0, inc) };
+    };
+
     if (periodType === 'week') {
       const days = ['一', '二', '三', '四', '五', '六', '日'];
       for (let i = 0; i < 7; i++) {
         const currentDay = addWeeks(startDate, 0);
         currentDay.setDate(startDate.getDate() + i);
         const dayStr = format(currentDay, 'yyyy-MM-dd');
-        let exp = 0;
-        let inc = 0;
-        periodTransactions.forEach(tx => {
-          if (tx.date.startsWith(dayStr)) {
-            if (tx.type === 'expense') exp += tx.amount;
-            else if (tx.type === 'income') inc += tx.amount;
-          }
-        });
+        const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
+        const { expense, income } = calculateDayTotals(dayTxs);
         const isZh = i18n.language.startsWith('zh');
         points.push({
           label: isZh ? `週${days[i]}` : format(currentDay, 'EEE'),
           fullLabel: `${format(currentDay, 'MM/dd')} (${isZh ? `週${days[i]}` : format(currentDay, 'EEE')})`,
-          expense: exp,
-          income: inc,
+          expense,
+          income,
           dateKey: dayStr,
         });
       }
@@ -291,19 +321,13 @@ export default function Reports() {
         const currentDay = new Date(startDate);
         currentDay.setDate(day);
         const dayStr = format(currentDay, 'yyyy-MM-dd');
-        let exp = 0;
-        let inc = 0;
-        periodTransactions.forEach(tx => {
-          if (tx.date.startsWith(dayStr)) {
-            if (tx.type === 'expense') exp += tx.amount;
-            else if (tx.type === 'income') inc += tx.amount;
-          }
-        });
+        const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
+        const { expense, income } = calculateDayTotals(dayTxs);
         points.push({
           label: `${day}日`,
           fullLabel: `${format(currentDay, 'yyyy/MM/dd')}`,
-          expense: exp,
-          income: inc,
+          expense,
+          income,
           dateKey: dayStr,
         });
       }
@@ -311,39 +335,31 @@ export default function Reports() {
       const startM = startDate.getMonth();
       for (let i = 0; i < 3; i++) {
         const m = (startM + i) % 12;
-        let exp = 0;
-        let inc = 0;
-        periodTransactions.forEach(tx => {
+        const monthTxs = periodTransactions.filter(tx => {
           const dateObj = parseISO(tx.date);
-          if (dateObj.getMonth() === m) {
-            if (tx.type === 'expense') exp += tx.amount;
-            else if (tx.type === 'income') inc += tx.amount;
-          }
+          return dateObj.getMonth() === m;
         });
+        const { expense, income } = calculateDayTotals(monthTxs);
         points.push({
           label: `${m + 1}月`,
           fullLabel: `${getYear(currentDate)} 年 ${m + 1} 月`,
-          expense: exp,
-          income: inc,
+          expense,
+          income,
           dateKey: `${getYear(currentDate)}-${String(m + 1).padStart(2, '0')}`,
         });
       }
     } else {
       for (let m = 0; m < 12; m++) {
-        let exp = 0;
-        let inc = 0;
-        periodTransactions.forEach(tx => {
+        const monthTxs = periodTransactions.filter(tx => {
           const dateObj = parseISO(tx.date);
-          if (dateObj.getMonth() === m) {
-            if (tx.type === 'expense') exp += tx.amount;
-            else if (tx.type === 'income') inc += tx.amount;
-          }
+          return dateObj.getMonth() === m;
         });
+        const { expense, income } = calculateDayTotals(monthTxs);
         points.push({
           label: `${m + 1}月`,
           fullLabel: `${getYear(currentDate)} 年 ${m + 1} 月`,
-          expense: exp,
-          income: inc,
+          expense,
+          income,
           dateKey: `${getYear(currentDate)}-${String(m + 1).padStart(2, '0')}`,
         });
       }

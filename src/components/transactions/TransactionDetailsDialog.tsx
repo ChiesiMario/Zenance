@@ -11,7 +11,91 @@ import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { Logo } from '@/components/ui/Logo';
+import { RefundDialog } from './RefundDialog';
 import type { Transaction } from '@/services/db/db';
+
+interface TreeBranchConnectorProps {
+  count: number;
+  cardWidth?: number;
+  gap?: number;
+  height?: number;
+}
+
+function TreeBranchConnector({
+  count,
+  cardWidth = 300,
+  gap = 24,
+  height = 56,
+}: TreeBranchConnectorProps) {
+  const targetY = height - 12; // Y = 44
+
+  if (count <= 1) {
+    return (
+      <div
+        style={{ height: `${height}px` }}
+        className="flex items-center justify-center relative w-full overflow-visible shrink-0 pointer-events-none"
+      >
+        <svg
+          width="32"
+          height={height}
+          viewBox={`0 0 32 ${height}`}
+          className="text-border overflow-visible"
+        >
+          {/* 頂部源點 */}
+          <circle cx="16" cy="0" r="2" className="fill-muted-foreground/40" />
+          {/* 垂直直線 */}
+          <line x1="16" y1="0" x2="16" y2={targetY} stroke="currentColor" strokeWidth="1.2" />
+          {/* 終端環形微芯端點 */}
+          <circle cx="16" cy={targetY} r="3" stroke="#10b981" strokeWidth="1.2" className="fill-card" />
+          <circle cx="16" cy={targetY} r="1.2" className="fill-emerald-500" />
+        </svg>
+      </div>
+    );
+  }
+
+  const span = cardWidth + gap;
+  const totalWidth = (count - 1) * span;
+  const svgWidth = totalWidth + 48;
+  const centerX = svgWidth / 2;
+
+  const childXs = Array.from({ length: count }, (_, idx) => {
+    const offset = (idx - (count - 1) / 2) * span;
+    return centerX + offset;
+  });
+
+  return (
+    <div
+      style={{ height: `${height}px` }}
+      className="flex items-center justify-center relative w-full overflow-visible shrink-0 pointer-events-none"
+    >
+      <svg
+        width={svgWidth}
+        height={height}
+        viewBox={`0 0 ${svgWidth} ${height}`}
+        className="text-border overflow-visible"
+      >
+        {/* 頂部中央節點：自然銜接父卡片底端 */}
+        <circle cx={centerX} cy="0" r="2.5" className="fill-muted-foreground/50" />
+
+        {/* 貝茲平滑分流曲線（Cubic Bezier S-Curve） */}
+        {childXs.map((x, idx) => (
+          <g key={idx}>
+            <path
+              d={`M ${centerX} 0 C ${centerX} ${targetY * 0.45}, ${x} ${targetY * 0.55}, ${x} ${targetY}`}
+              stroke="currentColor"
+              strokeWidth="1.2"
+              fill="none"
+              strokeLinecap="round"
+            />
+            {/* 終端環形微芯端點（Ring with Emerald Core） */}
+            <circle cx={x} cy={targetY} r="3" stroke="#10b981" strokeWidth="1.2" className="fill-card" />
+            <circle cx={x} cy={targetY} r="1.2" className="fill-emerald-500" />
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
 
 interface Props {
   transactionId: string | null;
@@ -24,12 +108,11 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const { transactions, deleteTransaction } = useTransactions();
   const { allCategories } = useCategories();
   const { accounts, wallets, allWallets, contacts, allContacts } = useAccounts();
-  const { activeLedgerId, setEditingTransactionId, openAddModal } = useAppStore();
+  const { activeLedgerId, setEditingTransactionId } = useAppStore();
   const { ledgers } = useLedgers();
 
-  // Active transaction ID within the group
+  // 1. 核心點擊交易與當前聚焦交易
   const [activeTxId, setActiveTxId] = useState<string | null>(transactionId);
-  const touchStartX = useRef<number>(0);
 
   useEffect(() => {
     setActiveTxId(transactionId);
@@ -40,84 +123,457 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     return transactions.find((tx) => tx.id === activeTxId) || null;
   }, [activeTxId, transactions]);
 
-  // Find all sibling/related transactions in the same group (split group or transfer + fee)
-  const groupTransactions = useMemo(() => {
-    if (!currentTransaction || !transactions) return [];
+  // 2. 獲取初始點擊交易的根節點
+  const initialRootTx = useMemo(() => {
+    if (!transactionId || !transactions) return null;
+    const clicked = transactions.find((t) => t.id === transactionId);
+    if (!clicked) return null;
+    if (clicked.parentId) {
+      return transactions.find((t) => t.id === clicked.parentId) || clicked;
+    }
+    return clicked;
+  }, [transactionId, transactions]);
 
-    // By splitGroupId (AA / Split expense or Transfer + Fee)
-    if (currentTransaction.splitGroupId) {
+  // 3. 獲取所有相關的主交易（若有 splitGroupId 則獲取整個群組的所有主交易；否則只有單筆主交易）
+  const relatedRootTransactions = useMemo(() => {
+    if (!initialRootTx || !transactions) return [];
+
+    if (initialRootTx.splitGroupId) {
       const list = transactions.filter(
-        (t) => !t.deleted && t.splitGroupId === currentTransaction.splitGroupId
+        (t) => !t.deleted && !t.parentId && t.splitGroupId === initialRootTx.splitGroupId
       );
       return sortTransactionsDesc(list);
     }
 
-    return [currentTransaction];
-  }, [currentTransaction, transactions]);
+    return [initialRootTx];
+  }, [initialRootTx, transactions]);
 
-  const currentIndex = useMemo(() => {
-    if (!currentTransaction || groupTransactions.length === 0) return 0;
-    const idx = groupTransactions.findIndex((t) => t.id === currentTransaction.id);
-    return idx >= 0 ? idx : 0;
-  }, [currentTransaction, groupTransactions]);
-
-  // Single card width = 320px, gap = 24px
+  // 4. 二維列結構化構建：每一列包含一個主交易及其名下的所有子退款
   const CARD_WIDTH = 320;
-  const CARD_GAP = 24;
+  const REFUND_GAP = 24;
+  const COLUMN_GAP = 32;
+  const CONNECTOR_HEIGHT = 56;
 
-  const totalTrackWidth = useMemo(() => {
-    const n = groupTransactions.length;
-    if (n === 0) return CARD_WIDTH;
-    return n * CARD_WIDTH + (n - 1) * CARD_GAP;
-  }, [groupTransactions.length]);
+  const columnsData = useMemo(() => {
+    if (!transactions || relatedRootTransactions.length === 0) return [];
 
-  const trackCenter = totalTrackWidth / 2;
+    // 先獲取每一列的交易數據及退款列表
+    const rawCols = relatedRootTransactions.map((rootTx) => {
+      const refunds = sortTransactionsDesc(
+        transactions.filter((t) => !t.deleted && t.parentId === rootTx.id)
+      );
+      const refundCount = refunds.length;
+      const refundGroupWidth =
+        refundCount <= 1
+          ? (refundCount === 1 ? CARD_WIDTH : 0)
+          : refundCount * CARD_WIDTH + (refundCount - 1) * REFUND_GAP;
 
-  const activeCardCenter = useMemo(() => {
-    return currentIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
-  }, [currentIndex]);
+      return {
+        rootTx,
+        refunds,
+        refundCount,
+        refundGroupWidth,
+      };
+    });
 
-  const centerTranslateX = -(activeCardCenter - trackCenter);
+    // 依序計算每棵樹的中心軸 centerX 與各卡片絕對 X 座標
+    const result = [];
+    let prevCenterX = 0;
+    let prevRefundGroupWidth = 0;
+    let prevHasRefunds = false;
 
-  const handlePrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setActiveTxId(groupTransactions[currentIndex - 1].id);
+    for (let i = 0; i < rawCols.length; i++) {
+      const col = rawCols[i];
+      let centerX: number;
+
+      if (i === 0) {
+        // 第 0 列的中心軸：確保退款卡片或主卡片左緣不小於 0
+        const minLeftSpan = Math.max(CARD_WIDTH / 2, col.refundGroupWidth / 2);
+        centerX = minLeftSpan;
+      } else {
+        // 條件 1：頂部主卡片行保持標準緊湊間距（間距 32px，卡片中心間距 352px）
+        let minCenterX = prevCenterX + CARD_WIDTH + COLUMN_GAP;
+
+        // 條件 2：若前一列與當前列皆有名下退款，必須確保底部退款行也不重疊
+        if (prevHasRefunds && col.refundCount > 0) {
+          const minRefundCenterX =
+            prevCenterX + (prevRefundGroupWidth + col.refundGroupWidth) / 2 + COLUMN_GAP;
+          minCenterX = Math.max(minCenterX, minRefundCenterX);
+        }
+
+        centerX = minCenterX;
+      }
+
+      // 主卡片左緣
+      const rootLeft = centerX - CARD_WIDTH / 2;
+
+      // 退款卡片中心與左緣
+      const childCenters: number[] = [];
+      const childLefts: number[] = [];
+      for (let rIdx = 0; rIdx < col.refundCount; rIdx++) {
+        const offset =
+          col.refundCount <= 1
+            ? 0
+            : (rIdx - (col.refundCount - 1) / 2) * (CARD_WIDTH + REFUND_GAP);
+        const cCenter = centerX + offset;
+        childCenters.push(cCenter);
+        childLefts.push(cCenter - CARD_WIDTH / 2);
+      }
+
+      result.push({
+        rootTx: col.rootTx,
+        refunds: col.refunds,
+        centerX,
+        rootLeft,
+        childCenters,
+        childLefts,
+        refundCount: col.refundCount,
+      });
+
+      prevCenterX = centerX;
+      prevRefundGroupWidth = col.refundGroupWidth;
+      prevHasRefunds = col.refundCount > 0;
     }
-  }, [currentIndex, groupTransactions]);
 
-  const handleNext = useCallback(() => {
-    if (currentIndex >= 0 && currentIndex < groupTransactions.length - 1) {
-      setActiveTxId(groupTransactions[currentIndex + 1].id);
-    }
-  }, [currentIndex, groupTransactions]);
+    return result;
+  }, [relatedRootTransactions, transactions]);
 
-  // Keyboard arrow navigation
+  // 5. 尺寸測量（舞台尺寸與卡片高度）
+  const stageRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const childrenRef = useRef<HTMLDivElement>(null);
+
+  const [stageSize, setStageSize] = useState(() => ({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }));
+  const [parentHeight, setParentHeight] = useState(520);
+  const [childrenHeight, setChildrenHeight] = useState(440);
+
+  // 控制相機平移過渡：初次打開時為 false（禁用過渡以防滑動/跳動），後續主動切換卡片時才啟用平滑過渡
+  const [isTransitionReady, setIsTransitionReady] = useState(false);
+  // 控制初次渲染可見性：在完成首幀真實高度測量前保持透明，測量完畢後柔和淡入，徹底杜絕高度突變引起的由下至上跳動
+  const [isReadyToDisplay, setIsReadyToDisplay] = useState(false);
+
   useEffect(() => {
-    if (!transactionId || groupTransactions.length <= 1) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        handlePrev();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleNext();
+    setIsReadyToDisplay(false);
+    setIsTransitionReady(false);
+  }, [transactionId]);
+
+  useEffect(() => {
+    const updateMeasurements = () => {
+      if (stageRef.current) {
+        const clientW = stageRef.current.clientWidth;
+        const clientH = stageRef.current.clientHeight;
+        if (clientW > 0 && clientH > 0) {
+          setStageSize({ width: clientW, height: clientH });
+        }
+
+        // 動態獲取同行主交易卡片的最大高度，確保同一行主卡片底緣齊平
+        const pSlots = stageRef.current.querySelectorAll('.card-parent-slot');
+        let maxP = 0;
+        pSlots.forEach((el) => {
+          const cardEl = (el as HTMLElement).firstElementChild as HTMLElement;
+          const h = cardEl ? cardEl.offsetHeight : (el as HTMLElement).offsetHeight;
+          if (h > maxP) maxP = h;
+        });
+        if (maxP > 0) setParentHeight(maxP);
+
+        // 動態獲取同行退款卡片的最大高度，確保同一行退款卡片底緣齊平
+        const cSlots = stageRef.current.querySelectorAll('.card-child-slot');
+        let maxC = 0;
+        cSlots.forEach((el) => {
+          const cardEl = (el as HTMLElement).firstElementChild as HTMLElement;
+          const h = cardEl ? cardEl.offsetHeight : (el as HTMLElement).offsetHeight;
+          if (h > maxC) maxC = h;
+        });
+        if (maxC > 0) setChildrenHeight(maxC);
+
+        // 首次測量就緒，可以純淡入呈現
+        setIsReadyToDisplay(true);
       }
     };
+
+    // 首幀立即測量，隨後雙重保險確認字型排版就緒
+    const rafId = requestAnimationFrame(() => {
+      updateMeasurements();
+    });
+    const timer = setTimeout(updateMeasurements, 40);
+    const transitionTimer = setTimeout(() => {
+      setIsTransitionReady(true);
+    }, 150);
+
+    window.addEventListener('resize', updateMeasurements);
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timer);
+      clearTimeout(transitionTimer);
+      window.removeEventListener('resize', updateMeasurements);
+    };
+  }, [columnsData, activeTxId]);
+
+  // 6. 計算當前選中卡片在二維舞台上的絕對座標 (x, y)
+  const activeLocation = useMemo(() => {
+    if (!activeTxId || columnsData.length === 0) {
+      return { x: CARD_WIDTH / 2, y: parentHeight / 2, colIdx: 0, isChild: false, childIdx: -1 };
+    }
+
+    for (let cIdx = 0; cIdx < columnsData.length; cIdx++) {
+      const col = columnsData[cIdx];
+      // 6.1 選中的是主交易
+      if (col.rootTx.id === activeTxId) {
+        return {
+          x: col.centerX,
+          y: parentHeight / 2,
+          colIdx: cIdx,
+          isChild: false,
+          childIdx: -1,
+        };
+      }
+
+      // 6.2 選中的是該主交易名下的退款子交易
+      const refIdx = col.refunds.findIndex((r) => r.id === activeTxId);
+      if (refIdx >= 0) {
+        return {
+          x: col.childCenters[refIdx],
+          y: parentHeight + CONNECTOR_HEIGHT + childrenHeight / 2,
+          colIdx: cIdx,
+          isChild: true,
+          childIdx: refIdx,
+        };
+      }
+    }
+
+    // 預設第 0 列主交易
+    return {
+      x: columnsData[0]?.centerX || CARD_WIDTH / 2,
+      y: parentHeight / 2,
+      colIdx: 0,
+      isChild: false,
+      childIdx: -1,
+    };
+  }, [activeTxId, columnsData, parentHeight, childrenHeight]);
+
+  // 畫布總寬度（計算最右側卡片的邊界）
+  const totalCanvasWidth = useMemo(() => {
+    if (columnsData.length === 0) return 800;
+    let maxRight = 0;
+    for (const col of columnsData) {
+      const rootRight = col.rootLeft + CARD_WIDTH;
+      if (rootRight > maxRight) maxRight = rootRight;
+      for (const left of col.childLefts) {
+        const childRight = left + CARD_WIDTH;
+        if (childRight > maxRight) maxRight = childRight;
+      }
+    }
+    return maxRight;
+  }, [columnsData]);
+
+  // 7. 相機平移量：將當前選中卡片的 (x, y) 搬移到舞台中央 (stageWidth / 2, stageHeight / 2)
+  const currentTranslateX = stageSize.width / 2 - activeLocation.x;
+  const currentTranslateY = stageSize.height / 2 - activeLocation.y;
+
+  // 當前聚焦列
+  const currentColumn = useMemo(() => {
+    if (columnsData.length === 0) return null;
+    return columnsData[activeLocation.colIdx] || columnsData[0];
+  }, [columnsData, activeLocation.colIdx]);
+
+  // 當前列的主交易
+  const activeRootTx = currentColumn?.rootTx || null;
+
+  // 當前列的所有退款
+  const activeColumnRefunds = useMemo(() => {
+    return currentColumn?.refunds || [];
+  }, [currentColumn]);
+
+  // 已退款總額
+  const refundedTotal = useMemo(() => {
+    return activeColumnRefunds.reduce((sum, r) => sum + (r.originalAmount ?? r.amount), 0);
+  }, [activeColumnRefunds]);
+
+  // 主交易原始金額
+  const rootOriginalAmount = useMemo(() => {
+    if (!activeRootTx) return 0;
+    return activeRootTx.originalAmount ?? activeRootTx.amount;
+  }, [activeRootTx]);
+
+  // 剩餘可退金額上限
+  const maxRefundable = useMemo(() => {
+    return Math.max(0, Math.round((rootOriginalAmount - refundedTotal) * 100) / 100);
+  }, [rootOriginalAmount, refundedTotal]);
+
+  // 當前選中的交易是否為退款子交易
+  const isCurrentActiveRefund = activeLocation.isChild;
+
+  // 當前選中的交易是否為不可退款類型（轉帳或借貸不可退）
+  const isNonRefundableType = useMemo(() => {
+    if (!activeRootTx) return true;
+    return activeRootTx.type !== 'expense' && activeRootTx.type !== 'income';
+  }, [activeRootTx]);
+
+  // 退款彈窗開關
+  const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
+
+  // 8. 二維巡航邏輯 (Navigate Left / Right / Up / Down)
+  const navigateLeft = useCallback(() => {
+    if (columnsData.length === 0) return;
+    const { colIdx, isChild, childIdx } = activeLocation;
+    const col = columnsData[colIdx];
+
+    if (isChild) {
+      if (childIdx > 0) {
+        setActiveTxId(col.refunds[childIdx - 1].id);
+        return;
+      }
+      if (colIdx > 0) {
+        const prevCol = columnsData[colIdx - 1];
+        if (prevCol.refunds.length > 0) {
+          setActiveTxId(prevCol.refunds[prevCol.refunds.length - 1].id);
+        } else {
+          setActiveTxId(prevCol.rootTx.id);
+        }
+      }
+    } else {
+      if (colIdx > 0) {
+        setActiveTxId(columnsData[colIdx - 1].rootTx.id);
+      }
+    }
+  }, [columnsData, activeLocation]);
+
+  const navigateRight = useCallback(() => {
+    if (columnsData.length === 0) return;
+    const { colIdx, isChild, childIdx } = activeLocation;
+    const col = columnsData[colIdx];
+
+    if (isChild) {
+      if (childIdx < col.refunds.length - 1) {
+        setActiveTxId(col.refunds[childIdx + 1].id);
+        return;
+      }
+      if (colIdx < columnsData.length - 1) {
+        const nextCol = columnsData[colIdx + 1];
+        if (nextCol.refunds.length > 0) {
+          setActiveTxId(nextCol.refunds[0].id);
+        } else {
+          setActiveTxId(nextCol.rootTx.id);
+        }
+      }
+    } else {
+      if (colIdx < columnsData.length - 1) {
+        setActiveTxId(columnsData[colIdx + 1].rootTx.id);
+      }
+    }
+  }, [columnsData, activeLocation]);
+
+  const navigateDown = useCallback(() => {
+    if (columnsData.length === 0) return;
+    const { colIdx, isChild } = activeLocation;
+    const col = columnsData[colIdx];
+
+    if (!isChild && col.refunds.length > 0) {
+      setActiveTxId(col.refunds[0].id);
+    }
+  }, [columnsData, activeLocation]);
+
+  const navigateUp = useCallback(() => {
+    if (columnsData.length === 0) return;
+    const { colIdx, isChild } = activeLocation;
+    const col = columnsData[colIdx];
+
+    if (isChild) {
+      setActiveTxId(col.rootTx.id);
+    }
+  }, [columnsData, activeLocation]);
+
+  // 鍵盤導航
+  useEffect(() => {
+    if (!transactionId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateUp();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateDown();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navigateLeft();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navigateRight();
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [transactionId, groupTransactions, handlePrev, handleNext]);
+  }, [transactionId, navigateUp, navigateDown, navigateLeft, navigateRight]);
+
+  // 觸控手勢
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (groupTransactions.length <= 1) return;
-    const diff = e.changedTouches[0].clientX - touchStartX.current;
-    if (diff > 45) {
-      handlePrev();
-    } else if (diff < -45) {
-      handleNext();
+    const diffX = e.changedTouches[0].clientX - touchStartX.current;
+    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+
+    if (Math.abs(diffY) >= Math.abs(diffX) && Math.abs(diffY) > 35) {
+      if (diffY < -35) {
+        navigateDown();
+      } else if (diffY > 35) {
+        navigateUp();
+      }
+    } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 35) {
+      if (diffX < -35) {
+        navigateRight();
+      } else if (diffX > 35) {
+        navigateLeft();
+      }
+    }
+  };
+
+  // 滑鼠滾輪（支援 Shift 水平滑動與原生水平/垂直滾動）
+  const wheelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    // 判斷是否為水平滾動（按住 Shift 鍵，或原生水平滾動 deltaX 大於 deltaY）
+    const isHorizontal = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+
+    if (isHorizontal) {
+      // 若按住 Shift 鍵，不同瀏覽器/平臺可能由 deltaX 或 deltaY 攜帶滾動幅度
+      const effectiveDelta = Math.abs(e.deltaX) >= 20 ? e.deltaX : e.deltaY;
+      if (Math.abs(effectiveDelta) < 20) return;
+
+      if (wheelTimeoutRef.current) return;
+      wheelTimeoutRef.current = setTimeout(() => {
+        wheelTimeoutRef.current = null;
+      }, 350);
+
+      if (effectiveDelta > 0) {
+        navigateRight();
+      } else if (effectiveDelta < 0) {
+        navigateLeft();
+      }
+    } else {
+      // 常規垂直滾動：在主卡片與名下退款子卡片之間上下切換
+      if (Math.abs(e.deltaY) < 20) return;
+
+      if (wheelTimeoutRef.current) return;
+      wheelTimeoutRef.current = setTimeout(() => {
+        wheelTimeoutRef.current = null;
+      }, 350);
+
+      if (e.deltaY > 0) {
+        navigateDown();
+      } else if (e.deltaY < 0) {
+        navigateUp();
+      }
     }
   };
 
@@ -151,6 +607,9 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     }
     const cat = allCategories?.find((c) => c.id === categoryId);
     if (cat?.isSystem) {
+      if (cat.name.includes('退款') || cat.name.toLowerCase().includes('refund')) {
+        return t('refund.title', '退款');
+      }
       return t('accounts.balanceAdjustment');
     }
     if (
@@ -216,10 +675,15 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const handleDelete = async () => {
     if (!activeTxId || !currentTransaction) return;
 
-    const description = t('dashboard.deleteTransactionConfirm');
+    const isChild = !!currentTransaction.parentId;
+    const description = isChild
+      ? t('refund.deleteRefundConfirm', '確定要刪除這筆退款記錄嗎？此操作無法復原。')
+      : activeColumnRefunds.length > 0
+      ? t('refund.deleteParentWithChildrenConfirm', '確定要刪除這筆主交易及其關聯的退款記錄嗎？此操作無法復原。')
+      : t('dashboard.deleteTransactionConfirm');
 
     const confirmed = await confirm({
-      title: t('dashboard.deleteTransaction'),
+      title: isChild ? t('refund.deleteRefundTitle', '刪除退款') : t('dashboard.deleteTransaction'),
       description,
       confirmText: t('common.delete'),
       variant: 'destructive',
@@ -227,45 +691,32 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
     if (!confirmed) return;
 
-    await deleteTransaction(activeTxId);
-
-    // If there are other items in the group, switch to sibling; otherwise close
-    if (groupTransactions.length > 1) {
-      if (currentIndex > 0) {
-        setActiveTxId(groupTransactions[currentIndex - 1].id);
-      } else if (currentIndex < groupTransactions.length - 1) {
-        setActiveTxId(groupTransactions[currentIndex + 1].id);
+    if (isChild) {
+      await deleteTransaction(activeTxId);
+      if (activeRootTx) {
+        setActiveTxId(activeRootTx.id);
       } else {
         onClose();
       }
     } else {
-      onClose();
+      if (activeColumnRefunds.length > 0) {
+        for (const child of activeColumnRefunds) {
+          await deleteTransaction(child.id);
+        }
+      }
+      await deleteTransaction(activeTxId);
+      const remainingCols = columnsData.filter((c) => c.rootTx.id !== activeTxId);
+      if (remainingCols.length > 0) {
+        setActiveTxId(remainingCols[0].rootTx.id);
+      } else {
+        onClose();
+      }
     }
   };
 
   const handleRefund = () => {
-    if (!currentTransaction) return;
-
-    // 支出退款轉為收款/收入，收入退款轉為支出
-    const refundType = currentTransaction.type === 'expense' ? 'income' : 'expense';
-    const refundAmount = currentTransaction.originalAmount ?? currentTransaction.amount;
-    const catName = getCategoryName(currentTransaction.category, currentTransaction);
-    const prefix = t('dashboard.refundPrefix', '退款：');
-    const refundNote = currentTransaction.note 
-      ? `${prefix}${currentTransaction.note}` 
-      : `${prefix}${catName}`;
-
-    onClose();
-    openAddModal(
-      refundType,
-      'borrow',
-      undefined,
-      currentTransaction.toAccountId || undefined,
-      refundAmount,
-      currentTransaction.accountId,
-      currentTransaction.category,
-      refundNote
-    );
+    if (!activeRootTx || isCurrentActiveRefund || isNonRefundableType || maxRefundable <= 0) return;
+    setIsRefundDialogOpen(true);
   };
 
   /**
@@ -273,6 +724,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
    */
   const renderCard = (tx: Transaction, idx: number) => {
     const isActive = tx.id === activeTxId;
+    const isChild = !!tx.parentId;
     const displayRef = tx.displayId || tx.id.split('-')[0].toUpperCase();
     const categoryTitle = getCategoryName(tx.category, tx);
     const barcode = getBarcodeBars(displayRef + tx.id);
@@ -306,7 +758,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     const isTransferFee =
       tx.type === 'expense' &&
       !!tx.splitGroupId &&
-      groupTransactions.some((t) => t.type === 'transfer');
+      relatedRootTransactions.some((t) => t.type === 'transfer');
     const isLoan = tx.type === 'loan';
     const isDirectOriginal = isTransfer || isTransferFee || isLoan;
     const isLendLoan = tx.type === 'loan' && isLend;
@@ -388,7 +840,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           }
         }}
         className={cn(
-          "w-[320px] shrink-0 bg-card text-card-foreground border border-border rounded-2xl shadow-none relative overflow-hidden transition-all duration-300",
+          "w-[320px] shrink-0 bg-card text-card-foreground rounded-2xl shadow-none relative overflow-hidden transition-all duration-300 border border-border flex flex-col justify-between",
           isActive
             ? "opacity-100 pointer-events-auto select-text cursor-default"
             : "opacity-30 hover:opacity-60 cursor-pointer pointer-events-auto select-none"
@@ -397,22 +849,29 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         {/* Top Paper Header: Branding & Serial */}
         <div className="pt-5 px-5 pb-2.5 flex flex-col items-center text-center">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <Logo size={18} showBorder={false} className="rounded shrink-0" />
-            <span className="text-[11px] font-mono font-bold uppercase tracking-[0.25em] text-foreground">
-              ZENANCE
+            {isChild ? (
+              <div className="w-4 h-4 rounded bg-emerald-500 text-black text-[10px] font-bold flex items-center justify-center font-mono">↩</div>
+            ) : (
+              <Logo size={18} showBorder={false} className="rounded shrink-0" />
+            )}
+            <span className={cn(
+              "text-[11px] font-mono font-bold uppercase tracking-[0.25em]",
+              isChild ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"
+            )}>
+              {isChild ? "REFUND VOUCHER" : "ZENANCE"}
             </span>
           </div>
           <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground block mb-2.5">
-            {t('receipt.voucherTitle', 'TRANSACTION RECEIPT')}
+            {isChild ? t('refund.subRefundItem', '退款憑證') : t('receipt.voucherTitle', 'TRANSACTION RECEIPT')}
           </span>
 
           {/* Serial & Date Bar (shows group index if multiple cards) */}
           <div className="w-full flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-3 border-b border-border/70 pb-2">
             <div className="flex items-center gap-1 font-semibold text-foreground">
               <span>#{displayRef}</span>
-              {groupTransactions.length > 1 && (
+              {!isChild && columnsData.length > 1 && (
                 <span className="text-[10px] text-muted-foreground/60 font-normal">
-                  ({idx + 1}/{groupTransactions.length})
+                  ({idx + 1}/{columnsData.length})
                 </span>
               )}
             </div>
@@ -424,7 +883,11 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         <div className="px-5 py-2 flex flex-col items-center text-center">
           {/* Category Capsule / Transfer Route & Status Badges */}
           <div className="flex items-center justify-center gap-1.5 mb-1.5 flex-wrap">
-            {tx.type === 'transfer' ? (
+            {isChild ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 leading-none shrink-0">
+                {tx.type === 'income' ? t('refund.title', '支出退款') : t('refund.title', '收入退款')}
+              </span>
+            ) : tx.type === 'transfer' ? (
               (() => {
                 const fromName = getAccountName(tx.accountId);
                 const toName = getAccountName(tx.toAccountId || '');
@@ -475,15 +938,33 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           </div>
 
           {/* Hero Amount Monospace Display */}
-          <div className="text-3xl sm:text-4xl font-mono tracking-tighter font-extrabold select-all py-1.5 text-foreground leading-tight">
+          <div className="text-3xl sm:text-4xl font-mono tracking-tighter font-extrabold select-all py-1.5 leading-tight">
             <AmountDisplay
               amount={cardAmount}
               originalCurrency={isDirectOriginal ? undefined : tx.originalCurrency}
               baseCurrency={cardBaseCurrency}
               isApproximate={isDirectOriginal ? false : undefined}
-              type={cardType as any}
+              type={isChild ? 'income' : (cardType as any)}
+              className={isChild ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"}
+              showSign={isChild ? true : undefined}
             />
           </div>
+
+          {/* 若為主交易且存在已退款金額，顯示已退款提示 */}
+          {!isChild && (() => {
+            const cardRefunds = transactions?.filter((t) => !t.deleted && t.parentId === tx.id) || [];
+            const cardRefundedTotal = cardRefunds.reduce((sum, r) => sum + (r.originalAmount ?? r.amount), 0);
+            if (cardRefundedTotal <= 0) return null;
+            return (
+              <div className="text-[11px] font-mono text-muted-foreground mt-0.5 flex items-center gap-1">
+                <span>{getAccountName(tx.accountId)}</span>
+                <span className="text-muted-foreground/60">·</span>
+                <span className="text-emerald-500 dark:text-emerald-400 font-medium">
+                  {t('refund.refunded', '已退款')} {cardRefundedTotal.toFixed(2)}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Ticket Notches & Dashed Perforation Line */}
@@ -614,6 +1095,8 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               </p>
             </div>
           )}
+
+
         </div>
 
         {/* Barcode & Footer Receipt Section */}
@@ -644,7 +1127,8 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     <Dialog open={!!transactionId} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !gap-4 !overflow-visible !pointer-events-none select-none"
+        fullscreen={true}
+        className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !overflow-hidden !pointer-events-none select-none duration-200"
       >
         <DialogTitle className="sr-only">
           {t('receipt.voucherTitle', '交易憑證')} - #{currentTransaction.displayId || currentTransaction.id}
@@ -657,84 +1141,174 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         />
 
         {/* ========================================================= */}
-        {/* Unified Centering Carousel Track                          */}
+        {/* Main Content Area                                         */}
         {/* ========================================================= */}
         <div
-          className="relative z-10 w-full flex items-end justify-center overflow-visible pt-1 pb-0 pointer-events-auto cursor-pointer"
-          onClick={onClose}
+          className={cn(
+            "relative z-10 w-full h-full pointer-events-none transition-opacity duration-150 ease-out",
+            isReadyToDisplay ? "opacity-100" : "opacity-0"
+          )}
         >
-          {groupTransactions.length <= 1 ? (
-            // Single standalone card: centered
-            <div className="p-0 flex items-end justify-center cursor-default" onClick={(e) => e.stopPropagation()}>
-              {renderCard(currentTransaction, 0)}
-            </div>
-          ) : (
+          
+          {/* Scrollable / Centered 2D Stage (佔滿全螢幕高度，杜絕上下邊界裁切) */}
+          <div
+            ref={stageRef}
+            className="absolute inset-0 w-full h-full overflow-hidden pointer-events-auto select-none"
+            onWheel={handleWheel}
+            onClick={onClose}
+          >
             <div
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
-              className="flex items-end gap-6 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] cursor-default"
+              className={cn(
+                "absolute left-0 top-0 cursor-default will-change-transform",
+                isTransitionReady
+                  ? "transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                  : "transition-none"
+              )}
               style={{
-                transform: `translateX(${centerTranslateX}px)`,
+                transform: `translate3d(${currentTranslateX}px, ${currentTranslateY}px, 0)`,
+                width: `${totalCanvasWidth}px`,
+                height: `${parentHeight + CONNECTOR_HEIGHT + childrenHeight}px`,
               }}
               onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  onClose();
-                }
+                if (e.target === e.currentTarget) onClose();
               }}
             >
-              {groupTransactions.map((tx, idx) => renderCard(tx, idx))}
+              {/* 1. 中間樹狀分支連接線 */}
+              {columnsData.map((col) => {
+                if (col.refunds.length === 0) return null;
+                return (
+                  <div
+                    key={`conn-${col.rootTx.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${col.centerX}px`,
+                      top: `${parentHeight}px`,
+                      transform: 'translateX(-50%)',
+                      height: `${CONNECTOR_HEIGHT}px`,
+                    }}
+                    className="pointer-events-none"
+                  >
+                    <TreeBranchConnector
+                      count={col.refunds.length}
+                      cardWidth={CARD_WIDTH}
+                      gap={REFUND_GAP}
+                      height={CONNECTOR_HEIGHT}
+                    />
+                  </div>
+                );
+              })}
+
+              {/* 2. 頂部主交易卡片行（同行底部對齊） */}
+              {columnsData.map((col, cIdx) => (
+                <div
+                  key={col.rootTx.id}
+                  ref={cIdx === 0 ? parentRef : undefined}
+                  style={{
+                    position: 'absolute',
+                    left: `${col.rootLeft}px`,
+                    top: 0,
+                    width: `${CARD_WIDTH}px`,
+                    height: `${parentHeight}px`,
+                  }}
+                  className="card-parent-slot flex items-end justify-center shrink-0 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTxId(col.rootTx.id);
+                  }}
+                >
+                  {renderCard(col.rootTx, cIdx)}
+                </div>
+              ))}
+
+              {/* 3. 下方退款子卡片（同行底部對齊） */}
+              {columnsData.map((col, cIdx) =>
+                col.refunds.map((refTx, rIdx) => (
+                  <div
+                    key={refTx.id}
+                    ref={cIdx === 0 && rIdx === 0 ? childrenRef : undefined}
+                    style={{
+                      position: 'absolute',
+                      left: `${col.childLefts[rIdx]}px`,
+                      top: `${parentHeight + CONNECTOR_HEIGHT}px`,
+                      width: `${CARD_WIDTH}px`,
+                      height: `${childrenHeight}px`,
+                    }}
+                    className="card-child-slot flex items-end justify-center shrink-0 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveTxId(refTx.id);
+                    }}
+                  >
+                    {renderCard(refTx, rIdx + 1)}
+                  </div>
+                ))
+              )}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* ========================================================= */}
-        {/* Scheme B2: 4-Column Segmented Minimal Dock Bar (Frosted)  */}
-        {/* ========================================================= */}
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="relative z-10 w-[280px] select-none font-mono pointer-events-auto"
-        >
-          <div className="grid grid-cols-4 divide-x divide-border/40 border border-border/50 rounded-full bg-background/40 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden text-xs">
-            {/* 1. 刪除 (Delete) */}
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="h-8.5 flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 active:bg-destructive/15 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
-            >
-              <span>{t('dashboard.delete')}</span>
-            </button>
+          {/* 3. 懸浮 4 欄 Dock Bar（固定在底部中央，毛玻璃懸浮，不侵佔舞台高度） */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[280px] select-none font-mono pointer-events-auto shrink-0 animate-in fade-in-0 duration-200 ease-out fill-mode-forwards"
+          >
+            <div className="grid grid-cols-4 divide-x divide-border/40 border border-border/50 rounded-full bg-background/40 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden text-xs">
+              {/* 1. 刪除 */}
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="h-8.5 flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 active:bg-destructive/15 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+              >
+                <span>{t('dashboard.delete')}</span>
+              </button>
 
-            {/* 2. 退款 (Refund) */}
-            <button
-              type="button"
-              onClick={handleRefund}
-              className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
-            >
-              <span>{t('dashboard.refund', '退款')}</span>
-            </button>
+              {/* 2. 退款 */}
+              <button
+                type="button"
+                disabled={isCurrentActiveRefund || isNonRefundableType || maxRefundable <= 0}
+                onClick={handleRefund}
+                className={cn(
+                  "h-8.5 flex items-center justify-center transition-all outline-none text-[11px] tracking-wide",
+                  isCurrentActiveRefund || isNonRefundableType || maxRefundable <= 0
+                    ? "text-muted-foreground/30 cursor-not-allowed"
+                    : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 cursor-pointer"
+                )}
+              >
+                <span>{t('dashboard.refund', '退款')}</span>
+              </button>
 
-            {/* 3. 編輯 (Edit) */}
-            <button
-              type="button"
-              onClick={() => {
-                setEditingTransactionId(currentTransaction.id);
-                onClose();
-              }}
-              className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
-            >
-              <span>{t('dashboard.edit', '編輯')}</span>
-            </button>
+              {/* 3. 編輯 */}
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingTransactionId(currentTransaction.id);
+                  onClose();
+                }}
+                className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+              >
+                <span>{t('dashboard.edit', '編輯')}</span>
+              </button>
 
-            {/* 4. 關閉 (Close) */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
-            >
-              <span>{t('dashboard.close')}</span>
-            </button>
+              {/* 4. 關閉 */}
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+              >
+                <span>{t('dashboard.close')}</span>
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* 退款 Dialog */}
+        <RefundDialog
+          open={isRefundDialogOpen}
+          onOpenChange={setIsRefundDialogOpen}
+          transaction={activeRootTx || currentTransaction}
+          maxRefundable={maxRefundable}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -108,17 +108,30 @@ export default function Dashboard() {
 
   const isBalanceAdjustment = (tx: any) => {
     if (tx.type !== 'income' && tx.type !== 'expense') return false;
+    // 退款交易（具有 parentId）不視為常規餘額調整，參與沖抵計算
+    if (tx.parentId) return false;
     const cat = allCategories?.find(c => c.id === tx.category);
     return !!cat?.isSystem;
   };
-
-
 
   const { income, expense, balance } = useMemo(() => {
     let inc = 0;
     let exp = 0;
     filteredTransactions.forEach(t => {
       if (isBalanceAdjustment(t)) return;
+
+      // 退款交易沖抵邏輯：
+      // 1. 支出退款（type === 'income' 且有 parentId）：直接扣除支出統計，不計入收入
+      // 2. 收入退款（type === 'expense' 且有 parentId）：直接扣除收入統計，不計入支出
+      if (t.parentId) {
+        if (t.type === 'income') {
+          exp -= t.amount;
+        } else if (t.type === 'expense') {
+          inc -= t.amount;
+        }
+        return;
+      }
+
       if (t.type === 'income') inc += t.amount;
       else if (t.type === 'expense') exp += t.amount;
     });

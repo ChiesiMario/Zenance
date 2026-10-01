@@ -599,6 +599,34 @@
       "details": "DETAILS",
       "createdAt": "Created",
       "updatedAt": "Updated"
+    },
+    "refund": {
+      "title": "Refund",
+      "dialogTitle": "Issue Refund",
+      "targetAccountExpense": "Receiving Account",
+      "targetAccountIncome": "Deducting Account",
+      "amount": "Refund Amount",
+      "maxRefundable": "Max Refundable",
+      "fullRefund": "Full Refund",
+      "date": "Refund Date",
+      "note": "Note",
+      "defaultExpenseRefundNote": "Refund: {{target}}",
+      "defaultIncomeRefundNote": "Refund: {{target}}",
+      "confirm": "Confirm Refund",
+      "cancel": "Cancel",
+      "success": "Refund created successfully",
+      "amountRequired": "Please enter an amount greater than 0",
+      "amountExceeded": "Refund amount cannot exceed {{max}}",
+      "cannotRefundRefund": "Cannot refund a refund transaction",
+      "refunded": "Refunded",
+      "fullyRefunded": "Refunded",
+      "partiallyRefunded": "Partially Refunded",
+      "refundRecords": "Associated Refunds",
+      "subRefundItem": "Refund",
+      "systemCategory": "Refund",
+      "deleteRefundTitle": "Delete Refund",
+      "deleteRefundConfirm": "Are you sure you want to delete this refund? This action cannot be undone.",
+      "deleteParentWithChildrenConfirm": "Are you sure you want to delete this transaction and all its associated refunds? This action cannot be undone."
     }
   }
 }

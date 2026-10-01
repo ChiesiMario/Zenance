@@ -164,7 +164,50 @@ export function useCategories() {
     const existing = await db.categories
       .where('ledgerId')
       .equals(activeLedgerId)
-      .filter(c => !c.deleted && c.isSystem === true && c.type === type)
+      .filter(
+        c =>
+          !c.deleted &&
+          c.isSystem === true &&
+          c.type === type &&
+          !c.name.includes('退款') &&
+          !c.name.toLowerCase().includes('refund')
+      )
+      .first();
+    if (existing) {
+      if (existing.name !== name) {
+        await updateCategory(existing.id, name);
+        existing.name = name;
+      }
+      return existing;
+    }
+    
+    const newCategory: Category = {
+      id: uuidv4(),
+      ledgerId: activeLedgerId,
+      name,
+      type,
+      isDefault: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deleted: false,
+      isSystem: true,
+    };
+    await db.categories.add(newCategory);
+    return newCategory;
+  };
+
+  const getOrCreateSystemRefundCategory = async (type: 'income' | 'expense', name: string = '退款') => {
+    if (!activeLedgerId) return null;
+    const existing = await db.categories
+      .where('ledgerId')
+      .equals(activeLedgerId)
+      .filter(
+        c =>
+          !c.deleted &&
+          c.isSystem === true &&
+          c.type === type &&
+          (c.name.includes('退款') || c.name.toLowerCase().includes('refund'))
+      )
       .first();
     if (existing) {
       if (existing.name !== name) {
@@ -200,5 +243,6 @@ export function useCategories() {
     deleteCategory,
     initDefaultCategories,
     getOrCreateSystemBalanceAdjustmentCategory,
+    getOrCreateSystemRefundCategory,
   };
 }

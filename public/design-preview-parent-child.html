@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenance - 父子交易（雙退款同水平線）設計概念預覽</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            background: '#09090b',
+            card: '#121215',
+            foreground: '#fafafa',
+            muted: '#71717a',
+            border: '#27272a',
+            primary: '#fafafa',
+            destructive: '#ef4444',
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+            sans: ['"Inter"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #000000;
+      color: #fafafa;
+      font-family: 'Inter', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    /* Hide scrollbars for clean presentation */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-black text-foreground flex flex-col items-center">
+
+  <!-- Top Controller Bar -->
+  <header class="sticky top-0 z-50 w-full border-b border-zinc-800 bg-black/80 backdrop-blur-md px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono font-bold text-xs text-white">
+        Z
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold tracking-tight">父子交易（雙退款同水平線）設計原型</h1>
+        <p class="text-xs text-zinc-400 font-mono">Tree Hierarchy: Single Parent & Horizontal Sibling Refunds</p>
+      </div>
+    </div>
+
+    <!-- Mode Toggle: 1 Child vs 2 Children on Same Row vs Group + Refunds -->
+    <div class="flex items-center gap-2 p-1 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-mono">
+      <button onclick="setScenario('single')" id="sc-single" class="px-3 py-1.5 rounded-md text-zinc-400 hover:text-white transition-all">
+        情境一：單筆退款
+      </button>
+      <button onclick="setScenario('multiple')" id="sc-multiple" class="px-3 py-1.5 rounded-md bg-zinc-700 text-white font-medium transition-all">
+        情境二：兩筆退款 (同水平線)
+      </button>
+      <button onclick="setScenario('group')" id="sc-group" class="px-3 py-1.5 rounded-md text-zinc-400 hover:text-white transition-all">
+        情境三：群組 + 退款 (同畫面多列)
+      </button>
+    </div>
+
+    <!-- View Mode for Multiple -->
+    <div id="view-mode-ctrl" class="flex items-center gap-1.5 text-xs font-mono">
+      <span class="text-zinc-500">卡片寬度:</span>
+      <button onclick="setCardWidth('300')" id="cw-300" class="px-2.5 py-1 rounded border border-zinc-700 bg-zinc-800 text-white">300px</button>
+      <button onclick="setCardWidth('320')" id="cw-320" class="px-2.5 py-1 rounded border border-zinc-800 text-zinc-400 hover:text-white">320px</button>
+    </div>
+  </header>
+
+  <!-- Interactive Stage Container -->
+  <main class="w-full max-w-5xl flex flex-col items-center pt-8 pb-32 px-4 relative overflow-x-auto no-scrollbar">
+
+    <div class="text-center mb-6">
+      <span class="text-[11px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-0.5 border border-zinc-800 rounded bg-zinc-950">
+        TREE-FORK RELATIONSHIP HIERARCHY
+      </span>
+      <p class="text-xs text-zinc-400 mt-2 max-w-md mx-auto">
+        主交易置於頂部中央；若存在兩筆退款，兩筆退款並排在同一水平線（水平同高），通過 T 字形樹狀分支連接線相互牽引。
+      </p>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- 1. PARENT TRANSACTION CARD (頂部主交易憑證)               -->
+    <!-- ========================================================= -->
+    <div class="flex justify-center w-full relative z-10">
+      <div id="parent-card" onclick="selectCard('parent')" class="w-[320px] bg-[#101013] border border-zinc-200 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none">
+        
+        <!-- Focused Badge -->
+        <div class="absolute -top-2.5 right-4 px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded-full text-[9px] font-mono text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span> 主交易 (Parent)
+        </div>
+
+        <!-- Header & Brand -->
+        <div class="flex flex-col items-center text-center">
+          <div class="flex items-center gap-1.5">
+            <div class="w-4 h-4 rounded bg-white text-black text-[10px] font-bold flex items-center justify-center font-mono">Z</div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-[0.25em] text-white">ZENANCE</span>
+          </div>
+          <span class="text-[9px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5">TRANSACTION VOUCHER</span>
+
+          <!-- Serial & Date -->
+          <div class="w-full flex items-center justify-between text-[11px] font-mono text-zinc-400 pt-3 border-b border-zinc-800 pb-2 mt-2">
+            <span class="font-semibold text-white">#TXN-20261001-08</span>
+            <span>2026-10-01</span>
+          </div>
+        </div>
+
+        <!-- Amount Section -->
+        <div class="py-3 flex flex-col items-center text-center">
+          <div class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60 mb-2">
+            購物 · 電子設備
+          </div>
+          <div class="text-3xl font-bold font-mono tracking-tight text-white">
+            -¥ 500.00
+          </div>
+          <div class="text-[11px] font-mono text-zinc-500 mt-1 flex items-center gap-1">
+            <span>招商銀行儲蓄卡</span>
+            <span class="text-zinc-600">·</span>
+            <span id="parent-refund-hint" class="text-emerald-400">已退款 ¥200.00</span>
+          </div>
+        </div>
+
+        <!-- Line Item Details -->
+        <div class="pt-2 border-t border-zinc-800/80 text-xs font-mono space-y-1.5 text-zinc-400">
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">付款帳戶</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-zinc-200">招商銀行</span>
+          </div>
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">交易時間</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-zinc-200">2026-10-01 14:32</span>
+          </div>
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">備註說明</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-zinc-200 truncate max-w-[140px]">Apple 藍牙耳機</span>
+          </div>
+        </div>
+
+        <!-- Mini Barcode -->
+        <div class="pt-3 mt-3 border-t border-zinc-800/80 flex flex-col items-center">
+          <div class="h-6 w-36 bg-zinc-800 rounded opacity-60 flex items-center justify-center font-mono text-[9px] tracking-[0.3em] text-zinc-400">
+            ||||| | |||| ||| |
+          </div>
+          <span class="text-[9px] font-mono tracking-widest text-zinc-500 mt-1">* 8823 1025 01 *</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- CONNECTOR GRAPHIC (動態 SVG 分支線)                      -->
+    <!-- ========================================================= -->
+    <div id="tree-connector-container" class="w-full flex justify-center py-0 relative z-0">
+      <!-- Injected by JavaScript based on Scenario -->
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- CHILDREN ROW (同一水平線上的退款子交易卡片，底部對齊)       -->
+    <!-- ========================================================= -->
+    <div id="children-row" class="flex items-end justify-center gap-6 relative z-10 w-full">
+
+      <!-- Child Card 1 -->
+      <div id="child-card-1" onclick="selectCard('child1')" class="card-child w-[300px] shrink-0 bg-[#101013] border border-zinc-800 hover:border-zinc-600 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none">
+        <div class="absolute -top-2.5 right-4 px-2 py-0.5 bg-emerald-950/80 border border-emerald-500/40 rounded-full text-[9px] font-mono text-emerald-300 uppercase tracking-wider flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 退款 #1
+        </div>
+
+        <div class="flex flex-col items-center text-center">
+          <div class="flex items-center gap-1.5">
+            <div class="w-4 h-4 rounded bg-emerald-500 text-black text-[10px] font-bold flex items-center justify-center font-mono">↩</div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-[0.25em] text-emerald-400">REFUND VOUCHER</span>
+          </div>
+          <span class="text-[9px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5">SUB-TRANSACTION #1</span>
+
+          <div class="w-full flex items-center justify-between text-[11px] font-mono text-zinc-400 pt-3 border-b border-zinc-800 pb-2 mt-2">
+            <span class="font-semibold text-white">#REF-1001-01</span>
+            <span>2026-10-01</span>
+          </div>
+        </div>
+
+        <div class="py-3 flex flex-col items-center text-center">
+          <div class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+            退款 · 沖抵支出
+          </div>
+          <div class="text-2xl font-bold font-mono tracking-tight text-emerald-400">
+            +¥ 100.00
+          </div>
+          <div class="text-[10px] font-mono text-zinc-500 mt-1">
+            退回至：招商銀行
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-zinc-800/80 text-xs font-mono space-y-1.5 text-zinc-400">
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">主交易</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-blue-400">#TXN...08</span>
+          </div>
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">備註說明</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-zinc-200 truncate max-w-[120px]">商品退差價</span>
+          </div>
+        </div>
+
+        <div class="pt-3 mt-3 border-t border-zinc-800/80 flex flex-col items-center">
+          <div class="h-4 w-28 bg-zinc-800 rounded opacity-50 flex items-center justify-center font-mono text-[8px] tracking-[0.25em] text-zinc-400">
+            ||| || |||| |
+          </div>
+          <span class="text-[8px] font-mono tracking-widest text-zinc-500 mt-1">* REF 01 *</span>
+        </div>
+      </div>
+
+      <!-- Child Card 2 (In Same Horizontal Row) -->
+      <div id="child-card-2" onclick="selectCard('child2')" class="card-child w-[300px] shrink-0 bg-[#101013] border border-zinc-800 hover:border-zinc-600 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none">
+        <div class="absolute -top-2.5 right-4 px-2 py-0.5 bg-emerald-950/80 border border-emerald-500/40 rounded-full text-[9px] font-mono text-emerald-300 uppercase tracking-wider flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> 退款 #2
+        </div>
+
+        <div class="flex flex-col items-center text-center">
+          <div class="flex items-center gap-1.5">
+            <div class="w-4 h-4 rounded bg-emerald-500 text-black text-[10px] font-bold flex items-center justify-center font-mono">↩</div>
+            <span class="text-[11px] font-mono font-bold uppercase tracking-[0.25em] text-emerald-400">REFUND VOUCHER</span>
+          </div>
+          <span class="text-[9px] font-mono uppercase tracking-widest text-zinc-500 mt-0.5">SUB-TRANSACTION #2</span>
+
+          <div class="w-full flex items-center justify-between text-[11px] font-mono text-zinc-400 pt-3 border-b border-zinc-800 pb-2 mt-2">
+            <span class="font-semibold text-white">#REF-1002-02</span>
+            <span>2026-10-02</span>
+          </div>
+        </div>
+
+        <div class="py-3 flex flex-col items-center text-center">
+          <div class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+            第二次部分退款
+          </div>
+          <div class="text-2xl font-bold font-mono tracking-tight text-emerald-400">
+            +¥ 100.00
+          </div>
+          <div class="text-[10px] font-mono text-zinc-500 mt-1">
+            退回至：支付寶
+          </div>
+        </div>
+
+        <div class="pt-2 border-t border-zinc-800/80 text-xs font-mono space-y-1.5 text-zinc-400">
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">主交易</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-blue-400">#TXN...08</span>
+          </div>
+          <div class="flex justify-between py-0.5">
+            <span class="text-zinc-500">備註說明</span>
+            <span class="flex-1 mx-2 border-b border-dotted border-zinc-800 self-center"></span>
+            <span class="text-zinc-200 truncate max-w-[120px]">售後補償金</span>
+          </div>
+        </div>
+
+        <div class="pt-3 mt-3 border-t border-zinc-800/80 flex flex-col items-center">
+          <div class="h-4 w-28 bg-zinc-800 rounded opacity-50 flex items-center justify-center font-mono text-[8px] tracking-[0.25em] text-zinc-400">
+            |||| | ||| |
+          </div>
+          <span class="text-[8px] font-mono tracking-widest text-zinc-500 mt-1">* REF 02 *</span>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================================= -->
+  <!-- FLOATING MINIMAL DOCK BAR (底部固定 4 欄按鈕)             -->
+  <!-- ========================================================= -->
+  <aside class="fixed bottom-6 z-50 w-[280px] select-none font-mono">
+    <div class="grid grid-cols-4 divide-x divide-zinc-700/50 border border-zinc-700/80 rounded-full bg-zinc-950/80 backdrop-blur-xl overflow-hidden text-xs shadow-2xl">
+      <!-- 1. 刪除 -->
+      <button class="h-9 flex items-center justify-center text-zinc-400 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-all text-[11px] tracking-wide">
+        刪除
+      </button>
+
+      <!-- 2. 退款 -->
+      <button id="dock-refund-btn" class="h-9 flex items-center justify-center text-zinc-200 hover:text-white hover:bg-zinc-800/60 active:bg-zinc-800 transition-all text-[11px] tracking-wide">
+        退款
+      </button>
+
+      <!-- 3. 編輯 -->
+      <button class="h-9 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800/60 active:bg-zinc-800 transition-all text-[11px] tracking-wide">
+        編輯
+      </button>
+
+      <!-- 4. 關閉 -->
+      <button class="h-9 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800/60 active:bg-zinc-800 transition-all text-[11px] tracking-wide">
+        關閉
+      </button>
+    </div>
+    
+    <div id="dock-hint" class="text-center mt-2 text-[10px] font-mono text-zinc-400 tracking-wider">
+      當前選中：主交易 (#TXN...08)
+    </div>
+  </aside>
+
+  <!-- Script for Switching Styles & Scenario -->
+  <script>
+    let currentScenario = 'multiple';
+    let cardWidth = 300;
+    let activeCard = 'parent';
+
+    function renderTreeConnector() {
+      const container = document.getElementById('tree-connector-container');
+      const gap = 24; // gap-6 = 24px
+      const span = cardWidth + gap; // Center distance between child1 and child2 = 324px
+      const halfSpan = span / 2;    // 162px
+
+      if (currentScenario === 'single') {
+        // 單筆退款：單一垂直直線
+        container.innerHTML = `
+          <div class="h-10 flex flex-col items-center justify-center relative">
+            <div class="w-[1.5px] h-3 bg-zinc-600"></div>
+            <div class="w-5 h-5 rounded-full bg-[#101013] border border-zinc-500 flex items-center justify-center shadow-sm z-10 my-[-2px]">
+              <div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+            </div>
+            <div class="w-[1.5px] h-3 bg-zinc-600"></div>
+          </div>
+        `;
+      } else {
+        // 兩筆退款並排在同一水平線：T 字形 / 倒 Y 字形樹狀分支線
+        const svgWidth = span + 40;
+        const centerX = svgWidth / 2;
+        const leftX = centerX - halfSpan;
+        const rightX = centerX + halfSpan;
+        
+        container.innerHTML = `
+          <div class="h-12 flex items-center justify-center relative w-full">
+            <svg width="${svgWidth}" height="48" viewBox="0 0 ${svgWidth} 48" class="text-zinc-600">
+              <!-- 1. 垂直主幹從上方主卡片中央向下延伸 -->
+              <line x1="${centerX}" y1="0" x2="${centerX}" y2="24" stroke="currentColor" stroke-width="1.5" />
+              
+              <!-- 2. 中樞分叉節點 (T-Junction Node) -->
+              <circle cx="${centerX}" cy="24" r="3.5" fill="#101013" stroke="#71717a" stroke-width="1.5" />
+              
+              <!-- 3. 水平橫向展開分支臂 (左右延伸至各子卡片中心) -->
+              <line x1="${leftX}" y1="24" x2="${rightX}" y2="24" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" />
+              
+              <!-- 4. 左側垂直引線連接至退款 #1 卡片頂部 -->
+              <line x1="${leftX}" y1="24" x2="${leftX}" y2="48" stroke="currentColor" stroke-width="1.5" />
+              <circle cx="${leftX}" cy="44" r="2.5" fill="#10b981" />
+              
+              <!-- 5. 右側垂直引線連接至退款 #2 卡片頂部 -->
+              <line x1="${rightX}" y1="24" x2="${rightX}" y2="48" stroke="currentColor" stroke-width="1.5" />
+              <circle cx="${rightX}" cy="44" r="2.5" fill="#10b981" />
+            </svg>
+          </div>
+        `;
+      }
+    }
+
+    function setScenario(sc) {
+      currentScenario = sc;
+      const c2 = document.getElementById('child-card-2');
+      const scSingle = document.getElementById('sc-single');
+      const scMultiple = document.getElementById('sc-multiple');
+      const scGroup = document.getElementById('sc-group');
+      const parentHint = document.getElementById('parent-refund-hint');
+
+      scSingle.className = "px-3 py-1.5 rounded-md text-zinc-400 hover:text-white transition-all";
+      scMultiple.className = "px-3 py-1.5 rounded-md text-zinc-400 hover:text-white transition-all";
+      scGroup.className = "px-3 py-1.5 rounded-md text-zinc-400 hover:text-white transition-all";
+
+      if (sc === 'single') {
+        c2.classList.add('hidden');
+        scSingle.className = "px-3 py-1.5 rounded-md bg-zinc-700 text-white font-medium transition-all";
+        parentHint.innerText = "已退款 ¥100.00";
+      } else if (sc === 'multiple') {
+        c2.classList.remove('hidden');
+        scMultiple.className = "px-3 py-1.5 rounded-md bg-zinc-700 text-white font-medium transition-all";
+        parentHint.innerText = "已退款 ¥200.00 (共 2 筆)";
+      } else if (sc === 'group') {
+        c2.classList.remove('hidden');
+        scGroup.className = "px-3 py-1.5 rounded-md bg-zinc-700 text-white font-medium transition-all";
+        parentHint.innerText = "已退款 ¥200.00 (群組成員 A 分攤項)";
+      }
+      renderTreeConnector();
+    }
+
+    function setCardWidth(w) {
+      cardWidth = parseInt(w);
+      const cards = document.querySelectorAll('.card-child');
+      cards.forEach(c => {
+        c.style.width = w + 'px';
+      });
+      document.getElementById('cw-300').className = w === '300' ? "px-2.5 py-1 rounded border border-zinc-700 bg-zinc-800 text-white" : "px-2.5 py-1 rounded border border-zinc-800 text-zinc-400 hover:text-white";
+      document.getElementById('cw-320').className = w === '320' ? "px-2.5 py-1 rounded border border-zinc-700 bg-zinc-800 text-white" : "px-2.5 py-1 rounded border border-zinc-800 text-zinc-400 hover:text-white";
+      renderTreeConnector();
+    }
+
+    function selectCard(cardId) {
+      activeCard = cardId;
+      const pCard = document.getElementById('parent-card');
+      const c1Card = document.getElementById('child-card-1');
+      const c2Card = document.getElementById('child-card-2');
+      const refundBtn = document.getElementById('dock-refund-btn');
+      const dockHint = document.getElementById('dock-hint');
+
+      // Reset
+      pCard.className = "w-[320px] bg-[#101013] border border-zinc-800 hover:border-zinc-700 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none opacity-80";
+      c1Card.className = "card-child w-[" + cardWidth + "px] shrink-0 bg-[#101013] border border-zinc-800 hover:border-zinc-700 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none opacity-80";
+      c2Card.className = "card-child w-[" + cardWidth + "px] shrink-0 bg-[#101013] border border-zinc-800 hover:border-zinc-700 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none opacity-80";
+
+      if (cardId === 'parent') {
+        pCard.className = "w-[320px] bg-[#101013] border border-zinc-200 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none opacity-100";
+        refundBtn.disabled = false;
+        refundBtn.className = "h-9 flex items-center justify-center text-zinc-200 hover:text-white hover:bg-zinc-800/60 active:bg-zinc-800 transition-all text-[11px] tracking-wide cursor-pointer";
+        refundBtn.innerText = "退款";
+        dockHint.innerText = "當前選中：主交易 (#TXN...08)";
+      } else if (cardId === 'child1') {
+        c1Card.className = "card-child w-[" + cardWidth + "px] shrink-0 bg-[#101013] border border-emerald-500 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none opacity-100";
+        refundBtn.disabled = true;
+        refundBtn.className = "h-9 flex items-center justify-center text-zinc-600 cursor-not-allowed transition-all text-[11px] tracking-wide";
+        refundBtn.innerText = "不可再退";
+        dockHint.innerText = "當前選中：退款子交易 #1 (#REF-1001-01)";
+      } else if (cardId === 'child2') {
+        c2Card.className = "card-child w-[" + cardWidth + "px] shrink-0 bg-[#101013] border border-emerald-500 rounded-2xl p-5 relative select-none transition-all duration-200 cursor-pointer shadow-none opacity-100";
+        refundBtn.disabled = true;
+        refundBtn.className = "h-9 flex items-center justify-center text-zinc-600 cursor-not-allowed transition-all text-[11px] tracking-wide";
+        refundBtn.innerText = "不可再退";
+        dockHint.innerText = "當前選中：退款子交易 #2 (#REF-1002-02)";
+      }
+    }
+
+    // Initial setup
+    setScenario('multiple');
+  </script>
+</body>
+</html>

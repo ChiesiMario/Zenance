@@ -16,6 +16,7 @@ export interface Transaction {
   id: string;
   displayId?: string; // Human-readable serial number
   ledgerId: string;
+  parentId?: string; // Parent transaction ID for sub-transactions (e.g. refunds)
   splitGroupId?: string; // Optional identifier for a multi-person advance / split expense group
   isGift?: boolean; // True if this loan transaction is a gift / grant (does not create debt / receivable / payable)
   budgetId?: string; // Optional manual budget assignment ('none' or budget id)

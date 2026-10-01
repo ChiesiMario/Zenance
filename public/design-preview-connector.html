@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenance - 父子交易連接線設計方案預覽</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "JetBrains Mono", monospace;
+    }
+    .card-mock {
+      width: 320px;
+      background: #0a0a0a;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 18px 20px;
+      position: relative;
+    }
+    .card-refund-mock {
+      width: 320px;
+      background: #0a0a0a;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      padding: 16px 20px;
+      position: relative;
+    }
+  </style>
+</head>
+<body class="p-6 sm:p-12 space-y-16 max-w-5xl mx-auto">
+
+  <!-- Header -->
+  <div class="border-b border-neutral-800 pb-6">
+    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 mb-3">
+      DESIGN PROPOSALS
+    </div>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">父子交易連接線 · 4 種重新設計方案</h1>
+    <p class="text-neutral-400 text-sm mt-2">
+      針對原有生硬直角、破碎虛線與孤立圓點進行全面升級，提供 Vercel / Linear 極簡美學方案供您挑選。
+    </p>
+  </div>
+
+  <!-- Proposal 1: Minimalist Smooth Orthogonal -->
+  <section class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30">1</span>
+        <h2 class="text-lg font-bold text-white">方案一：極簡圓角折線（推薦 ⭐⭐⭐⭐⭐）</h2>
+      </div>
+      <span class="text-xs font-mono text-neutral-400">Vercel / Linear Minimalist</span>
+    </div>
+    <p class="text-xs text-neutral-400 pl-9">
+      採用 1px 精緻細實線，在分支拐角處融入 8px 平滑倒角（Smooth Radius），徹底消除破碎虛線。落線以向下的微型 Chevron 箭頭或 2px 翡翠綠微圓點精準導引，克制且高級。
+    </p>
+
+    <div class="bg-neutral-950 border border-neutral-800/80 rounded-2xl p-8 overflow-x-auto flex flex-col items-center">
+      <!-- Parent Card -->
+      <div class="card-mock shrink-0 text-center">
+        <div class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-1">ZENANCE · VOUCHER</div>
+        <div class="text-2xl font-mono font-bold">-¥1.00</div>
+        <div class="text-[11px] font-mono text-neutral-400 mt-1">手續費 · #3F6DDBA0</div>
+      </div>
+
+      <!-- Connector 1: Smooth Rounded Orthogonal -->
+      <div class="w-[664px] h-14 relative shrink-0">
+        <svg class="w-full h-full text-neutral-600 overflow-visible" viewBox="0 0 664 56" fill="none">
+          <!-- Central Trunk from Parent Card Center (X=332, Y=0 to 18) -->
+          <line x1="332" y1="0" x2="332" y2="18" stroke="currentColor" stroke-width="1.2" />
+          
+          <!-- Left Branch with Smooth Rounded Corner: (332,18) -> (160,18) -> (160,44) -->
+          <path d="M 332 18 L 168 18 A 8 8 0 0 0 160 26 L 160 44" stroke="currentColor" stroke-width="1.2" />
+          
+          <!-- Right Branch with Smooth Rounded Corner: (332,18) -> (504,18) -> (504,44) -->
+          <path d="M 332 18 L 496 18 A 8 8 0 0 1 504 26 L 504 44" stroke="currentColor" stroke-width="1.2" />
+
+          <!-- Terminal Node Left: Subtle Downward Chevron Arrow -->
+          <path d="M 157 41 L 160 45 L 163 41" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+
+          <!-- Terminal Node Right: Subtle Downward Chevron Arrow -->
+          <path d="M 501 41 L 504 45 L 507 41" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
+
+      <!-- Refund Cards -->
+      <div class="flex gap-6 shrink-0">
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#BC833EFF</div>
+        </div>
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#C60070DD</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Proposal 2: Flowing Bezier Tree -->
+  <section class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-800 text-neutral-300 font-mono text-xs font-bold border border-neutral-700">2</span>
+        <h2 class="text-lg font-bold text-white">方案二：貝茲流暢分流曲線（Flowing Bezier DAG）</h2>
+      </div>
+      <span class="text-xs font-mono text-neutral-400">Organic Data Flow</span>
+    </div>
+    <p class="text-xs text-neutral-400 pl-9">
+      採用平滑的 S 型貝茲曲線分流，從父節點自然湧出並優雅彎曲垂直注入退款卡片，具備現代流程圖與思維導圖的高級科技感。
+    </p>
+
+    <div class="bg-neutral-950 border border-neutral-800/80 rounded-2xl p-8 overflow-x-auto flex flex-col items-center">
+      <!-- Parent Card -->
+      <div class="card-mock shrink-0 text-center">
+        <div class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-1">ZENANCE · VOUCHER</div>
+        <div class="text-2xl font-mono font-bold">-¥1.00</div>
+        <div class="text-[11px] font-mono text-neutral-400 mt-1">手續費 · #3F6DDBA0</div>
+      </div>
+
+      <!-- Connector 2: Flowing Bezier -->
+      <div class="w-[664px] h-14 relative shrink-0">
+        <svg class="w-full h-full text-neutral-600 overflow-visible" viewBox="0 0 664 56" fill="none">
+          <!-- Left Bezier Curve -->
+          <path d="M 332 0 C 332 26, 160 20, 160 44" stroke="currentColor" stroke-width="1.2" />
+          
+          <!-- Right Bezier Curve -->
+          <path d="M 332 0 C 332 26, 504 20, 504 44" stroke="currentColor" stroke-width="1.2" />
+
+          <!-- Origin Node -->
+          <circle cx="332" cy="0" r="2.5" fill="#525252" />
+
+          <!-- Terminal Node Left: Ring with emerald core -->
+          <circle cx="160" cy="45" r="3" stroke="#10b981" stroke-width="1.2" fill="#0a0a0a" />
+          <circle cx="160" cy="45" r="1.2" fill="#10b981" />
+
+          <!-- Terminal Node Right: Ring with emerald core -->
+          <circle cx="504" cy="45" r="3" stroke="#10b981" stroke-width="1.2" fill="#0a0a0a" />
+          <circle cx="504" cy="45" r="1.2" fill="#10b981" />
+        </svg>
+      </div>
+
+      <!-- Refund Cards -->
+      <div class="flex gap-6 shrink-0">
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#BC833EFF</div>
+        </div>
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#C60070DD</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Proposal 3: Pipeline with Badge -->
+  <section class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-800 text-neutral-300 font-mono text-xs font-bold border border-neutral-700">3</span>
+        <h2 class="text-lg font-bold text-white">方案三：管道分支 + 微型狀態膠囊（Pipeline Rail with Badge）</h2>
+      </div>
+      <span class="text-xs font-mono text-neutral-400">GitHub Actions / Stripe Pipeline</span>
+    </div>
+    <p class="text-xs text-neutral-400 pl-9">
+      在分叉處嵌入一個微小的「REFUNDS 2」等寬膠囊標籤，明確標記子交易會計關係，主幹與落線乾淨垂直，資訊層級極度嚴謹。
+    </p>
+
+    <div class="bg-neutral-950 border border-neutral-800/80 rounded-2xl p-8 overflow-x-auto flex flex-col items-center">
+      <!-- Parent Card -->
+      <div class="card-mock shrink-0 text-center">
+        <div class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-1">ZENANCE · VOUCHER</div>
+        <div class="text-2xl font-mono font-bold">-¥1.00</div>
+        <div class="text-[11px] font-mono text-neutral-400 mt-1">手續費 · #3F6DDBA0</div>
+      </div>
+
+      <!-- Connector 3: Pipeline with Badge -->
+      <div class="w-[664px] h-14 relative shrink-0">
+        <svg class="w-full h-full text-neutral-600 overflow-visible" viewBox="0 0 664 56" fill="none">
+          <!-- Top Trunk -->
+          <line x1="332" y1="0" x2="332" y2="12" stroke="currentColor" stroke-width="1.2" />
+          
+          <!-- Horizontal Rail: from 160 to 504 at Y=28 -->
+          <line x1="160" y1="28" x2="504" y2="28" stroke="currentColor" stroke-width="1.2" />
+
+          <!-- Left Drop -->
+          <line x1="160" y1="28" x2="160" y2="44" stroke="currentColor" stroke-width="1.2" />
+
+          <!-- Right Drop -->
+          <line x1="504" y1="28" x2="504" y2="44" stroke="currentColor" stroke-width="1.2" />
+
+          <!-- Left Drop Dot -->
+          <circle cx="160" cy="44" r="2" fill="#10b981" />
+
+          <!-- Right Drop Dot -->
+          <circle cx="504" cy="44" r="2" fill="#10b981" />
+        </svg>
+
+        <!-- Centered Micro Badge -->
+        <div class="absolute left-1/2 top-[18px] -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-900 border border-neutral-700/80 text-[9px] font-mono text-neutral-300 shadow-none">
+          <span class="size-1 rounded-full bg-emerald-400"></span>
+          <span>2 REFUNDS</span>
+        </div>
+      </div>
+
+      <!-- Refund Cards -->
+      <div class="flex gap-6 shrink-0">
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#BC833EFF</div>
+        </div>
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#C60070DD</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Proposal 4: Minimalist Hairline Direct -->
+  <section class="space-y-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center justify-center w-6 h-6 rounded-full bg-neutral-800 text-neutral-300 font-mono text-xs font-bold border border-neutral-700">4</span>
+        <h2 class="text-lg font-bold text-white">方案四：極致直角纖細鋼線（Minimalist Hairline Tree）</h2>
+      </div>
+      <span class="text-xs font-mono text-neutral-400">Zero Decorative Elements</span>
+    </div>
+    <p class="text-xs text-neutral-400 pl-9">
+      去掉所有裝飾性圓點、虛線與箭頭，僅保留最純粹的 1px 細灰線，水平分叉直達各退款卡片中軸上方，極度冷淡、極簡約。
+    </p>
+
+    <div class="bg-neutral-950 border border-neutral-800/80 rounded-2xl p-8 overflow-x-auto flex flex-col items-center">
+      <!-- Parent Card -->
+      <div class="card-mock shrink-0 text-center">
+        <div class="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-1">ZENANCE · VOUCHER</div>
+        <div class="text-2xl font-mono font-bold">-¥1.00</div>
+        <div class="text-[11px] font-mono text-neutral-400 mt-1">手續費 · #3F6DDBA0</div>
+      </div>
+
+      <!-- Connector 4: Hairline Pure -->
+      <div class="w-[664px] h-14 relative shrink-0">
+        <svg class="w-full h-full text-neutral-700 overflow-visible" viewBox="0 0 664 56" fill="none">
+          <!-- Trunk -->
+          <line x1="332" y1="0" x2="332" y2="20" stroke="currentColor" stroke-width="1" />
+          
+          <!-- Bar -->
+          <line x1="160" y1="20" x2="504" y2="20" stroke="currentColor" stroke-width="1" />
+
+          <!-- Left Drop -->
+          <line x1="160" y1="20" x2="160" y2="46" stroke="currentColor" stroke-width="1" />
+
+          <!-- Right Drop -->
+          <line x1="504" y1="20" x2="504" y2="46" stroke="currentColor" stroke-width="1" />
+        </svg>
+      </div>
+
+      <!-- Refund Cards -->
+      <div class="flex gap-6 shrink-0">
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#BC833EFF</div>
+        </div>
+        <div class="card-refund-mock border-emerald-500/20">
+          <div class="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">REFUND VOUCHER</div>
+          <div class="text-xl font-mono font-bold text-emerald-400 mt-1">+¥0.10</div>
+          <div class="text-[10px] font-mono text-neutral-500 mt-1">#C60070DD</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>

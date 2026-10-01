@@ -320,6 +320,29 @@ export function useBudgets() {
         // If explicitly bound to another budget, do not auto-match
         if (tx.budgetId && tx.budgetId !== 'auto') continue;
 
+        // 退款子交易：若其父交易計入了此預算，則沖減預算已用額度
+        if (tx.parentId) {
+          const parentTx = transactions.find(t => t.id === tx.parentId);
+          if (parentTx && !parentTx.deleted) {
+            const parentIsExplicit = parentTx.budgetId === budget.id;
+            const parentIsAuto =
+              (!parentTx.budgetId || parentTx.budgetId === 'auto') &&
+              categorySet.size > 0 &&
+              categorySet.has(parentTx.category) &&
+              parentTx.date >= startDate &&
+              (!endDate || parentTx.date <= endDate);
+
+            if (parentIsExplicit || parentIsAuto) {
+              if (tx.type === 'income') {
+                spent -= tx.amount;
+              } else if (tx.type === 'expense') {
+                spent += tx.amount;
+              }
+              continue;
+            }
+          }
+        }
+
         // Auto-match for expenses: within date range and matching categories
         if (
           tx.type === 'expense' &&

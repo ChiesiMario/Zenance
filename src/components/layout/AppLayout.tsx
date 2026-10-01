@@ -61,6 +61,11 @@ export function AppLayout() {
     let borrow = 0;
     
     transactions?.filter(t => t.date.startsWith(prefix) && !t.deleted).forEach(t => {
+      if (t.parentId) {
+        if (t.type === 'income') expense -= t.amount;
+        else if (t.type === 'expense') income -= t.amount;
+        return;
+      }
       if (t.type === 'expense') expense += t.amount;
       else if (t.type === 'income') income += t.amount;
       else if (t.type === 'transfer') transfer += t.amount;

@@ -606,6 +606,34 @@
       "details": "明細",
       "createdAt": "建立時間",
       "updatedAt": "修改時間"
+    },
+    "refund": {
+      "title": "退款",
+      "dialogTitle": "辦理退款",
+      "targetAccountExpense": "收款帳戶",
+      "targetAccountIncome": "扣款帳戶",
+      "amount": "退款金額",
+      "maxRefundable": "剩餘可退上限",
+      "fullRefund": "全額退款",
+      "date": "退款日期",
+      "note": "備註",
+      "defaultExpenseRefundNote": "退款：{{target}}",
+      "defaultIncomeRefundNote": "退款：{{target}}",
+      "confirm": "確認退款",
+      "cancel": "取消",
+      "success": "已成功建立退款記錄",
+      "amountRequired": "請輸入大於 0 的有效金額",
+      "amountExceeded": "退款金額不得超過剩餘上限 {{max}}",
+      "cannotRefundRefund": "退款交易無法再次退款",
+      "refunded": "已退款",
+      "fullyRefunded": "已退款",
+      "partiallyRefunded": "部分退款",
+      "refundRecords": "關聯退款記錄",
+      "subRefundItem": "退款",
+      "systemCategory": "退款",
+      "deleteRefundTitle": "刪除退款",
+      "deleteRefundConfirm": "確定要刪除這筆退款記錄嗎？此操作無法復原。",
+      "deleteParentWithChildrenConfirm": "確定要刪除這筆主交易及其關聯的退款記錄嗎？此操作無法復原。"
     }
   }
 }

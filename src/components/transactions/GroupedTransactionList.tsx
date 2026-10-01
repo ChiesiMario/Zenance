@@ -8,6 +8,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { ChevronRight, User, Building2 } from 'lucide-react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
+import { useTransactions } from '@/hooks/useTransactions';
 import type { Transaction } from '@/services/db/db';
 
 interface ContactCapsuleProps {
@@ -106,6 +107,38 @@ export function GroupedTransactionList({
   const { allCategories } = useCategories();
   const { ledgers } = useLedgers();
   const { activeLedgerId } = useAppStore();
+  const { transactions: allTransactions } = useTransactions();
+
+  // 建立 parentId -> 退款列表 的聚合索引，快速查詢主交易的退款狀態
+  const refundsByParentId = useMemo(() => {
+    const map = new Map<string, { totalRefunded: number }>();
+    const source = allTransactions && allTransactions.length > 0 ? allTransactions : transactions;
+    if (!source) return map;
+    source.forEach((t) => {
+      if (!t.deleted && t.parentId) {
+        const prev = map.get(t.parentId) || { totalRefunded: 0 };
+        const amt = t.originalAmount ?? t.amount;
+        map.set(t.parentId, {
+          totalRefunded: Math.round((prev.totalRefunded + amt) * 100) / 100,
+        });
+      }
+    });
+    return map;
+  }, [allTransactions, transactions]);
+
+  // 取得主交易的退款狀態標籤（部分退款 / 已退款）
+  const getRefundStatus = useCallback((tx: Transaction) => {
+    if (tx.parentId) return null;
+    const info = refundsByParentId.get(tx.id);
+    if (!info || info.totalRefunded <= 0) return null;
+
+    const originalAmt = tx.originalAmount ?? tx.amount;
+    const isFullyRefunded = info.totalRefunded >= originalAmt - 0.001;
+
+    return isFullyRefunded
+      ? t('refund.refunded', '已退款')
+      : t('refund.partiallyRefunded', '部分退款');
+  }, [refundsByParentId, t]);
 
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [expandedSplitIds, setExpandedSplitIds] = useState<Set<string>>(new Set());
@@ -318,6 +351,8 @@ export function GroupedTransactionList({
 
   const isBalanceAdjustment = useCallback((tx: Transaction) => {
     if (tx.type !== 'income' && tx.type !== 'expense') return false;
+    // 退款子交易代表實際金流，不作為純餘額調整排除
+    if (tx.parentId) return false;
     const cat = allCategories?.find(c => c.id === tx.category);
     return !!cat?.isSystem;
   }, [allCategories]);
@@ -336,6 +371,9 @@ export function GroupedTransactionList({
     }
     const cat = allCategories?.find(c => c.id === tx.category);
     if (cat?.isSystem) {
+      if (cat.name.includes('退款') || cat.name.toLowerCase().includes('refund') || tx.parentId) {
+        return t('refund.title', '退款');
+      }
       return t('accounts.balanceAdjustment');
     }
     if (cat?.name && (cat.name.includes('差額吸收') || cat.name.includes('差额吸收') || cat.name === '抹零' || cat.name.toLowerCase().includes('write-off'))) {
@@ -756,6 +794,16 @@ export function GroupedTransactionList({
                                   );
                                 })()
                               )}
+                              {(() => {
+                                const refundStatus = getRefundStatus(tx);
+                                if (!refundStatus) return null;
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-normal ml-1.5 shrink-0">
+                                    <span className="text-muted-foreground/60 select-none">·</span>
+                                    <span>{refundStatus}</span>
+                                  </span>
+                                );
+                              })()}
                             </div>
 
                             {!contextAccountId && tx.type !== 'transfer' && (() => {
@@ -992,6 +1040,16 @@ export function GroupedTransactionList({
                                           className="text-sm font-mono leading-none"
                                         />
                                       )}
+                                      {(() => {
+                                        const refundStatus = getRefundStatus(subTx);
+                                        if (!refundStatus) return null;
+                                        return (
+                                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-normal ml-1.5 shrink-0">
+                                            <span className="text-muted-foreground/60 select-none">·</span>
+                                            <span>{refundStatus}</span>
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                     {item.isTransferGroup && subTx.type === 'expense' && (() => {
                                       const wallet = wallets?.find((w) => w.id === subTx.accountId);

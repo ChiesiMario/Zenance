@@ -72,6 +72,8 @@
       "subTransaction": "子交易",
       "close": "关闭",
       "edit": "编辑",
+      "refund": "退款",
+      "refundPrefix": "退款：",
       "save": "保存",
       "multiCurrencyBreakdownTitle": "多币种收支折算",
       "baseCurrencyTotal": "折算本位币净值",

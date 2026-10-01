@@ -34,6 +34,9 @@ interface Props {
   initialContactId?: string | null;
   initialToAccountId?: string | null;
   initialAmount?: number | null;
+  initialAccountId?: string | null;
+  initialCategoryId?: string | null;
+  initialNote?: string | null;
 }
 
 export function AddTransactionModal({ 
@@ -45,6 +48,9 @@ export function AddTransactionModal({
   initialContactId,
   initialToAccountId,
   initialAmount,
+  initialAccountId,
+  initialCategoryId,
+  initialNote,
 }: Props) {
   const { t } = useTranslation();
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactions();
@@ -249,6 +255,16 @@ export function AddTransactionModal({
         if (initialToAccountId) {
           setValue('toAccountId', initialToAccountId);
         }
+        if (initialAccountId) {
+          setValue('accountId', initialAccountId);
+        }
+        if (initialCategoryId) {
+          setValue('categoryId', initialCategoryId);
+          setIsUserSelectedCat(true);
+        }
+        if (initialNote) {
+          setValue('note', initialNote);
+        }
         setDisplayAmountIn('');
         setDisplayFeeAmount('');
         setFocusedField('out');
@@ -256,10 +272,10 @@ export function AddTransactionModal({
         setValue('feeCategoryId', undefined);
         setLoanType(initialLoanType);
         setIsGift(false);
-        setIsUserSelectedCat(Boolean(transactionToEditId));
+        setIsUserSelectedCat(Boolean(transactionToEditId || initialCategoryId));
       }
     }
-  }, [isOpen, initialType, initialLoanType, initialContactId, initialToAccountId, initialAmount, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue, transactionToEditId]);
+  }, [isOpen, initialType, initialLoanType, initialContactId, initialToAccountId, initialAmount, initialAccountId, initialCategoryId, initialNote, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue, transactionToEditId]);
 
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer' | 'loan', newLoanType?: 'borrow' | 'lend') => {
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;

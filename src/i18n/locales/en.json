@@ -72,6 +72,8 @@
       "subTransaction": "Sub-transaction",
       "close": "Close",
       "edit": "Edit",
+      "refund": "Refund",
+      "refundPrefix": "Refund: ",
       "save": "Save",
       "multiCurrencyBreakdownTitle": "Multi-Currency Breakdown",
       "baseCurrencyTotal": "Converted Net Total",

@@ -40,6 +40,9 @@ export function AppLayout() {
     addModalContactId, 
     addModalInitialToAccountId,
     addModalInitialAmount,
+    addModalInitialAccountId,
+    addModalInitialCategoryId,
+    addModalInitialNote,
     openAddModal, 
     closeAddModal 
   } = useAppStore();
@@ -318,6 +321,9 @@ export function AppLayout() {
         initialContactId={addModalContactId}
         initialToAccountId={addModalInitialToAccountId}
         initialAmount={addModalInitialAmount}
+        initialAccountId={addModalInitialAccountId}
+        initialCategoryId={addModalInitialCategoryId}
+        initialNote={addModalInitialNote}
       />
 
       <TransactionDetailsDialog 

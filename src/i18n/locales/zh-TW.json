@@ -72,6 +72,8 @@
       "subTransaction": "子交易",
       "close": "關閉",
       "edit": "編輯",
+      "refund": "退款",
+      "refundPrefix": "退款：",
       "save": "儲存",
       "multiCurrencyBreakdownTitle": "多幣種收支折算",
       "baseCurrencyTotal": "折算本位幣淨值",

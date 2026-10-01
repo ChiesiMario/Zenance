@@ -18,12 +18,18 @@ interface AppState {
   addModalContactId: string | null;
   addModalInitialToAccountId?: string | null;
   addModalInitialAmount?: number | null;
+  addModalInitialAccountId?: string | null;
+  addModalInitialCategoryId?: string | null;
+  addModalInitialNote?: string | null;
   openAddModal: (
     type?: 'expense' | 'income' | 'transfer' | 'loan',
     loanType?: 'borrow' | 'lend',
     contactId?: string,
     initialToAccountId?: string,
-    initialAmount?: number
+    initialAmount?: number,
+    initialAccountId?: string,
+    initialCategoryId?: string,
+    initialNote?: string
   ) => void;
   closeAddModal: () => void;
 }
@@ -42,12 +48,15 @@ export const useAppStore = create<AppState>()(
       addModalContactId: null,
       addModalInitialToAccountId: null,
       addModalInitialAmount: null,
+      addModalInitialAccountId: null,
+      addModalInitialCategoryId: null,
+      addModalInitialNote: null,
       setSyncing: (isSyncing) => set({ isSyncing }),
       setLastSyncTime: (time) => set({ lastSyncTime: time }),
       setActiveLedgerId: (id) => set({ activeLedgerId: id }),
       setEditingTransactionId: (id) => set({ editingTransactionId: id }),
       setViewingTransactionId: (id) => set({ viewingTransactionId: id }),
-      openAddModal: (type = 'expense', loanType = 'borrow', contactId, initialToAccountId, initialAmount) => 
+      openAddModal: (type = 'expense', loanType = 'borrow', contactId, initialToAccountId, initialAmount, initialAccountId, initialCategoryId, initialNote) => 
         set({ 
           isAddModalOpen: true, 
           addModalType: type, 
@@ -55,12 +64,18 @@ export const useAppStore = create<AppState>()(
           addModalContactId: contactId || null,
           addModalInitialToAccountId: initialToAccountId || null,
           addModalInitialAmount: initialAmount ?? null,
+          addModalInitialAccountId: initialAccountId || null,
+          addModalInitialCategoryId: initialCategoryId || null,
+          addModalInitialNote: initialNote || null,
         }),
       closeAddModal: () => set({ 
         isAddModalOpen: false, 
         addModalContactId: null,
         addModalInitialToAccountId: null,
         addModalInitialAmount: null,
+        addModalInitialAccountId: null,
+        addModalInitialCategoryId: null,
+        addModalInitialNote: null,
       }),
     }),
     {

@@ -24,7 +24,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const { transactions, deleteTransaction } = useTransactions();
   const { allCategories } = useCategories();
   const { accounts, wallets, allWallets, contacts, allContacts } = useAccounts();
-  const { activeLedgerId, setEditingTransactionId } = useAppStore();
+  const { activeLedgerId, setEditingTransactionId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
 
   // Active transaction ID within the group
@@ -61,8 +61,8 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     return idx >= 0 ? idx : 0;
   }, [currentTransaction, groupTransactions]);
 
-  // Single card width = 300px, gap = 24px
-  const CARD_WIDTH = 300;
+  // Single card width = 320px, gap = 24px
+  const CARD_WIDTH = 320;
   const CARD_GAP = 24;
 
   const totalTrackWidth = useMemo(() => {
@@ -243,6 +243,31 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     }
   };
 
+  const handleRefund = () => {
+    if (!currentTransaction) return;
+
+    // 支出退款轉為收款/收入，收入退款轉為支出
+    const refundType = currentTransaction.type === 'expense' ? 'income' : 'expense';
+    const refundAmount = currentTransaction.originalAmount ?? currentTransaction.amount;
+    const catName = getCategoryName(currentTransaction.category, currentTransaction);
+    const prefix = t('dashboard.refundPrefix', '退款：');
+    const refundNote = currentTransaction.note 
+      ? `${prefix}${currentTransaction.note}` 
+      : `${prefix}${catName}`;
+
+    onClose();
+    openAddModal(
+      refundType,
+      'borrow',
+      undefined,
+      currentTransaction.toAccountId || undefined,
+      refundAmount,
+      currentTransaction.accountId,
+      currentTransaction.category,
+      refundNote
+    );
+  };
+
   /**
    * Render an authentic paper receipt card
    */
@@ -363,7 +388,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           }
         }}
         className={cn(
-          "w-[300px] shrink-0 bg-card text-card-foreground border border-border rounded-2xl shadow-none relative overflow-hidden transition-all duration-300",
+          "w-[320px] shrink-0 bg-card text-card-foreground border border-border rounded-2xl shadow-none relative overflow-hidden transition-all duration-300",
           isActive
             ? "opacity-100 pointer-events-auto select-text cursor-default"
             : "opacity-30 hover:opacity-60 cursor-pointer pointer-events-auto select-none"
@@ -592,7 +617,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         </div>
 
         {/* Barcode & Footer Receipt Section */}
-        <div className="px-5 pt-3.5 pb-5 flex flex-col items-center text-center border-t border-border/60 mt-1">
+        <div className="px-5 pt-3 pb-5 flex flex-col items-center text-center border-t border-border/60 mt-1">
           <svg
             className="w-44 h-7 opacity-85 dark:opacity-75 text-foreground"
             viewBox="0 0 200 32"
@@ -619,7 +644,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     <Dialog open={!!transactionId} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !gap-3 !overflow-visible !pointer-events-none select-none"
+        className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !gap-4 !overflow-visible !pointer-events-none select-none"
       >
         <DialogTitle className="sr-only">
           {t('receipt.voucherTitle', '交易憑證')} - #{currentTransaction.displayId || currentTransaction.id}
@@ -635,12 +660,12 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         {/* Unified Centering Carousel Track                          */}
         {/* ========================================================= */}
         <div
-          className="relative z-10 w-full flex items-end justify-center overflow-visible py-2 pointer-events-auto cursor-pointer"
+          className="relative z-10 w-full flex items-end justify-center overflow-visible pt-1 pb-0 pointer-events-auto cursor-pointer"
           onClick={onClose}
         >
           {groupTransactions.length <= 1 ? (
             // Single standalone card: centered
-            <div className="py-1 flex items-end justify-center cursor-default" onClick={(e) => e.stopPropagation()}>
+            <div className="p-0 flex items-end justify-center cursor-default" onClick={(e) => e.stopPropagation()}>
               {renderCard(currentTransaction, 0)}
             </div>
           ) : (
@@ -663,42 +688,52 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         </div>
 
         {/* ========================================================= */}
-        {/* Minimal Text-Only Action Footer (Fixed Centered Below)    */}
+        {/* Scheme B2: 4-Column Segmented Minimal Dock Bar (Frosted)  */}
         {/* ========================================================= */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative z-10 flex items-center justify-center gap-3.5 text-xs text-muted-foreground/60 pt-0.5 select-none font-mono pointer-events-auto"
+          className="relative z-10 w-[280px] select-none font-mono pointer-events-auto"
         >
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="hover:text-foreground transition-colors cursor-pointer outline-none"
-          >
-            {t('dashboard.delete')}
-          </button>
+          <div className="grid grid-cols-4 divide-x divide-border/40 border border-border/50 rounded-full bg-background/40 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden text-xs">
+            {/* 1. 刪除 (Delete) */}
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="h-8.5 flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 active:bg-destructive/15 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+            >
+              <span>{t('dashboard.delete')}</span>
+            </button>
 
-          <span className="text-muted-foreground/25">·</span>
+            {/* 2. 退款 (Refund) */}
+            <button
+              type="button"
+              onClick={handleRefund}
+              className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+            >
+              <span>{t('dashboard.refund', '退款')}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="hover:text-foreground transition-colors cursor-pointer outline-none"
-          >
-            {t('dashboard.close')}
-          </button>
+            {/* 3. 編輯 (Edit) */}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingTransactionId(currentTransaction.id);
+                onClose();
+              }}
+              className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+            >
+              <span>{t('dashboard.edit', '編輯')}</span>
+            </button>
 
-          <span className="text-muted-foreground/25">·</span>
-
-          <button
-            type="button"
-            onClick={() => {
-              setEditingTransactionId(currentTransaction.id);
-              onClose();
-            }}
-            className="hover:text-foreground transition-colors cursor-pointer outline-none"
-          >
-            {t('dashboard.edit', '編輯')}
-          </button>
+            {/* 4. 關閉 (Close) */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+            >
+              <span>{t('dashboard.close')}</span>
+            </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

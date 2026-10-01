@@ -189,7 +189,8 @@
       "errors": {
         "amountRequired": "Required",
         "amountPositive": "Amount must be > 0",
-        "categoryRequired": "Required",
+        "categoryRequired": "Please select a category",
+        "pleaseSelectCategory": "Please select a category",
         "accountRequired": "Required",
         "dateRequired": "Required",
         "sameAccount": "Cannot transfer to same account"
@@ -465,7 +466,10 @@
       "pendingReimbLabel": "Pending",
       "pendingReimbursement": "Pending Collection",
       "refundIncome": "Refund Received",
-      "netReceivable": "Net Receivable"
+      "netReceivable": "Net Receivable",
+      "netBalance": "Net Contacts",
+      "receivable": "Receivable",
+      "payable": "Payable"
     },
     "setup": {
       "welcomeTagline": "Master your personal finances with elegance.",

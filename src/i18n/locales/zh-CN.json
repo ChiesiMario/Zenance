@@ -189,7 +189,8 @@
       "errors": {
         "amountRequired": "必填",
         "amountPositive": "金额必须大于 0",
-        "categoryRequired": "必填",
+        "categoryRequired": "请选择交易分类",
+        "pleaseSelectCategory": "请选择交易分类",
         "accountRequired": "必填",
         "dateRequired": "必填",
         "sameAccount": "转出与转入账户不能相同"
@@ -465,7 +466,10 @@
       "pendingReimbLabel": "待收款",
       "pendingReimbursement": "待收款项",
       "refundIncome": "回款入账",
-      "netReceivable": "净应收"
+      "netReceivable": "净应收",
+      "netBalance": "往来净额",
+      "receivable": "应收",
+      "payable": "应还"
     },
     "setup": {
       "welcomeTagline": "以优雅的方式掌握您的个人财务。",

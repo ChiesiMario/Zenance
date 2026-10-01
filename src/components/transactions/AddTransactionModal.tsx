@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -82,6 +82,28 @@ export function AddTransactionModal({
     open: false,
     onSelect: () => {},
   });
+
+  const [isCategoryWarning, setIsCategoryWarning] = useState(false);
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerCategoryWarning = () => {
+    setIsCategoryWarning(false);
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+    }
+    requestAnimationFrame(() => {
+      setIsCategoryWarning(true);
+      warningTimeoutRef.current = setTimeout(() => {
+        setIsCategoryWarning(false);
+      }, 1500);
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    };
+  }, []);
 
   const formSchema = z.object({
     amount: z.number({ message: t('add.errors.amountRequired') }).positive(t('add.errors.amountPositive')),
@@ -720,7 +742,12 @@ export function AddTransactionModal({
       }
     }
     
-    handleSubmit(onSubmit)();
+    handleSubmit(onSubmit, (invalidErrors) => {
+      if (invalidErrors.categoryId) {
+        triggerCategoryWarning();
+        toast.show(t('add.errors.pleaseSelectCategory'));
+      }
+    })();
   };
 
   return (
@@ -1322,19 +1349,24 @@ export function AddTransactionModal({
         <div className="w-full flex flex-col gap-2 shrink-0 mt-auto">
           {/* Category Pills (for expense / income) */}
           {(type === 'expense' || type === 'income') && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0 w-full">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full">
               {displayedPills.map(cat => {
                 const isSelected = selectedCategoryId === cat.id;
                 return (
                   <button
                     key={cat.id}
                     type="button"
-                    onClick={() => setValue('categoryId', cat.id)}
+                    onClick={() => {
+                      setValue('categoryId', cat.id, { shouldValidate: true });
+                      setIsCategoryWarning(false);
+                    }}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-all cursor-pointer border",
+                      "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border",
                       isSelected
                         ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
-                        : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                        : isCategoryWarning
+                          ? "bg-muted/80 border-destructive/80 text-foreground hover:border-foreground/40"
+                          : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                     )}
                   >
                     {cat.name}
@@ -1343,8 +1375,16 @@ export function AddTransactionModal({
               })}
               <button
                 type="button"
-                onClick={() => setIsCatPickerOpen(true)}
-                className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 shrink-0 transition-all cursor-pointer flex items-center gap-1"
+                onClick={() => {
+                  setIsCatPickerOpen(true);
+                  setIsCategoryWarning(false);
+                }}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1",
+                  isCategoryWarning
+                    ? "border-destructive/80 text-foreground hover:border-foreground/50"
+                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                )}
                 title={t('add.moreCategories', '更多分類')}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -1352,8 +1392,6 @@ export function AddTransactionModal({
               </button>
             </div>
           )}
-
-          {errors.categoryId && <p className="text-xs font-medium text-destructive">{errors.categoryId.message}</p>}
 
           {/* Inline Note Input */}
           <div className="w-full">

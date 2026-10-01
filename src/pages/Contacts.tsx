@@ -14,13 +14,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getCurrencySymbol } from '@/lib/utils';
+import { cn, getCurrencySymbol } from '@/lib/utils';
 import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
+import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { calculateAccountBalances, convertAmount } from '@/lib/currency';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
 
 export default function Contacts() {
   const { t } = useTranslation();
-  const { contacts, archivedContacts, addContact } = useContacts();
+  const { contacts, archivedContacts, allContacts, addContact } = useContacts();
   const { transactions } = useTransactions();
+  const { getRate } = useExchangeRates();
+  const { latestSnapshotsMap } = useBalanceSnapshots();
   
   const [currentView, setCurrentView] = useState<'active' | 'archived'>('active');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -31,34 +37,50 @@ export default function Contacts() {
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
-  const currencySymbol = getCurrencySymbol(activeLedger?.baseCurrency || 'CNY');
+  const baseCurrency = activeLedger?.baseCurrency || 'CNY';
+  const currencySymbol = getCurrencySymbol(baseCurrency);
 
-  // 純淨流水餘額法計算各對象應收應付淨額
+  // 匯總所有往來對象（含已歸檔），用於全面計算原生餘額
+  const allContactsList = useMemo(() => {
+    return allContacts || [...(contacts || []), ...(archivedContacts || [])];
+  }, [allContacts, contacts, archivedContacts]);
+
+  // 計算所有往來對象在各自原生幣種下的餘額 (支援月度餘額快照加速)
   const contactBalances = useMemo(() => {
-    const balances: Record<string, number> = {};
-    const allContacts = [...(contacts || []), ...(archivedContacts || [])];
-    if (!allContacts || !transactions) return balances;
+    if (!allContactsList || allContactsList.length === 0) return {};
+    return calculateAccountBalances(allContactsList, transactions || [], getRate, baseCurrency, latestSnapshotsMap);
+  }, [allContactsList, transactions, getRate, baseCurrency, latestSnapshotsMap]);
 
-    allContacts.forEach(c => {
-      balances[c.id] = 0;
-    });
+  // 判斷是否存在非基準幣種往來
+  const hasForeignCurrency = useMemo(() => {
+    return allContactsList.some(
+      c => (c.currency || baseCurrency) !== baseCurrency && (contactBalances[c.id] || 0) !== 0
+    );
+  }, [allContactsList, baseCurrency, contactBalances]);
 
-    transactions.forEach(tx => {
-      if (tx.deleted || tx.isGift) return;
-      if (tx.type === 'transfer' || tx.type === 'loan') {
-        // 出款給聯絡人（出借 / 代付）：聯絡人欠款增加 (+)
-        if (tx.toAccountId && balances[tx.toAccountId] !== undefined) {
-          balances[tx.toAccountId] += (tx.transferInAmount ?? tx.originalAmount ?? tx.amount);
-        }
-        // 聯絡人出款（還款 / 借入）：聯絡人欠款減少 (-)
-        if (tx.accountId && balances[tx.accountId] !== undefined) {
-          balances[tx.accountId] -= (tx.originalAmount ?? tx.amount);
-        }
+  // 統計所有往來對象折算基準幣種後的應收、應還與往來淨額
+  const { totalReceivable, totalPayable, netBalance } = useMemo(() => {
+    let receivable = 0;
+    let payable = 0;
+
+    allContactsList.forEach(c => {
+      const raw = contactBalances[c.id] || 0;
+      const curr = c.currency || baseCurrency;
+      const converted = convertAmount(raw, curr, baseCurrency, getRate);
+
+      if (converted > 0) {
+        receivable += converted;
+      } else if (converted < 0) {
+        payable += Math.abs(converted);
       }
     });
 
-    return balances;
-  }, [contacts, archivedContacts, transactions]);
+    return {
+      totalReceivable: Math.round(receivable * 100) / 100,
+      totalPayable: Math.round(payable * 100) / 100,
+      netBalance: Math.round((receivable - payable) * 100) / 100,
+    };
+  }, [allContactsList, contactBalances, baseCurrency, getRate]);
 
   const filteredAndSortedContacts = useMemo(() => {
     let source = currentView === 'archived' ? (archivedContacts || []) : (contacts || []);
@@ -180,6 +202,48 @@ export default function Contacts() {
           <div className="w-8 h-8" />
         )}
       </div>
+
+      {currentView === 'active' && (
+        <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+          <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center relative">
+            {hasForeignCurrency && (
+              <span className="absolute top-4 right-4 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/20 select-none">
+                ≈ {t('accounts.rateEstimated')}
+              </span>
+            )}
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('contacts.netBalance')}</p>
+            <div className="text-5xl font-mono tracking-tighter font-medium">
+              <AmountDisplay 
+                amount={netBalance} 
+                baseCurrency={baseCurrency} 
+                type="balance" 
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2">
+            <div className="p-5 border-r border-border flex flex-col">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.receivable')}</p>
+              <p className={cn("text-2xl font-mono tracking-tight font-medium", totalReceivable > 0 ? "text-emerald-500" : "text-muted-foreground/60")}>
+                <AmountDisplay 
+                  amount={totalReceivable} 
+                  baseCurrency={baseCurrency} 
+                  type="neutral" 
+                />
+              </p>
+            </div>
+            <div className="p-5 flex flex-col">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.payable')}</p>
+              <p className={cn("text-2xl font-mono tracking-tight font-medium", totalPayable > 0 ? "text-rose-500" : "text-muted-foreground/60")}>
+                <AmountDisplay 
+                  amount={totalPayable} 
+                  baseCurrency={baseCurrency} 
+                  type="neutral" 
+                />
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contacts List */}
       <div className="space-y-6">

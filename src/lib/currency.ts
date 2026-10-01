@@ -1,4 +1,4 @@
-import type { Wallet, Contact, Account, Transaction, BalanceSnapshot } from '@/services/db/db';
+import type { Wallet, Contact, Transaction, BalanceSnapshot } from '@/services/db/db';
 
 /**
  * 安全轉換任意金額從來源幣種至目標幣種
@@ -100,7 +100,7 @@ export function getTxAccountDelta(
  * 支援傳入月度餘額快照字典 (snapshotsMap) 進行基線檢查點加速運算。
  */
 export function calculateAccountBalances(
-  accounts: Account[],
+  accounts: (Wallet | Contact)[],
   transactions: Transaction[],
   getRate: (from: string, to: string) => number,
   baseCurrency: string = 'CNY',
@@ -109,7 +109,7 @@ export function calculateAccountBalances(
   const balances: Record<string, number> = {};
   if (!accounts || accounts.length === 0) return balances;
 
-  const accountMap = new Map<string, Account>();
+  const accountMap = new Map<string, Wallet | Contact>();
   const snapshotDateMap = new Map<string, string>(); // accountId -> snapshotDate
 
   accounts.forEach(acc => {
@@ -119,7 +119,7 @@ export function calculateAccountBalances(
       balances[acc.id] = snap.closingBalance;
       snapshotDateMap.set(acc.id, snap.snapshotDate);
     } else {
-      balances[acc.id] = acc.initialBalance || 0;
+      balances[acc.id] = ('initialBalance' in acc ? acc.initialBalance : 0) || 0;
     }
   });
 

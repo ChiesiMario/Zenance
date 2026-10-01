@@ -189,7 +189,8 @@
       "errors": {
         "amountRequired": "必填",
         "amountPositive": "金額必須大於 0",
-        "categoryRequired": "必填",
+        "categoryRequired": "請選擇交易分類",
+        "pleaseSelectCategory": "請選擇交易分類",
         "accountRequired": "必填",
         "dateRequired": "必填",
         "sameAccount": "轉出與轉入帳戶不能相同"
@@ -465,7 +466,10 @@
       "pendingReimbLabel": "待收款",
       "pendingReimbursement": "待收款項",
       "refundIncome": "回款入帳",
-      "netReceivable": "淨應收"
+      "netReceivable": "淨應收",
+      "netBalance": "往來淨額",
+      "receivable": "應收",
+      "payable": "應還"
     },
     "setup": {
       "welcomeTagline": "以優雅的方式掌握您的個人財務。",

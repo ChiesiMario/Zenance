@@ -187,12 +187,12 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground">
+    <div className="flex flex-col h-full min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground overflow-hidden">
       {/* Main Content Area with Keep-Alive View Stack */}
       <main 
         ref={mainRef} 
         onScroll={handleScroll}
-        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-4 [scrollbar-gutter:stable]"
+        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-20 [scrollbar-gutter:stable]"
       >
         {/* Keep-Alive Tab Views */}
         {mountedTabs.has('/') && (
@@ -220,9 +220,9 @@ export function AppLayout() {
         {!isCurrentTab && <Outlet />}
       </main>
 
-      {/* Bottom Navigation - Frosted Glass */}
-      <nav className="fixed bottom-0 w-full bg-background/80 backdrop-blur-xl border-t border-border flex justify-around items-center h-16 pb-safe z-50">
-        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-full">
+      {/* Bottom Navigation - Frosted Glass (嚴格緊貼螢幕最底邊) */}
+      <nav className="fixed bottom-0 left-0 right-0 w-full bg-background/80 backdrop-blur-xl border-t border-border z-50">
+        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-14">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;

@@ -47,4 +47,14 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// force reload
+// 修復 iOS Safari/PWA 虛擬鍵盤或輸入框聚焦引發的 visualViewport 殘留偏移導致點擊錯位
+if (typeof window !== 'undefined') {
+  document.addEventListener('focusout', (e) => {
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 50);
+    }
+  });
+}

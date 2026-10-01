@@ -194,6 +194,11 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     openKeypad();
     onFocus?.(e);
+    if (!disableKeypad && typeof window !== 'undefined') {
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 50);
+    }
   };
 
   const handleInputClick = (e: React.MouseEvent<HTMLInputElement>) => {

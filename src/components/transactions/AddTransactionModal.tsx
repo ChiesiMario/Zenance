@@ -8,11 +8,12 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift } from 'lucide-react';
+import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
+import { predictCategoryFromNote } from '@/lib/categoryPredictor';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useBudgets } from '@/hooks/useBudgets';
@@ -85,6 +86,7 @@ export function AddTransactionModal({
   });
 
   const [isCategoryWarning, setIsCategoryWarning] = useState(false);
+  const [isUserSelectedCat, setIsUserSelectedCat] = useState(false);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerCategoryWarning = () => {
@@ -254,9 +256,10 @@ export function AddTransactionModal({
         setValue('feeCategoryId', undefined);
         setLoanType(initialLoanType);
         setIsGift(false);
+        setIsUserSelectedCat(Boolean(transactionToEditId));
       }
     }
-  }, [isOpen, initialType, initialLoanType, initialContactId, initialToAccountId, initialAmount, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue]);
+  }, [isOpen, initialType, initialLoanType, initialContactId, initialToAccountId, initialAmount, transactionToEdit, transactions, baseCurrency, contacts, reset, setValue, transactionToEditId]);
 
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer' | 'loan', newLoanType?: 'borrow' | 'lend') => {
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;
@@ -273,6 +276,7 @@ export function AddTransactionModal({
     const targetLoanType = newLoanType || 'borrow';
     setLoanType(targetLoanType);
     setIsGift(false);
+    setIsUserSelectedCat(false);
   };
 
   const toggleLoanType = () => {
@@ -436,16 +440,34 @@ export function AddTransactionModal({
     });
   }, [filteredCategories, categoryFrequencyStats]);
 
-  const displayedPills = useMemo(() => {
-    const top = frequentCategories.slice(0, 6);
-    if (selectedCategoryId && !top.some(c => c.id === selectedCategoryId)) {
-      const activeCat = filteredCategories.find(c => c.id === selectedCategoryId);
-      if (activeCat) {
-        return [activeCat, ...top.slice(0, 5)];
+  // 智慧語意預測：備註反向推斷分類
+  const currentNote = watch('note') || '';
+
+  const predictedResult = useMemo(() => {
+    if (!currentNote.trim() || (type !== 'expense' && type !== 'income')) return null;
+    return predictCategoryFromNote(currentNote, type, filteredCategories, transactions || []);
+  }, [currentNote, type, filteredCategories, transactions]);
+
+  // 當使用者未手動指定過分類時，若產生高信心預測，自動切換並給予輕微觸覺反饋
+  useEffect(() => {
+    if (predictedResult && !isUserSelectedCat) {
+      if (selectedCategoryId !== predictedResult.category.id) {
+        setValue('categoryId', predictedResult.category.id, { shouldValidate: true });
+        setIsCategoryWarning(false);
+        triggerHaptic('light');
       }
     }
-    return top;
-  }, [frequentCategories, selectedCategoryId, filteredCategories]);
+  }, [predictedResult, isUserSelectedCat, selectedCategoryId, setValue]);
+
+  const displayedPills = useMemo(() => {
+    let list = [...frequentCategories];
+    const targetCat = predictedResult ? predictedResult.category : (selectedCategoryId ? filteredCategories.find(c => c.id === selectedCategoryId) : null);
+    
+    if (targetCat) {
+      list = [targetCat, ...list.filter(c => c.id !== targetCat.id)];
+    }
+    return list.slice(0, 6);
+  }, [frequentCategories, predictedResult, selectedCategoryId, filteredCategories]);
 
   const handleSwapTransferAccounts = () => {
     const currentFrom = watch('fromAccountId');
@@ -1418,17 +1440,19 @@ export function AddTransactionModal({
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full">
               {displayedPills.map(cat => {
                 const isSelected = selectedCategoryId === cat.id;
+                const isPredicted = predictedResult?.category.id === cat.id;
                 return (
                   <button
                     key={cat.id}
                     type="button"
                     onClick={() => {
                       triggerHaptic('selection');
+                      setIsUserSelectedCat(true);
                       setValue('categoryId', cat.id, { shouldValidate: true });
                       setIsCategoryWarning(false);
                     }}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border",
+                      "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
                       isSelected
                         ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
                         : isCategoryWarning
@@ -1436,7 +1460,10 @@ export function AddTransactionModal({
                           : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                     )}
                   >
-                    {cat.name}
+                    {isPredicted && (
+                      <Sparkles className={cn("w-3 h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
+                    )}
+                    <span>{cat.name}</span>
                   </button>
                 );
               })}
@@ -1547,6 +1574,7 @@ export function AddTransactionModal({
                     type="button"
                     onClick={() => {
                       triggerHaptic('selection');
+                      setIsUserSelectedCat(true);
                       setValue('categoryId', cat.id);
                       setIsCatPickerOpen(false);
                     }}

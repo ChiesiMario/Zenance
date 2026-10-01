@@ -119,6 +119,11 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
+  @media (min-width: 768px) {
+    html {
+      font-size: 81%;
+    }
+  }
   html, body {
     user-select: none;
     -webkit-user-select: none;

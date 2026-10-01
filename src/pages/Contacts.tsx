@@ -217,6 +217,7 @@ export default function Contacts() {
                 amount={netBalance} 
                 baseCurrency={baseCurrency} 
                 type="balance" 
+                animated
               />
             </div>
           </div>
@@ -228,6 +229,7 @@ export default function Contacts() {
                   amount={totalReceivable} 
                   baseCurrency={baseCurrency} 
                   type="neutral" 
+                  animated
                 />
               </p>
             </div>
@@ -238,6 +240,7 @@ export default function Contacts() {
                   amount={totalPayable} 
                   baseCurrency={baseCurrency} 
                   type="neutral" 
+                  animated
                 />
               </p>
             </div>

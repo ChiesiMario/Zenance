@@ -381,7 +381,7 @@ export default function Dashboard() {
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('dashboard.netBalance')}</p>
           <p className="text-4xl font-mono tracking-tighter font-medium">
-            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="balance" />
+            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="balance" animated />
           </p>
         </div>
 
@@ -390,13 +390,13 @@ export default function Dashboard() {
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
             <p className="text-2xl font-mono tracking-tight font-medium">
-              <AmountDisplay amount={income} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+              <AmountDisplay amount={income} baseCurrency={activeLedger?.baseCurrency} type="neutral" animated />
             </p>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
             <p className="text-2xl font-mono tracking-tight font-medium">
-              <AmountDisplay amount={expense} baseCurrency={activeLedger?.baseCurrency} type="neutral" />
+              <AmountDisplay amount={expense} baseCurrency={activeLedger?.baseCurrency} type="neutral" animated />
             </p>
           </div>
         </div>

@@ -1,4 +1,5 @@
 import { getCurrencySymbol, cn } from '@/lib/utils';
+import { SpringNumber } from '@/components/ui/SpringNumber';
 
 export interface AmountDisplayProps {
   amount: number;
@@ -8,6 +9,14 @@ export interface AmountDisplayProps {
   type?: 'income' | 'expense' | 'transfer' | 'loan' | 'neutral' | 'balance';
   showSign?: boolean;
   className?: string;
+  /**
+   * Whether to animate the numeric value with smooth spring physics
+   */
+  animated?: boolean;
+  /**
+   * Unique memory key for persisting previous numeric value across page transitions
+   */
+  memoryKey?: string;
 }
 
 export function AmountDisplay({
@@ -18,12 +27,18 @@ export function AmountDisplay({
   type = 'neutral',
   showSign = true,
   className,
+  animated = false,
+  memoryKey,
 }: AmountDisplayProps) {
+  const effectiveMemoryKey = memoryKey || (animated ? `amt-${type}-${baseCurrency}-${className || 'd'}` : undefined);
   const effectiveIsApproximate = isApproximate !== undefined
     ? isApproximate
     : Boolean(originalCurrency && originalCurrency !== baseCurrency);
   const symbol = getCurrencySymbol(baseCurrency);
-  const formattedAmount = Math.abs(amount).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const formattedAmount = Math.abs(amount).toLocaleString(undefined, { 
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2 
+  });
   
   let colorClass = '';
   let sign = '';
@@ -61,11 +76,15 @@ export function AmountDisplay({
   }
 
   return (
-    <span className={cn('font-mono font-medium select-text', colorClass, className)}>
+    <span className={cn('font-mono tabular-nums font-medium select-text', colorClass, className)}>
       {effectiveIsApproximate && '≈ '}
       {sign}
       {symbol}
-      {formattedAmount}
+      {animated ? (
+        <SpringNumber value={Math.abs(amount)} decimals={2} memoryKey={effectiveMemoryKey} />
+      ) : (
+        formattedAmount
+      )}
     </span>
   );
 }

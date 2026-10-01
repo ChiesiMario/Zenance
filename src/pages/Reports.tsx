@@ -34,6 +34,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { SpringNumber } from '@/components/ui/SpringNumber';
 import {
   Dialog,
   DialogContent,
@@ -498,10 +499,7 @@ export default function Reports() {
           >
             {netBalance < 0 ? '-' : netBalance > 0 ? '+' : ''}
             {currencySymbol}
-            {Math.abs(netBalance).toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            <SpringNumber value={Math.abs(netBalance)} decimals={2} memoryKey="reports-net-balance" />
           </p>
         </div>
 
@@ -518,10 +516,7 @@ export default function Reports() {
             <div>
               <p className="text-xl font-mono tracking-tight font-medium text-foreground">
                 {currencySymbol}
-                {totalExpense.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                <SpringNumber value={totalExpense} decimals={2} memoryKey="reports-total-expense" />
               </p>
               <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
                 {t('reports.dailyAverage', '日均支出')}: {currencySymbol}
@@ -544,10 +539,7 @@ export default function Reports() {
             <div>
               <p className="text-xl font-mono tracking-tight font-medium text-foreground">
                 {currencySymbol}
-                {totalIncome.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                <SpringNumber value={totalIncome} decimals={2} memoryKey="reports-total-income" />
               </p>
               <p className="text-[11px] font-mono mt-0.5">
                 {savingsRate !== null ? (

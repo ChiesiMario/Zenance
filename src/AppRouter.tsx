@@ -1,10 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
-import Dashboard from './pages/Dashboard';
-
-import Accounts from './pages/Accounts';
-import Contacts from './pages/Contacts';
-import Budgets from './pages/Budgets';
 import BudgetHistory from './pages/BudgetHistory';
 import BudgetDetails from './pages/BudgetDetails';
 import Settings from './pages/Settings';
@@ -35,11 +30,11 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Dashboard />,
+        element: null,
       },
       {
         path: 'accounts',
-        element: <Accounts />,
+        element: null,
       },
       {
         path: 'accounts/:id',
@@ -47,7 +42,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'contacts',
-        element: <Contacts />,
+        element: null,
       },
       {
         path: 'contacts/:id',
@@ -55,7 +50,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'budgets',
-        element: <Budgets />,
+        element: null,
       },
       {
         path: 'budgets/history',

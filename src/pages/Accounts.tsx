@@ -365,6 +365,7 @@ export default function Accounts() {
                 amount={netWorth} 
                 baseCurrency={baseCurrency} 
                 type="balance" 
+                animated
               />
             </div>
           </div>
@@ -376,6 +377,7 @@ export default function Accounts() {
                   amount={totalWallets} 
                   baseCurrency={baseCurrency} 
                   type={totalWallets >= 0 ? "income" : "expense"} 
+                  animated
                 />
               </p>
             </div>
@@ -386,6 +388,7 @@ export default function Accounts() {
                   amount={totalLoans} 
                   baseCurrency={baseCurrency} 
                   type={totalLoans >= 0 ? "income" : "expense"} 
+                  animated
                 />
               </p>
             </div>

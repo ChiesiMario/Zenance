@@ -1,6 +1,10 @@
-import { useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins, Coins } from 'lucide-react';
+import Dashboard from '@/pages/Dashboard';
+import Budgets from '@/pages/Budgets';
+import Accounts from '@/pages/Accounts';
+import Contacts from '@/pages/Contacts';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -92,20 +96,120 @@ export function AppLayout() {
     { path: '/contacts', label: t('nav.contacts'), icon: Users },
   ];
 
+  const TAB_PATHS = ['/', '/budgets', '/accounts', '/contacts'] as const;
+  type TabPath = typeof TAB_PATHS[number];
+  const isCurrentTab = TAB_PATHS.includes(location.pathname as TabPath);
+
+  // Keep-Alive tab cache: lazy mount when first visited
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => {
+    return isCurrentTab ? new Set([location.pathname]) : new Set(['/']);
+  });
+  const tabLastActiveRef = useRef<Record<string, number>>({
+    [location.pathname]: Date.now(),
+  });
+
+  // Track each tab/route's scroll position independently
+  const scrollPositionsRef = useRef<Record<string, number>>({});
+  const lastPathRef = useRef<string>(location.pathname);
+
+  // Register newly visited tabs & update last active timestamp
+  useEffect(() => {
+    if (isCurrentTab) {
+      setMountedTabs(prev => {
+        if (prev.has(location.pathname)) return prev;
+        const next = new Set(prev);
+        next.add(location.pathname);
+        return next;
+      });
+      tabLastActiveRef.current[location.pathname] = Date.now();
+    }
+  }, [location.pathname, isCurrentTab]);
+
+  // Periodic 30-minute cache eviction: inspect every 5 mins and prune tabs inactive for >= 30 mins
+  useEffect(() => {
+    const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 mins
+    const MAX_INACTIVE_AGE = 30 * 60 * 1000; // 30 mins
+
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setMountedTabs(prev => {
+        let hasChanges = false;
+        const next = new Set(prev);
+
+        for (const tab of prev) {
+          // Never evict currently active page
+          if (tab === location.pathname) continue;
+          const lastActive = tabLastActiveRef.current[tab] || 0;
+          if (now - lastActive > MAX_INACTIVE_AGE) {
+            next.delete(tab);
+            delete scrollPositionsRef.current[tab];
+            hasChanges = true;
+          }
+        }
+
+        return hasChanges ? next : prev;
+      });
+    }, CLEANUP_INTERVAL);
+
+    return () => clearInterval(timer);
+  }, [location.pathname]);
+
   const mainRef = useRef<HTMLElement>(null);
 
-  // Reset scroll position synchronously on route change before paint so new page smoothly fades in from top
+  // Seamless scroll position restoration per page
   useLayoutEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = 0;
+    const mainEl = mainRef.current;
+    if (!mainEl) return;
+
+    // Save previous path's scroll position before switching
+    if (lastPathRef.current) {
+      scrollPositionsRef.current[lastPathRef.current] = mainEl.scrollTop;
     }
+
+    // Restore incoming path's scroll position
+    const targetScroll = scrollPositionsRef.current[location.pathname] || 0;
+    mainEl.scrollTop = targetScroll;
+    lastPathRef.current = location.pathname;
   }, [location.pathname]);
+
+  const handleScroll = () => {
+    if (mainRef.current) {
+      scrollPositionsRef.current[location.pathname] = mainRef.current.scrollTop;
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground">
-      {/* Main Content Area */}
-      <main ref={mainRef} className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-4 [scrollbar-gutter:stable]">
-        <Outlet />
+      {/* Main Content Area with Keep-Alive View Stack */}
+      <main 
+        ref={mainRef} 
+        onScroll={handleScroll}
+        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto pb-24 px-5 pt-4 [scrollbar-gutter:stable]"
+      >
+        {/* Keep-Alive Tab Views */}
+        {mountedTabs.has('/') && (
+          <div style={{ display: location.pathname === '/' ? 'block' : 'none' }}>
+            <Dashboard />
+          </div>
+        )}
+        {mountedTabs.has('/budgets') && (
+          <div style={{ display: location.pathname === '/budgets' ? 'block' : 'none' }}>
+            <Budgets />
+          </div>
+        )}
+        {mountedTabs.has('/accounts') && (
+          <div style={{ display: location.pathname === '/accounts' ? 'block' : 'none' }}>
+            <Accounts />
+          </div>
+        )}
+        {mountedTabs.has('/contacts') && (
+          <div style={{ display: location.pathname === '/contacts' ? 'block' : 'none' }}>
+            <Contacts />
+          </div>
+        )}
+
+        {/* Sub-routes and detail pages rendered via standard Outlet */}
+        {!isCurrentTab && <Outlet />}
       </main>
 
       {/* Bottom Navigation - Frosted Glass */}

@@ -75,7 +75,7 @@ export function ConfirmDialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
           data-slot="confirm-dialog-overlay"
-          className="fixed inset-0 isolate z-[75] bg-background/40 backdrop-blur-md duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+          className="fixed inset-0 isolate z-[75] bg-background/40 backdrop-blur-md duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 data-closed:hidden"
         />
         <DialogPrimitive.Popup
           data-slot="confirm-dialog-content"

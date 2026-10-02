@@ -19,6 +19,11 @@ export interface AutoMarqueeProps {
    * 'end': 從右側末尾向左捲動（適用於輸入完畢後以現時狀態無縫開跑）
    */
   startFrom?: 'start' | 'end';
+  /**
+   * 是否處於啟用/活躍狀態。
+   * 預設為 true。若為 false 且內容超長時，暫停動畫並以靜態省略號（...）截斷展示首端金額。
+   */
+  active?: boolean;
 }
 
 /**
@@ -26,7 +31,8 @@ export interface AutoMarqueeProps {
  * 當內容未超出容器寬度時，維持一般排版（居中、靠左或靠右）；
  * 當內容超出容器寬度時，自動禁止換行，並開啟絲滑的往復平移（Ping-Pong）跑馬燈動畫，
  * 兩端具備停頓停留，手指或滑鼠按下懸停時自動暫停；
- * 支援輸入狀態鎖定，打字期間固定顯示末位，停頓後以現時狀態無縫開跑，絕不閃現跳動。
+ * 支援輸入狀態鎖定，打字期間固定顯示末位，停頓後以現時狀態無縫開跑，絕不閃現跳動；
+ * 支援 active 狀態控制，未活躍時以省略號截斷首端，選中時啟動跑馬燈。
  */
 export function AutoMarquee({
   children,
@@ -36,6 +42,7 @@ export function AutoMarquee({
   speed = 20,
   isTyping = false,
   startFrom,
+  active = true,
 }: AutoMarqueeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -89,7 +96,7 @@ export function AutoMarquee({
       cancelAnimationFrame(rafId);
       ro.disconnect();
     };
-  }, [measure, children]);
+  }, [measure, children, active]);
 
   // 動態計算動畫總週期：(滾動時間 + 兩端停頓時間) * 2
   // 停頓時間各約 1.4s，共 2.8s
@@ -102,9 +109,11 @@ export function AutoMarquee({
       className={cn(
         'overflow-hidden max-w-full w-full [backface-visibility:hidden]',
         isOverflowing
-          ? effectiveStartFrom === 'end'
-            ? 'flex justify-end text-right'
-            : 'flex justify-start text-left'
+          ? !active
+            ? 'flex justify-start text-left'
+            : effectiveStartFrom === 'end'
+              ? 'flex justify-end text-right'
+              : 'flex justify-start text-left'
           : align === 'center'
             ? 'flex justify-center text-center'
             : align === 'right'
@@ -116,8 +125,11 @@ export function AutoMarquee({
       <div
         ref={contentRef}
         className={cn(
-          'whitespace-nowrap shrink-0 inline-flex items-center [backface-visibility:hidden]',
-          isOverflowing && !isTyping && (
+          'shrink-0 [backface-visibility:hidden]',
+          isOverflowing && !active
+            ? 'truncate max-w-full block'
+            : 'whitespace-nowrap inline-flex items-center',
+          isOverflowing && active && !isTyping && (
             effectiveStartFrom === 'end'
               ? 'will-change-transform animate-marquee-pingpong-from-end hover:[animation-play-state:paused] active:[animation-play-state:paused]'
               : 'will-change-transform animate-marquee-pingpong hover:[animation-play-state:paused] active:[animation-play-state:paused]'
@@ -125,7 +137,7 @@ export function AutoMarquee({
           contentClassName
         )}
         style={
-          isOverflowing
+          isOverflowing && active
             ? isTyping
               ? undefined
               : ({

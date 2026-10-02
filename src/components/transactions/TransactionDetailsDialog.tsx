@@ -7,6 +7,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { cn, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
@@ -937,17 +938,19 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
             )}
           </div>
 
-          {/* Hero Amount Monospace Display */}
-          <div className="text-3xl sm:text-4xl font-mono tracking-tighter font-extrabold select-all py-1.5 leading-tight">
-            <AmountDisplay
-              amount={cardAmount}
-              originalCurrency={isDirectOriginal ? undefined : tx.originalCurrency}
-              baseCurrency={cardBaseCurrency}
-              isApproximate={isDirectOriginal ? false : undefined}
-              type={isChild ? 'income' : (cardType as any)}
-              className={isChild ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"}
-              showSign={isChild ? true : undefined}
-            />
+          {/* Hero Amount Monospace Display with AutoMarquee */}
+          <div className="w-full max-w-full overflow-hidden text-3xl sm:text-4xl font-mono tracking-tighter font-extrabold select-all py-1.5 leading-tight flex items-center justify-center">
+            <AutoMarquee align="center" active={isActive} className="max-w-full">
+              <AmountDisplay
+                amount={cardAmount}
+                originalCurrency={isDirectOriginal ? undefined : tx.originalCurrency}
+                baseCurrency={cardBaseCurrency}
+                isApproximate={isDirectOriginal ? false : undefined}
+                type={isChild ? 'income' : (cardType as any)}
+                className={isChild ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"}
+                showSign={isChild ? true : undefined}
+              />
+            </AutoMarquee>
           </div>
 
           {/* 若為主交易且存在已退款金額，顯示已退款提示 */}

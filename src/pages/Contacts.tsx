@@ -17,6 +17,7 @@ import {
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { calculateAccountBalances, convertAmount } from '@/lib/currency';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
@@ -213,37 +214,41 @@ export default function Contacts() {
               </span>
             )}
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('contacts.netBalance')}</p>
-            <div className="text-5xl font-mono tracking-tighter font-medium">
+            <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2">
               <AmountDisplay 
                 amount={netBalance} 
                 baseCurrency={baseCurrency} 
                 type="balance" 
                 animated
               />
-            </div>
+            </AutoMarquee>
           </div>
           <div className="grid grid-cols-2">
             <div className="p-5 border-r border-border flex flex-col">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.receivable')}</p>
-              <p className={cn("text-2xl font-mono tracking-tight font-medium", totalReceivable > 0 ? "text-emerald-500" : "text-muted-foreground/60")}>
-                <AmountDisplay 
-                  amount={totalReceivable} 
-                  baseCurrency={baseCurrency} 
-                  type="neutral" 
-                  animated
-                />
-              </p>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalReceivable > 0 ? "text-emerald-500" : "text-foreground")}>
+                <AutoMarquee align="left">
+                  <AmountDisplay 
+                    amount={totalReceivable} 
+                    baseCurrency={baseCurrency} 
+                    type="neutral" 
+                    animated
+                  />
+                </AutoMarquee>
+              </div>
             </div>
             <div className="p-5 flex flex-col">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.payable')}</p>
-              <p className={cn("text-2xl font-mono tracking-tight font-medium", totalPayable > 0 ? "text-rose-500" : "text-muted-foreground/60")}>
-                <AmountDisplay 
-                  amount={totalPayable} 
-                  baseCurrency={baseCurrency} 
-                  type="neutral" 
-                  animated
-                />
-              </p>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalPayable > 0 ? "text-rose-500" : "text-foreground")}>
+                <AutoMarquee align="left">
+                  <AmountDisplay 
+                    amount={totalPayable} 
+                    baseCurrency={baseCurrency} 
+                    type="neutral" 
+                    animated
+                  />
+                </AutoMarquee>
+              </div>
             </div>
           </div>
         </div>

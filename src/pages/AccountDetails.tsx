@@ -14,6 +14,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
 import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 import { getTxAccountDelta, convertAmount } from '@/lib/currency';
 
@@ -213,9 +214,9 @@ export default function AccountDetails() {
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('accounts.balance')}</p>
-          <div className={cn("text-6xl font-mono tracking-tighter font-medium break-all px-4", balance < 0 ? 'text-destructive' : 'text-foreground')}>
-            <AmountDisplay amount={balance} baseCurrency={currency} type="neutral" />
-          </div>
+          <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4">
+            <AmountDisplay amount={balance} baseCurrency={currency} type="balance" />
+          </AutoMarquee>
           {account?.excludeFromStats && (
             <div className="mt-2 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/20 select-none">
               {t('accounts.excludedFromStatsTag')}
@@ -294,15 +295,19 @@ export default function AccountDetails() {
           <div className="grid grid-cols-2 gap-px bg-border">
             <div className="bg-card p-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
-              <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
-                <AmountDisplay amount={totalIncome} baseCurrency={currency} type="neutral" />
-              </p>
+              <div className="text-2xl font-mono tracking-tight font-medium">
+                <AutoMarquee align="left">
+                  <AmountDisplay amount={totalIncome} baseCurrency={currency} type="income" />
+                </AutoMarquee>
+              </div>
             </div>
             <div className="bg-card p-4">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
-              <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
-                <AmountDisplay amount={totalExpense} baseCurrency={currency} type="neutral" />
-              </p>
+              <div className="text-2xl font-mono tracking-tight font-medium">
+                <AutoMarquee align="left">
+                  <AmountDisplay amount={totalExpense} baseCurrency={currency} type="expense" showSign={false} />
+                </AutoMarquee>
+              </div>
             </div>
           </div>
         )}

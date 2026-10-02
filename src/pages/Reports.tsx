@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/dialog';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 
@@ -503,9 +504,10 @@ export default function Reports() {
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 font-mono">
             {t('reports.netBalance')}
           </p>
-          <p
+          <AutoMarquee
+            align="center"
             className={cn(
-              'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold',
+              'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold px-2',
               netBalance === 0
                 ? 'text-muted-foreground'
                 : netBalance > 0
@@ -516,7 +518,7 @@ export default function Reports() {
             {netBalance < 0 ? '-' : netBalance > 0 ? '+' : ''}
             {currencySymbol}
             <SpringNumber value={Math.abs(netBalance)} decimals={2} memoryKey="reports-net-balance" />
-          </p>
+          </AutoMarquee>
         </div>
 
         {/* 3-Column Analytical Indicators Grid */}
@@ -530,7 +532,7 @@ export default function Reports() {
               </span>
             </div>
             <div>
-              <p className="text-xl font-mono tracking-tight font-medium text-foreground">
+              <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
                 {currencySymbol}
                 <SpringNumber value={totalExpense} decimals={2} memoryKey="reports-total-expense" />
               </p>
@@ -553,7 +555,7 @@ export default function Reports() {
               </span>
             </div>
             <div>
-              <p className="text-xl font-mono tracking-tight font-medium text-foreground">
+              <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
                 {currencySymbol}
                 <SpringNumber value={totalIncome} decimals={2} memoryKey="reports-total-income" />
               </p>
@@ -586,7 +588,7 @@ export default function Reports() {
             <div>
               {peakExpenseTx ? (
                 <>
-                  <p className="text-xl font-mono tracking-tight font-medium text-foreground truncate select-text">
+                  <p className="text-2xl font-mono tracking-tight font-medium text-foreground truncate select-text">
                     {currencySymbol}
                     {peakExpenseTx.amount.toLocaleString(undefined, {
                       minimumFractionDigits: 2,

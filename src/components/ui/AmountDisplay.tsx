@@ -43,17 +43,22 @@ export function AmountDisplay({
   let colorClass = '';
   let sign = '';
 
+  const isZero = Math.abs(amount) < 0.000001;
+
   if (type === 'income') {
-    colorClass = 'text-emerald-500';
+    colorClass = isZero ? 'text-foreground' : 'text-emerald-500';
     sign = '';
   } else if (type === 'expense') {
-    colorClass = 'text-rose-500';
-    sign = showSign ? '-' : '';
+    colorClass = isZero ? 'text-foreground' : 'text-rose-500';
+    sign = (showSign && !isZero) ? '-' : '';
   } else if (type === 'transfer') {
-    colorClass = 'text-blue-500';
+    colorClass = isZero ? 'text-foreground' : 'text-blue-500';
     sign = '';
   } else if (type === 'loan') {
-    if (amount < 0) {
+    if (isZero) {
+      colorClass = 'text-foreground';
+      sign = '';
+    } else if (amount < 0) {
       colorClass = 'text-rose-500';
       sign = showSign ? '-' : '';
     } else {
@@ -61,18 +66,18 @@ export function AmountDisplay({
       sign = '';
     }
   } else if (type === 'balance') {
-    if (amount > 0) {
-      colorClass = 'text-emerald-500';
-      sign = '';
-    } else if (amount < 0) {
-      colorClass = 'text-rose-500';
-      sign = showSign ? '-' : '';
-    } else {
+    if (isZero) {
       colorClass = 'text-foreground';
       sign = '';
+    } else if (amount > 0) {
+      colorClass = 'text-emerald-500';
+      sign = '';
+    } else {
+      colorClass = 'text-rose-500';
+      sign = showSign ? '-' : '';
     }
   } else if (type === 'neutral') {
-    if (showSign && amount < 0) sign = '-';
+    if (showSign && amount < 0 && !isZero) sign = '-';
   }
 
   return (

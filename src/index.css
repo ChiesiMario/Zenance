@@ -263,4 +263,21 @@
   }
 }
 
+/* Marquee Ping-Pong Animation for Overflowing Amounts */
+@keyframes marquee-pingpong {
+  0%, 20% {
+    transform: translateX(0);
+  }
+  50%, 70% {
+    transform: translateX(var(--marquee-distance, 0px));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee-pingpong {
+  animation: marquee-pingpong var(--marquee-duration, 5s) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
 

@@ -13,6 +13,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { useAccounts } from '@/hooks/useAccounts';
+import { useCategories } from '@/hooks/useCategories';
 import { toast, Toaster } from '@/components/ui/toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
@@ -28,6 +29,7 @@ export function AppLayout() {
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
   const { wallets, contacts, archivedContacts } = useAccounts();
+  const { allCategories } = useCategories();
   const { 
     activeLedgerId, 
     editingTransactionId, 
@@ -61,6 +63,12 @@ export function AppLayout() {
     let borrow = 0;
     
     transactions?.filter(t => t.date.startsWith(prefix) && !t.deleted).forEach(t => {
+      // 排除常規餘額調整交易（系統分類），退款子交易具有 parentId 則保留參與沖抵計算
+      if (!t.parentId) {
+        const cat = allCategories?.find(c => c.id === t.category);
+        if (cat?.isSystem) return;
+      }
+
       if (t.parentId) {
         if (t.type === 'income') expense -= t.amount;
         else if (t.type === 'expense') income -= t.amount;
@@ -80,7 +88,7 @@ export function AppLayout() {
     });
     
     const format = (val: number) => {
-      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(val);
+      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Math.max(0, val));
     };
     
     return {
@@ -90,7 +98,7 @@ export function AppLayout() {
       lend: format(lend),
       borrow: format(borrow),
     };
-  }, [transactions, contacts, archivedContacts]);
+  }, [transactions, contacts, archivedContacts, allCategories]);
   
   const handleOpenAddModal = (type: 'expense' | 'income' | 'transfer' | 'loan', loanType?: 'borrow' | 'lend') => {
     openAddModal(type, loanType);

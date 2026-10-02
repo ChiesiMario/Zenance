@@ -545,256 +545,265 @@ export function AddTransactionModal({
   }, [accounts, type, loanType, contacts, setValue, initialContactId, selectedAccountId, selectedFromAccountId, selectedToAccountId, initialToAccountId]);
 
   const onSubmit = async (data: FormValues) => {
-    const rateToBase = getRate(fromCurrency, baseCurrency);
-    const exchangeRate = rateToBase;
+    try {
+      const rateToBase = getRate(fromCurrency, baseCurrency);
+      const exchangeRate = rateToBase;
 
-    if (type === 'transfer') {
-      const feeAmount = parseFloat(displayFeeAmount) || 0;
-      const transferAmount = data.amount;
-      const transferInAmount = isCrossCurrency
-        ? (data.transferInAmount ?? transferAmount)
-        : transferAmount;
-      const transferRate = (isCrossCurrency && transferAmount > 0)
-        ? (transferInAmount / transferAmount)
-        : 1;
-      const baseAmount = transferAmount * rateToBase;
+      if (type === 'transfer') {
+        const feeAmount = parseFloat(displayFeeAmount) || 0;
+        const transferAmount = data.amount;
+        const transferInAmount = isCrossCurrency
+          ? (data.transferInAmount ?? transferAmount)
+          : transferAmount;
+        const transferRate = (isCrossCurrency && transferAmount > 0)
+          ? (transferInAmount / transferAmount)
+          : 1;
+        const baseAmount = transferAmount * rateToBase;
 
-      let feeCategoryId: string | undefined;
-      if (feeAmount > 0) {
-        let feeCat = categories?.find(c => c.type === 'expense' && (c.name === '手續費' || c.name === '手续费' || c.name.toLowerCase() === 'fee'));
-        if (!feeCat) {
-          feeCat = categories?.find(c => c.type === 'expense' && (c.name.includes('手續費') || c.name.includes('手续费') || c.name.toLowerCase().includes('fee')));
-        }
-        if (!feeCat) {
-          const newCat = await addCategory('手續費', 'expense');
-          feeCategoryId = newCat.id;
-        } else {
-          feeCategoryId = feeCat.id;
-        }
-      }
-
-      const splitGroupId = (feeAmount > 0) ? (transactionToEdit?.splitGroupId || uuidv4()) : undefined;
-
-      await db.transaction('rw', db.transactions, async () => {
-        if (transactionToEdit) {
-          if (transactionToEdit.splitGroupId) {
-            const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
-            for (const otherTx of otherGroupTxs) {
-              await deleteTransaction(otherTx.id);
-            }
+        let feeCategoryId: string | undefined;
+        if (feeAmount > 0) {
+          let feeCat = categories?.find(c => c.type === 'expense' && (c.name === '手續費' || c.name === '手续费' || c.name.toLowerCase() === 'fee'));
+          if (!feeCat) {
+            feeCat = categories?.find(c => c.type === 'expense' && (c.name.includes('手續費') || c.name.includes('手续费') || c.name.toLowerCase().includes('fee')));
           }
-          await updateTransaction(transactionToEdit.id, {
-            originalAmount: transferAmount,
-            originalCurrency: fromCurrency,
-            exchangeRate: transferRate,
-            amount: baseAmount,
-            type: 'transfer',
-            category: 'transfer',
-            accountId: data.fromAccountId!,
-            toAccountId: data.toAccountId,
-            transferInAmount: transferInAmount,
-            splitGroupId,
-            note: data.note,
-            date: data.date,
-          });
-
-          if (feeAmount > 0 && feeCategoryId) {
-            await addTransaction({
-              originalAmount: feeAmount,
-              originalCurrency: fromCurrency,
-              exchangeRate: transferRate,
-              amount: feeAmount * rateToBase,
-              type: 'expense',
-              category: feeCategoryId,
-              accountId: data.fromAccountId!,
-              splitGroupId,
-              note: data.note?.trim() || undefined,
-              date: data.date,
-            });
-          }
-        } else {
-          await addTransaction({
-            originalAmount: transferAmount,
-            originalCurrency: fromCurrency,
-            exchangeRate: transferRate,
-            amount: baseAmount,
-            type: 'transfer',
-            category: 'transfer',
-            accountId: data.fromAccountId!,
-            toAccountId: data.toAccountId,
-            transferInAmount: transferInAmount,
-            splitGroupId,
-            note: data.note,
-            date: data.date,
-          });
-
-          if (feeAmount > 0 && feeCategoryId) {
-            await addTransaction({
-              originalAmount: feeAmount,
-              originalCurrency: fromCurrency,
-              exchangeRate: transferRate,
-              amount: feeAmount * rateToBase,
-              type: 'expense',
-              category: feeCategoryId,
-              accountId: data.fromAccountId!,
-              splitGroupId,
-              note: data.note?.trim() || undefined,
-              date: data.date,
-            });
+          if (!feeCat) {
+            const newCat = await addCategory('手續費', 'expense');
+            feeCategoryId = newCat.id;
+          } else {
+            feeCategoryId = feeCat.id;
           }
         }
-      });
 
-      onClose();
-      return;
-    }
+        const splitGroupId = (feeAmount > 0) ? (transactionToEdit?.splitGroupId || uuidv4()) : undefined;
 
-    if (type === 'loan') {
-      const loanAmount = data.amount;
-      const loanCurrency = loanWallet?.currency || baseCurrency;
-      const isForeignLoan = loanCurrency !== baseCurrency;
-      const loanRate = isForeignLoan ? rateToBase : 1;
-      const loanBaseAmount = loanAmount * loanRate;
-
-      if (transactionToEdit && transactionToEdit.splitGroupId) {
-        const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
-        for (const otherTx of otherGroupTxs) {
-          await deleteTransaction(otherTx.id);
-        }
-      }
-
-      const mainTx = {
-        originalAmount: loanAmount,
-        originalCurrency: loanCurrency,
-        exchangeRate: loanRate,
-        transferInAmount: undefined,
-        amount: loanBaseAmount,
-        type: 'loan' as const,
-        category: 'loan',
-        accountId: data.fromAccountId!,
-        toAccountId: data.toAccountId!,
-        note: data.note,
-        date: data.date,
-        isGift: isGift,
-      };
-
-      if (transactionToEdit) {
-        await updateTransaction(transactionToEdit.id, mainTx);
-      } else {
-        await addTransaction(mainTx);
-      }
-
-      onClose();
-      return;
-    }
-
-    const calculatedBaseAmount = data.amount * rateToBase;
-    const hasSplits = type === 'expense' && splits.length > 0;
-    const isAdvance = type === 'expense' && hasSplits;
-
-    // 多人分攤或部分代付分拆處理
-    if (type === 'expense' && splits.length > 0) {
-      const totalAdvanceOriginal = splits.reduce((sum, s) => sum + s.amount, 0);
-      const selfExpenseOriginal = Math.max(0, Math.round((data.amount - totalAdvanceOriginal) * 100) / 100);
-      const isMultiOrPartial = splits.length > 1 || (splits.length === 1 && selfExpenseOriginal > 0);
-
-      if (isMultiOrPartial) {
-        const splitGroupId = transactionToEdit?.splitGroupId || uuidv4();
-
-        // 若為編輯模式，清除舊群組所有交易
-        await db.transaction('rw', db.transactions, async () => {
+        await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
           if (transactionToEdit) {
             if (transactionToEdit.splitGroupId) {
-              const oldGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
-              for (const oldTx of oldGroupTxs) {
-                await deleteTransaction(oldTx.id);
+              const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+              for (const otherTx of otherGroupTxs) {
+                await deleteTransaction(otherTx.id);
               }
-            } else {
-              await deleteTransaction(transactionToEdit.id);
             }
-          }
-
-          // 1. 若有自己的自費支出，建立支出交易
-          if (selfExpenseOriginal > 0) {
-            const selfBaseAmount = selfExpenseOriginal * exchangeRate;
-            await addTransaction({
-              originalAmount: selfExpenseOriginal,
-              originalCurrency: selectedCurrency,
-              exchangeRate: exchangeRate,
-              amount: selfBaseAmount,
-              type: 'expense',
-              category: data.categoryId!,
-              accountId: data.accountId!,
-              budgetId: data.budgetId,
+            await updateTransaction(transactionToEdit.id, {
+              originalAmount: transferAmount,
+              originalCurrency: fromCurrency,
+              exchangeRate: transferRate,
+              amount: baseAmount,
+              type: 'transfer',
+              category: 'transfer',
+              accountId: data.fromAccountId!,
+              toAccountId: data.toAccountId,
+              transferInAmount: transferInAmount,
               splitGroupId,
               note: data.note,
               date: data.date,
             });
-          }
 
-          // 2. 為每位代付對象建立借貸代付交易 (type: 'loan'，分類為代付)
-          for (const s of splits) {
-            const advBaseAmount = s.amount * exchangeRate;
+            if (feeAmount > 0 && feeCategoryId) {
+              await addTransaction({
+                originalAmount: feeAmount,
+                originalCurrency: fromCurrency,
+                exchangeRate: transferRate,
+                amount: feeAmount * rateToBase,
+                type: 'expense',
+                category: feeCategoryId,
+                accountId: data.fromAccountId!,
+                splitGroupId,
+                note: data.note?.trim() || undefined,
+                date: data.date,
+              });
+            }
+          } else {
             await addTransaction({
-              originalAmount: s.amount,
-              originalCurrency: selectedCurrency,
-              exchangeRate: exchangeRate,
-              amount: advBaseAmount,
-              type: 'loan',
-              category: 'advance', // 分類為「代付」
-              accountId: data.accountId!, // 付款錢包扣款
-              toAccountId: s.contactId,   // 借給代付對象（應收債權）
+              originalAmount: transferAmount,
+              originalCurrency: fromCurrency,
+              exchangeRate: transferRate,
+              amount: baseAmount,
+              type: 'transfer',
+              category: 'transfer',
+              accountId: data.fromAccountId!,
+              toAccountId: data.toAccountId,
+              transferInAmount: transferInAmount,
               splitGroupId,
               note: data.note,
               date: data.date,
             });
+
+            if (feeAmount > 0 && feeCategoryId) {
+              await addTransaction({
+                originalAmount: feeAmount,
+                originalCurrency: fromCurrency,
+                exchangeRate: transferRate,
+                amount: feeAmount * rateToBase,
+                type: 'expense',
+                category: feeCategoryId,
+                accountId: data.fromAccountId!,
+                splitGroupId,
+                note: data.note?.trim() || undefined,
+                date: data.date,
+              });
+            }
           }
         });
 
+        triggerHaptic('success');
         onClose();
         return;
       }
-    }
 
-    const effectiveType = (isAdvance ? 'loan' : type) as 'expense' | 'income' | 'loan';
-    const singleContactId = splits.length === 1 ? splits[0].contactId : undefined;
-    
-    const txData = {
-      originalAmount: data.amount,
-      originalCurrency: selectedCurrency,
-      exchangeRate: exchangeRate,
-      amount: calculatedBaseAmount,
-      type: effectiveType,
-      category: isAdvance 
-        ? 'advance' 
-        : data.categoryId!,
-      accountId: data.accountId!,
-      toAccountId: isAdvance 
-        ? singleContactId 
-        : undefined,
-      transferInAmount: undefined,
-      budgetId: isAdvance ? undefined : data.budgetId,
-      note: data.note,
-      date: data.date,
-    };
+      if (type === 'loan') {
+        const loanAmount = data.amount;
+        const loanCurrency = loanWallet?.currency || baseCurrency;
+        const isForeignLoan = loanCurrency !== baseCurrency;
+        const loanRate = isForeignLoan ? rateToBase : 1;
+        const loanBaseAmount = loanAmount * loanRate;
 
-    if (transactionToEdit) {
-      if (transactionToEdit.splitGroupId) {
-        const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
-        for (const otherTx of otherGroupTxs) {
-          await deleteTransaction(otherTx.id);
+        if (transactionToEdit && transactionToEdit.splitGroupId) {
+          const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+          for (const otherTx of otherGroupTxs) {
+            await deleteTransaction(otherTx.id);
+          }
+        }
+
+        const mainTx = {
+          originalAmount: loanAmount,
+          originalCurrency: loanCurrency,
+          exchangeRate: loanRate,
+          transferInAmount: undefined,
+          amount: loanBaseAmount,
+          type: 'loan' as const,
+          category: 'loan',
+          accountId: data.fromAccountId!,
+          toAccountId: data.toAccountId!,
+          note: data.note,
+          date: data.date,
+          isGift: isGift,
+        };
+
+        if (transactionToEdit) {
+          await updateTransaction(transactionToEdit.id, mainTx);
+        } else {
+          await addTransaction(mainTx);
+        }
+
+        triggerHaptic('success');
+        onClose();
+        return;
+      }
+
+      const calculatedBaseAmount = data.amount * rateToBase;
+      const validSplits = type === 'expense' ? splits.filter(s => s.amount > 0 && Boolean(s.contactId)) : [];
+      const hasSplits = validSplits.length > 0;
+      const isAdvance = hasSplits;
+
+      // 多人分攤或部分代付分拆處理
+      if (isAdvance) {
+        const totalAdvanceOriginal = validSplits.reduce((sum, s) => sum + s.amount, 0);
+        const selfExpenseOriginal = Math.max(0, Math.round((data.amount - totalAdvanceOriginal) * 100) / 100);
+        const isMultiOrPartial = validSplits.length > 1 || (validSplits.length === 1 && selfExpenseOriginal > 0);
+
+        if (isMultiOrPartial) {
+          const splitGroupId = transactionToEdit?.splitGroupId || uuidv4();
+
+          // 若為編輯模式，清除舊群組所有交易
+          await db.transaction('rw', [db.transactions, db.balance_snapshots, db.accounts], async () => {
+            if (transactionToEdit) {
+              if (transactionToEdit.splitGroupId) {
+                const oldGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
+                for (const oldTx of oldGroupTxs) {
+                  await deleteTransaction(oldTx.id);
+                }
+              } else {
+                await deleteTransaction(transactionToEdit.id);
+              }
+            }
+
+            // 1. 若有自己的自費支出，建立支出交易
+            if (selfExpenseOriginal > 0) {
+              const selfBaseAmount = selfExpenseOriginal * exchangeRate;
+              await addTransaction({
+                originalAmount: selfExpenseOriginal,
+                originalCurrency: selectedCurrency,
+                exchangeRate: exchangeRate,
+                amount: selfBaseAmount,
+                type: 'expense',
+                category: data.categoryId!,
+                accountId: data.accountId!,
+                budgetId: data.budgetId,
+                splitGroupId,
+                note: data.note,
+                date: data.date,
+              });
+            }
+
+            // 2. 為每位代付對象建立借貸代付交易 (type: 'loan'，分類為代付)
+            for (const s of validSplits) {
+              const advBaseAmount = s.amount * exchangeRate;
+              await addTransaction({
+                originalAmount: s.amount,
+                originalCurrency: selectedCurrency,
+                exchangeRate: exchangeRate,
+                amount: advBaseAmount,
+                type: 'loan',
+                category: 'advance', // 分類為「代付」
+                accountId: data.accountId!, // 付款錢包扣款
+                toAccountId: s.contactId,   // 借給代付對象（應收債權）
+                splitGroupId,
+                note: data.note,
+                date: data.date,
+              });
+            }
+          });
+
+          triggerHaptic('success');
+          onClose();
+          return;
         }
       }
-      await updateTransaction(transactionToEdit.id, {
-        ...txData,
-        splitGroupId: undefined,
-      });
-    } else {
-      await addTransaction(txData);
+
+      const effectiveType = (isAdvance ? 'loan' : type) as 'expense' | 'income' | 'loan';
+      const singleContactId = validSplits.length === 1 ? validSplits[0].contactId : undefined;
+      
+      const txData = {
+        originalAmount: data.amount,
+        originalCurrency: selectedCurrency,
+        exchangeRate: exchangeRate,
+        amount: calculatedBaseAmount,
+        type: effectiveType,
+        category: isAdvance 
+          ? 'advance' 
+          : data.categoryId!,
+        accountId: data.accountId!,
+        toAccountId: isAdvance 
+          ? singleContactId 
+          : undefined,
+        transferInAmount: undefined,
+        budgetId: isAdvance ? undefined : data.budgetId,
+        note: data.note,
+        date: data.date,
+      };
+
+      if (transactionToEdit) {
+        if (transactionToEdit.splitGroupId) {
+          const otherGroupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId && t.id !== transactionToEdit.id) || [];
+          for (const otherTx of otherGroupTxs) {
+            await deleteTransaction(otherTx.id);
+          }
+        }
+        await updateTransaction(transactionToEdit.id, {
+          ...txData,
+          splitGroupId: undefined,
+        });
+      } else {
+        await addTransaction(txData);
+      }
+      
+      triggerHaptic('success');
+      onClose();
+    } catch (err: any) {
+      console.error('Failed to submit transaction:', err);
+      toast.show(err?.message || t('common.error', '保存失敗，請重試'));
     }
-    
-    triggerHaptic('success');
-    onClose();
   };
 
   const handleAddCategory = async () => {
@@ -839,6 +848,16 @@ export function AddTransactionModal({
       if (invalidErrors.categoryId) {
         triggerCategoryWarning();
         toast.show(t('add.errors.pleaseSelectCategory'));
+      } else if (invalidErrors.amount) {
+        toast.show(invalidErrors.amount.message || t('add.errors.amountRequired'));
+      } else if (invalidErrors.accountId) {
+        toast.show(invalidErrors.accountId.message || t('add.errors.accountRequired'));
+      } else {
+        const firstKey = Object.keys(invalidErrors)[0];
+        const errorMsg = (invalidErrors as any)[firstKey]?.message;
+        if (typeof errorMsg === 'string') {
+          toast.show(errorMsg);
+        }
       }
     })();
   };

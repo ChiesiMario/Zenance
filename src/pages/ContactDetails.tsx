@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 
 export default function ContactDetails() {
@@ -158,33 +159,38 @@ export default function ContactDetails() {
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
             {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
           </p>
-          <div
+          <AutoMarquee
+            align="center"
             className={cn(
-              "text-6xl font-mono tracking-tighter font-medium break-all px-4",
+              "text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4",
               netBalance === 0
-                ? "text-muted-foreground/50"
+                ? "text-foreground"
                 : netBalance > 0
                   ? "text-emerald-500"
                   : "text-rose-500"
             )}
           >
             <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={currency} type="neutral" />
-          </div>
+          </AutoMarquee>
         </div>
 
         {/* 2-Column Metrics Breakdown */}
         <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
-            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalLent === 0 ? "text-muted-foreground/50" : "text-emerald-500")}>
-              <AmountDisplay amount={totalLent} baseCurrency={currency} type="neutral" />
-            </p>
+            <div className={cn("text-2xl font-mono tracking-tight font-medium", totalLent === 0 ? "text-foreground" : "text-emerald-500")}>
+              <AutoMarquee align="left">
+                <AmountDisplay amount={totalLent} baseCurrency={currency} type="neutral" />
+              </AutoMarquee>
+            </div>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
-            <p className={cn("text-xl sm:text-2xl font-mono tracking-tight font-medium truncate", totalBorrowed === 0 ? "text-muted-foreground/50" : "text-rose-500")}>
-              <AmountDisplay amount={totalBorrowed} baseCurrency={currency} type="neutral" />
-            </p>
+            <div className={cn("text-2xl font-mono tracking-tight font-medium", totalBorrowed === 0 ? "text-foreground" : "text-rose-500")}>
+              <AutoMarquee align="left">
+                <AmountDisplay amount={totalBorrowed} baseCurrency={currency} type="neutral" />
+              </AutoMarquee>
+            </div>
           </div>
         </div>
       </div>

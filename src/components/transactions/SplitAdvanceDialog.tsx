@@ -270,13 +270,16 @@ export function SplitAdvanceDialog({
   // 是否超額
   const isOverAllocated = totalAdvance > totalAmount + 0.0001;
 
-  // 批次添加對象至本次分攤（預設金額 0.00）
+  // 批次添加對象至本次分攤（若原本為空且僅加入 1 位，預設全額代付）
   const handleBatchAddContacts = (newContactIds: string[]) => {
     setAllocatedAmounts(prev => {
       const next = { ...prev };
+      const currentKeys = Object.keys(prev);
+      const shouldAutoFill = currentKeys.length === 0 && newContactIds.length === 1 && totalAmount > 0;
+
       newContactIds.forEach(id => {
         if (next[id] === undefined) {
-          next[id] = '0';
+          next[id] = shouldAutoFill ? totalAmount.toFixed(2) : '0';
         }
       });
       return next;
@@ -351,7 +354,7 @@ export function SplitAdvanceDialog({
   const handleConfirm = () => {
     if (isOverAllocated) return;
 
-    const result: SplitItem[] = [];
+    let result: SplitItem[] = [];
     Object.entries(allocatedAmounts).forEach(([contactId, strVal]) => {
       const amt = parseFloat(strVal);
       if (!isNaN(amt) && amt > 0) {
@@ -361,6 +364,14 @@ export function SplitAdvanceDialog({
         });
       }
     });
+
+    // 若有選取單一對象但金額為 0，且有總消費金額，自動以全額代付確認
+    if (result.length === 0 && selectedContactIds.length === 1 && totalAmount > 0) {
+      result = [{
+        contactId: selectedContactIds[0],
+        amount: Math.round(totalAmount * 100) / 100,
+      }];
+    }
 
     onConfirm(result);
     onOpenChange(false);

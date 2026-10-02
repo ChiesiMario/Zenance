@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { type Ledger } from '@/services/db/db';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 import {
   DropdownMenu,
@@ -394,24 +395,28 @@ export default function Dashboard() {
         {/* Top Summary row */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('dashboard.netBalance')}</p>
-          <p className="text-4xl font-mono tracking-tighter font-medium">
+          <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2">
             <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="balance" animated />
-          </p>
+          </AutoMarquee>
         </div>
 
         {/* Split Metrics */}
         <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium">
-              <AmountDisplay amount={income} baseCurrency={activeLedger?.baseCurrency} type="neutral" animated />
-            </p>
+            <div className="text-2xl font-mono tracking-tight font-medium">
+              <AutoMarquee align="left">
+                <AmountDisplay amount={income} baseCurrency={activeLedger?.baseCurrency} type="income" animated />
+              </AutoMarquee>
+            </div>
           </div>
           <div className="bg-card p-4">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
-            <p className="text-2xl font-mono tracking-tight font-medium">
-              <AmountDisplay amount={expense} baseCurrency={activeLedger?.baseCurrency} type="neutral" animated />
-            </p>
+            <div className="text-2xl font-mono tracking-tight font-medium">
+              <AutoMarquee align="left">
+                <AmountDisplay amount={expense} baseCurrency={activeLedger?.baseCurrency} type="expense" showSign={false} animated />
+              </AutoMarquee>
+            </div>
           </div>
         </div>
 

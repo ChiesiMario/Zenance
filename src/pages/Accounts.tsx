@@ -20,6 +20,7 @@ import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { calculateAccountBalances, convertAmount } from '@/lib/currency';
 import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
 
@@ -361,37 +362,41 @@ export default function Accounts() {
                 </span>
               )}
             </div>
-            <div className="text-5xl font-mono tracking-tighter font-medium">
+            <AutoMarquee align="left" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium">
               <AmountDisplay 
                 amount={netWorth} 
                 baseCurrency={baseCurrency} 
                 type="balance" 
                 animated
               />
-            </div>
+            </AutoMarquee>
           </div>
           <div className="grid grid-cols-2">
             <div className="p-5 border-r border-border flex flex-col">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.totalWallets')}</p>
-              <p className={cn("text-2xl font-mono tracking-tight font-medium", totalWallets >= 0 ? "text-primary" : "text-destructive")}>
-                <AmountDisplay 
-                  amount={totalWallets} 
-                  baseCurrency={baseCurrency} 
-                  type={totalWallets >= 0 ? "income" : "expense"} 
-                  animated
-                />
-              </p>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalWallets >= 0 ? "text-primary" : "text-destructive")}>
+                <AutoMarquee align="left">
+                  <AmountDisplay 
+                    amount={totalWallets} 
+                    baseCurrency={baseCurrency} 
+                    type={totalWallets >= 0 ? "income" : "expense"} 
+                    animated
+                  />
+                </AutoMarquee>
+              </div>
             </div>
             <div className="p-5 flex flex-col">
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.netLoans')}</p>
-              <p className={cn("text-2xl font-mono tracking-tight font-medium", totalLoans >= 0 ? "text-primary" : "text-destructive")}>
-                <AmountDisplay 
-                  amount={totalLoans} 
-                  baseCurrency={baseCurrency} 
-                  type={totalLoans >= 0 ? "income" : "expense"} 
-                  animated
-                />
-              </p>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalLoans >= 0 ? "text-primary" : "text-destructive")}>
+                <AutoMarquee align="left">
+                  <AmountDisplay 
+                    amount={totalLoans} 
+                    baseCurrency={baseCurrency} 
+                    type={totalLoans >= 0 ? "income" : "expense"} 
+                    animated
+                  />
+                </AutoMarquee>
+              </div>
             </div>
           </div>
         </div>

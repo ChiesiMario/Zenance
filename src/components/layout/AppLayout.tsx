@@ -227,8 +227,8 @@ export function AppLayout() {
       </main>
 
       {/* Bottom Navigation - Responsive Height with Safe Area Docking */}
-      <nav className="flex-none w-full bg-background/90 backdrop-blur-xl border-t border-border z-50 pb-[env(safe-area-inset-bottom,0px)]">
-        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-14 sm:h-16">
+      <nav id="bottom-nav" className="flex-none w-full bg-background/90 backdrop-blur-xl border-t border-border z-50 pb-[env(safe-area-inset-bottom,0px)]">
+        <div id="bottom-nav-inner" className="w-full max-w-xl mx-auto flex justify-around items-center h-14 sm:h-16">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;

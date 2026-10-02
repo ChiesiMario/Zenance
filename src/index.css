@@ -244,12 +244,23 @@
 }
 
 @media (display-mode: standalone) and (orientation: portrait) {
-  .is-ios {
+  /* 僅在 iOS 26+ 存在強制毛玻璃與陰影的系統上啟用 16px 避讓與全覆蓋遮罩 */
+  .ios-has-status-blur {
     --ios-status-blur-offset: 16px;
   }
 
-  .is-ios #ios-status-bar-tint {
+  .ios-has-status-blur #ios-status-bar-tint {
     height: calc(env(safe-area-inset-top, 0px) + var(--ios-status-blur-offset)) !important;
   }
+
+  /* 精準打擊：收緊 iOS PWA 下巴，消除巨大白色留白 */
+  .is-ios #bottom-nav {
+    padding-bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) - 14px)) !important;
+  }
+
+  .is-ios #bottom-nav-inner {
+    height: 3rem !important; /* 48px 原生 HIG 緊湊高度 */
+  }
 }
+
 

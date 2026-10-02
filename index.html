@@ -14,12 +14,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Zenance</title>
     <script>
-      if (
-        /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-      ) {
-        document.documentElement.classList.add('is-ios');
-      }
+      (function() {
+        var ua = navigator.userAgent;
+        var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+          document.documentElement.classList.add('is-ios');
+          var match = ua.match(/OS (\d+)[._]/);
+          var iosMajorVersion = match ? parseInt(match[1], 10) : 0;
+          if (iosMajorVersion >= 26) {
+            document.documentElement.classList.add('ios-has-status-blur');
+          }
+        }
+      })();
     </script>
   </head>
   <body>

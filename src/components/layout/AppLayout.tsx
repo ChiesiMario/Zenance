@@ -192,7 +192,7 @@ export function AppLayout() {
       <main 
         ref={mainRef} 
         onScroll={handleScroll}
-        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.375rem+env(safe-area-inset-top,0px))] pb-[calc(4rem+env(safe-area-inset-bottom,0px)*0.45)] [scrollbar-gutter:stable]"
+        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-6 [scrollbar-gutter:stable]"
       >
         {/* Keep-Alive Tab Views */}
         {mountedTabs.has('/') && (
@@ -220,9 +220,9 @@ export function AppLayout() {
         {!isCurrentTab && <Outlet />}
       </main>
 
-      {/* Bottom Navigation - Frosted Glass with Compact Safe Area Capsule Padding */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full bg-background/80 backdrop-blur-xl border-t border-border z-50 pt-1 pb-[max(0.375rem,calc(env(safe-area-inset-bottom,0px)*0.45))]">
-        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-10">
+      {/* Bottom Navigation - Flex-none container sticking natively to bottom edge */}
+      <nav className="flex-none w-full bg-background/80 backdrop-blur-xl border-t border-border z-50 pb-[env(safe-area-inset-bottom,0px)]">
+        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-14">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;

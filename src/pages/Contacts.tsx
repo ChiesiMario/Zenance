@@ -17,6 +17,7 @@ import {
 import { cn, getCurrencySymbol } from '@/lib/utils';
 import { ContactGroupCard } from '@/components/contacts/ContactGroupCard';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { calculateAccountBalances, convertAmount } from '@/lib/currency';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
@@ -114,7 +115,7 @@ export default function Contacts() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full">
+    <div className="w-full">
       
       {/* Top Header */}
       <div className="flex items-center justify-between mb-2">
@@ -213,39 +214,51 @@ export default function Contacts() {
                 ≈ {t('accounts.rateEstimated')}
               </span>
             )}
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('contacts.netBalance')}</p>
-            <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2">
+            <div className="flex items-center justify-center gap-2 h-5 mb-2">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('contacts.netBalance')}</p>
+              <MagnitudeBadge amount={netBalance} memoryKey="contacts-net-balance" />
+            </div>
+            <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2 leading-none">
               <AmountDisplay 
                 amount={netBalance} 
                 baseCurrency={baseCurrency} 
                 type="balance" 
                 animated
+                memoryKey="contacts-net-balance"
               />
             </AutoMarquee>
           </div>
           <div className="grid grid-cols-2">
             <div className="p-5 border-r border-border flex flex-col">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.receivable')}</p>
-              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalReceivable > 0 ? "text-emerald-500" : "text-foreground")}>
+              <div className="flex items-center justify-between h-5 mb-1">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('contacts.receivable')}</p>
+                <MagnitudeBadge amount={totalReceivable} memoryKey="contacts-total-receivable" />
+              </div>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium leading-none", totalReceivable > 0 ? "text-emerald-500" : "text-foreground")}>
                 <AutoMarquee align="left">
                   <AmountDisplay 
                     amount={totalReceivable} 
                     baseCurrency={baseCurrency} 
                     type="neutral" 
                     animated
+                    memoryKey="contacts-total-receivable"
                   />
                 </AutoMarquee>
               </div>
             </div>
             <div className="p-5 flex flex-col">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.payable')}</p>
-              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalPayable > 0 ? "text-rose-500" : "text-foreground")}>
+              <div className="flex items-center justify-between h-5 mb-1">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('contacts.payable')}</p>
+                <MagnitudeBadge amount={totalPayable} memoryKey="contacts-total-payable" />
+              </div>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium leading-none", totalPayable > 0 ? "text-rose-500" : "text-foreground")}>
                 <AutoMarquee align="left">
                   <AmountDisplay 
                     amount={totalPayable} 
                     baseCurrency={baseCurrency} 
                     type="neutral" 
                     animated
+                    memoryKey="contacts-total-payable"
                   />
                 </AutoMarquee>
               </div>

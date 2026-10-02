@@ -20,6 +20,20 @@ export function getCurrencySymbol(currency: string): string {
   return symbols[currency] || '$';
 }
 
+/**
+ * 將數值格式化為帶千分位字串：
+ * - 若金額為整數（四捨五入到 2 位後無小數，例如 100 或 100.00），則不顯示小數點與 .00（如 100, 1,000）
+ * - 若金額帶小數（例如 100.5 或 100.25），則保留標準 2 位小數（如 100.50, 100.25）
+ */
+export function formatAmountNumber(val: number): string {
+  const rounded = Math.round(val * 100) / 100;
+  const isInteger = Math.abs(rounded % 1) < 0.00001;
+  return val.toLocaleString(undefined, {
+    minimumFractionDigits: isInteger ? 0 : 2,
+    maximumFractionDigits: isInteger ? 0 : 2,
+  });
+}
+
 export function formatDisplayAmount(amountStr: string): string {
   if (!amountStr) return '0';
 

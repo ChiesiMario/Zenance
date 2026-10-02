@@ -113,6 +113,9 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   html {
     font-size: 90%;

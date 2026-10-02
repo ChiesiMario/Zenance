@@ -664,7 +664,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full max-w-md mx-auto space-y-6 pb-20">
+    <div className="w-full max-w-md mx-auto space-y-6 pb-20">
       {/* Hidden File Input for Backup Import */}
       <input
         ref={fileInputRef}

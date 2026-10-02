@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
+import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
 import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 import { getTxAccountDelta, convertAmount } from '@/lib/currency';
@@ -195,7 +196,7 @@ export default function AccountDetails() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4 pb-8">
+    <div className="w-full space-y-4 pb-8">
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigate('/accounts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground">
           <ChevronLeft className="h-5 w-5" />
@@ -213,9 +214,18 @@ export default function AccountDetails() {
 
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('accounts.balance')}</p>
-          <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4">
-            <AmountDisplay amount={balance} baseCurrency={currency} type="balance" />
+          <div className="flex items-center justify-center gap-2 h-5 mb-2">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('accounts.balance')}</p>
+            <MagnitudeBadge amount={balance} memoryKey={`account-balance-${id}`} />
+          </div>
+          <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4 leading-none">
+            <AmountDisplay 
+              amount={balance} 
+              baseCurrency={currency} 
+              type="balance" 
+              memoryKey={`account-balance-${id}`}
+              className="leading-none"
+            />
           </AutoMarquee>
           {account?.excludeFromStats && (
             <div className="mt-2 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/20 select-none">
@@ -224,7 +234,7 @@ export default function AccountDetails() {
           )}
           {isForeign && (
             <div className="flex items-center gap-1.5 mt-2 text-xs font-mono text-muted-foreground select-text">
-              <span>≈ {getCurrencySymbol(baseCurrency)}{Math.abs(convertAmount(balance, currency, baseCurrency, getRate)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>≈ {getCurrencySymbol(baseCurrency)}{formatAmountNumber(Math.abs(convertAmount(balance, currency, baseCurrency, getRate)))}</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-border bg-muted/20 select-none">
                 {t('accounts.rateEstimated')}
               </span>
@@ -237,15 +247,18 @@ export default function AccountDetails() {
             <div className="grid grid-cols-2 gap-px bg-border">
               <div className="bg-card p-4 flex flex-col justify-between">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">{t('accounts.availableCredit')}</p>
-                  <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground select-text">
-                    {hasCreditLimit ? `${currencySymbol}${availableCredit.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : '-'}
+                  <div className="flex items-center justify-between h-5 mb-1">
+                    <p className="text-[11px] uppercase tracking-wider text-muted-foreground leading-none">{t('accounts.availableCredit')}</p>
+                    {hasCreditLimit && <MagnitudeBadge amount={availableCredit} memoryKey={`account-credit-${id}`} />}
+                  </div>
+                  <p className="text-xl sm:text-2xl font-mono tracking-tight font-medium text-foreground select-text leading-none mt-1">
+                    {hasCreditLimit ? `${currencySymbol}${formatAmountNumber(availableCredit)}` : '-'}
                   </p>
                 </div>
                 <div className="mt-2 text-xs font-mono text-muted-foreground">
                   <span>{t('accounts.creditLimit')}: </span>
                   <span className="text-foreground/80 font-medium">
-                    {hasCreditLimit ? `${currencySymbol}${account!.creditLimit!.toLocaleString()}` : t('accounts.notSet')}
+                    {hasCreditLimit ? `${currencySymbol}${formatAmountNumber(account!.creditLimit!)}` : t('accounts.notSet')}
                   </span>
                 </div>
               </div>
@@ -294,18 +307,35 @@ export default function AccountDetails() {
         ) : (
           <div className="grid grid-cols-2 gap-px bg-border">
             <div className="bg-card p-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
-              <div className="text-2xl font-mono tracking-tight font-medium">
+              <div className="flex items-center justify-between h-5 mb-1">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.income')}</p>
+                <MagnitudeBadge amount={totalIncome} memoryKey={`account-income-${id}`} />
+              </div>
+              <div className="text-2xl font-mono tracking-tight font-medium leading-none">
                 <AutoMarquee align="left">
-                  <AmountDisplay amount={totalIncome} baseCurrency={currency} type="income" />
+                  <AmountDisplay 
+                    amount={totalIncome} 
+                    baseCurrency={currency} 
+                    type="income" 
+                    memoryKey={`account-income-${id}`}
+                  />
                 </AutoMarquee>
               </div>
             </div>
             <div className="bg-card p-4">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
-              <div className="text-2xl font-mono tracking-tight font-medium">
+              <div className="flex items-center justify-between h-5 mb-1">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.expense')}</p>
+                <MagnitudeBadge amount={totalExpense} memoryKey={`account-expense-${id}`} />
+              </div>
+              <div className="text-2xl font-mono tracking-tight font-medium leading-none">
                 <AutoMarquee align="left">
-                  <AmountDisplay amount={totalExpense} baseCurrency={currency} type="expense" showSign={false} />
+                  <AmountDisplay 
+                    amount={totalExpense} 
+                    baseCurrency={currency} 
+                    type="expense" 
+                    showSign={false} 
+                    memoryKey={`account-expense-${id}`}
+                  />
                 </AutoMarquee>
               </div>
             </div>

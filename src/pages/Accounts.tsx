@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { calculateAccountBalances, convertAmount } from '@/lib/currency';
 import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
@@ -168,7 +169,7 @@ export default function Accounts() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-2">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none cursor-pointer">
@@ -353,47 +354,57 @@ export default function Accounts() {
       <div className="space-y-4">
         {currentView === 'active' && (
         <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-          <div className="p-6 border-b border-border flex flex-col items-start justify-center">
-            <div className="w-full flex items-center justify-between mb-2">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">{t('accounts.netWorth')}</p>
-              {hasForeignCurrency && (
-                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/20 select-none">
-                  ≈ {t('accounts.rateEstimated')}
-                </span>
-              )}
+          <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center relative">
+            {hasForeignCurrency && (
+              <span className="absolute top-4 right-4 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/20 select-none">
+                ≈ {t('accounts.rateEstimated')}
+              </span>
+            )}
+            <div className="flex items-center justify-center gap-2 h-5 mb-2">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('accounts.netWorth')}</p>
+              <MagnitudeBadge amount={netWorth} memoryKey="accounts-net-worth" />
             </div>
-            <AutoMarquee align="left" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium">
+            <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2 leading-none">
               <AmountDisplay 
                 amount={netWorth} 
                 baseCurrency={baseCurrency} 
                 type="balance" 
                 animated
+                memoryKey="accounts-net-worth"
               />
             </AutoMarquee>
           </div>
           <div className="grid grid-cols-2">
             <div className="p-5 border-r border-border flex flex-col">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.totalWallets')}</p>
-              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalWallets >= 0 ? "text-primary" : "text-destructive")}>
+              <div className="flex items-center justify-between h-5 mb-1">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('accounts.totalWallets')}</p>
+                <MagnitudeBadge amount={totalWallets} memoryKey="accounts-total-wallets" />
+              </div>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium leading-none", totalWallets >= 0 ? "text-primary" : "text-destructive")}>
                 <AutoMarquee align="left">
                   <AmountDisplay 
                     amount={totalWallets} 
                     baseCurrency={baseCurrency} 
                     type={totalWallets >= 0 ? "income" : "expense"} 
                     animated
+                    memoryKey="accounts-total-wallets"
                   />
                 </AutoMarquee>
               </div>
             </div>
             <div className="p-5 flex flex-col">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('accounts.netLoans')}</p>
-              <div className={cn("text-2xl font-mono tracking-tight font-medium", totalLoans >= 0 ? "text-primary" : "text-destructive")}>
+              <div className="flex items-center justify-between h-5 mb-1">
+                <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('accounts.netLoans')}</p>
+                <MagnitudeBadge amount={totalLoans} memoryKey="accounts-net-loans" />
+              </div>
+              <div className={cn("text-2xl font-mono tracking-tight font-medium leading-none", totalLoans >= 0 ? "text-primary" : "text-destructive")}>
                 <AutoMarquee align="left">
                   <AmountDisplay 
                     amount={totalLoans} 
                     baseCurrency={baseCurrency} 
                     type={totalLoans >= 0 ? "income" : "expense"} 
                     animated
+                    memoryKey="accounts-net-loans"
                   />
                 </AutoMarquee>
               </div>
@@ -500,7 +511,7 @@ export default function Accounts() {
                             />
                             {isForeign && (
                               <span className="text-xs font-mono text-muted-foreground leading-none">
-                                ≈ {getCurrencySymbol(baseCurrency)}{Math.abs(convertedBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                ≈ {getCurrencySymbol(baseCurrency)}{formatAmountNumber(Math.abs(convertedBalance))}
                               </span>
                             )}
                           </div>
@@ -566,7 +577,7 @@ export default function Accounts() {
                           />
                           {isForeign && (
                             <span className="text-xs font-mono text-muted-foreground/80 leading-none">
-                              ≈ {getCurrencySymbol(baseCurrency)}{Math.abs(convertedBal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ≈ {getCurrencySymbol(baseCurrency)}{formatAmountNumber(Math.abs(convertedBal))}
                             </span>
                           )}
                         </div>

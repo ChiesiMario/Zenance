@@ -11,7 +11,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { getCurrencySymbol, cn } from '@/lib/utils';
+import { getCurrencySymbol, cn, formatAmountNumber } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 import { Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, Calendar, FileText } from 'lucide-react';
 
@@ -226,7 +226,7 @@ export function RefundDialog({
               <div className="text-[11px] font-mono text-muted-foreground/80 flex items-center justify-between pt-1 border-t border-border/50">
                 <span>{t('refund.maxRefundable', '剩餘可退上限')}</span>
                 <span className="font-semibold text-foreground">
-                  {currencySymbol} {maxRefundable.toFixed(2)}
+                  {currencySymbol} {formatAmountNumber(maxRefundable)}
                 </span>
               </div>
             </div>

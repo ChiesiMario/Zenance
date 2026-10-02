@@ -1,6 +1,6 @@
 import type { Contact } from '@/services/db/db';
 import { useTranslation } from 'react-i18next';
-import { getCurrencySymbol } from '@/lib/utils';
+import { getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import React from 'react';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
@@ -41,7 +41,7 @@ export function ContactGroupCard({
           {contacts.map(contact => {
             const netReceivable = contactBalances[contact.id] || 0;
             const sym = contact.currency ? getCurrencySymbol(contact.currency) : currencySymbol;
-            const absAmt = Math.abs(netReceivable).toLocaleString(undefined, { maximumFractionDigits: 2 });
+            const absAmt = formatAmountNumber(Math.abs(netReceivable));
 
             return (
               <div

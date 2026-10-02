@@ -9,7 +9,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { cn, sortTransactionsDesc } from '@/lib/utils';
+import { cn, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
 import { Logo } from '@/components/ui/Logo';
 import { RefundDialog } from './RefundDialog';
 import type { Transaction } from '@/services/db/db';
@@ -960,7 +960,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 <span>{getAccountName(tx.accountId)}</span>
                 <span className="text-muted-foreground/60">·</span>
                 <span className="text-emerald-500 dark:text-emerald-400 font-medium">
-                  {t('refund.refunded', '已退款')} {cardRefundedTotal.toFixed(2)}
+                  {t('refund.refunded', '已退款')} {formatAmountNumber(cardRefundedTotal)}
                 </span>
               </div>
             );

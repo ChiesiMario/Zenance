@@ -8,7 +8,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { convertAmount } from '@/lib/currency';
 import type { Wallet, Contact } from '@/services/db/db';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { Check } from 'lucide-react';
 
@@ -255,16 +255,16 @@ export function AccountSelectDialog({
                                   rawBalance > 0 ? (
                                     <span className="font-mono text-sm font-semibold block leading-tight text-emerald-500 dark:text-emerald-400">
                                       <span className="text-xs font-sans font-medium mr-1">{t('contacts.toCollect')}</span>
-                                      {sym}{Math.abs(rawBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {sym}{formatAmountNumber(Math.abs(rawBalance))}
                                     </span>
                                   ) : rawBalance < 0 ? (
                                     <span className="font-mono text-sm font-semibold block leading-tight text-rose-500 dark:text-rose-400">
                                       <span className="text-xs font-sans font-medium mr-1">{t('contacts.toPay')}</span>
-                                      {sym}{Math.abs(rawBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {sym}{formatAmountNumber(Math.abs(rawBalance))}
                                     </span>
                                   ) : (
                                     <span className="font-mono text-sm font-semibold block leading-tight text-muted-foreground">
-                                      {sym}{Math.abs(rawBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      {sym}{formatAmountNumber(Math.abs(rawBalance))}
                                     </span>
                                   )
                                 ) : (
@@ -274,12 +274,12 @@ export function AccountSelectDialog({
                                       rawBalance < 0 ? "text-rose-500 dark:text-rose-400" : "text-foreground"
                                     )}
                                   >
-                                    {rawBalance < 0 ? '-' : ''}{sym}{Math.abs(rawBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {rawBalance < 0 ? '-' : ''}{sym}{formatAmountNumber(Math.abs(rawBalance))}
                                   </span>
                                 )}
                                 {!isContact && isForeign && (
                                   <span className="text-[10px] font-mono text-muted-foreground block mt-0.5 leading-none">
-                                    ≈ {getCurrencySymbol(baseCurrency)}{Math.abs(convertedBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    ≈ {getCurrencySymbol(baseCurrency)}{formatAmountNumber(Math.abs(convertedBalance))}
                                   </span>
                                 )}
                               </div>

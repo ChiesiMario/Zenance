@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect } from 'react';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 
@@ -123,7 +124,7 @@ export default function ContactDetails() {
 
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4 pb-8">
+    <div className="w-full space-y-4 pb-8">
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => navigate('/contacts')} className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer">
@@ -156,13 +157,16 @@ export default function ContactDetails() {
       {/* Net Balance & Metrics Card */}
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground shadow-none">
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
-            {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
-          </p>
+          <div className="flex items-center justify-center gap-2 h-5 mb-2">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
+              {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
+            </p>
+            <MagnitudeBadge amount={Math.abs(netBalance)} memoryKey={`contact-net-balance-${id}`} />
+          </div>
           <AutoMarquee
             align="center"
             className={cn(
-              "text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4",
+              "text-4xl sm:text-5xl font-mono tracking-tighter font-medium leading-none px-4",
               netBalance === 0
                 ? "text-foreground"
                 : netBalance > 0
@@ -170,25 +174,46 @@ export default function ContactDetails() {
                   : "text-rose-500"
             )}
           >
-            <AmountDisplay amount={Math.abs(netBalance)} baseCurrency={currency} type="neutral" />
+            <AmountDisplay 
+              amount={Math.abs(netBalance)} 
+              baseCurrency={currency} 
+              type="neutral" 
+              memoryKey={`contact-net-balance-${id}`}
+            />
           </AutoMarquee>
         </div>
 
         {/* 2-Column Metrics Breakdown */}
         <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalLent')}</p>
-            <div className={cn("text-2xl font-mono tracking-tight font-medium", totalLent === 0 ? "text-foreground" : "text-emerald-500")}>
+            <div className="flex items-center justify-between h-5 mb-1">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('contacts.totalLent')}</p>
+              <MagnitudeBadge amount={totalLent} memoryKey={`contact-total-lent-${id}`} />
+            </div>
+            <div className={cn("text-2xl font-mono tracking-tight font-medium leading-none", totalLent === 0 ? "text-foreground" : "text-emerald-500")}>
               <AutoMarquee align="left">
-                <AmountDisplay amount={totalLent} baseCurrency={currency} type="neutral" />
+                <AmountDisplay 
+                  amount={totalLent} 
+                  baseCurrency={currency} 
+                  type="neutral" 
+                  memoryKey={`contact-total-lent-${id}`}
+                />
               </AutoMarquee>
             </div>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('contacts.totalBorrowed')}</p>
-            <div className={cn("text-2xl font-mono tracking-tight font-medium", totalBorrowed === 0 ? "text-foreground" : "text-rose-500")}>
+            <div className="flex items-center justify-between h-5 mb-1">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('contacts.totalBorrowed')}</p>
+              <MagnitudeBadge amount={totalBorrowed} memoryKey={`contact-total-borrowed-${id}`} />
+            </div>
+            <div className={cn("text-2xl font-mono tracking-tight font-medium leading-none", totalBorrowed === 0 ? "text-foreground" : "text-rose-500")}>
               <AutoMarquee align="left">
-                <AmountDisplay amount={totalBorrowed} baseCurrency={currency} type="neutral" />
+                <AmountDisplay 
+                  amount={totalBorrowed} 
+                  baseCurrency={currency} 
+                  type="neutral" 
+                  memoryKey={`contact-total-borrowed-${id}`}
+                />
               </AutoMarquee>
             </div>
           </div>

@@ -35,6 +35,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SpringNumber } from '@/components/ui/SpringNumber';
+import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import {
   Dialog,
   DialogContent,
@@ -45,7 +46,7 @@ import {
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
-import { cn, getCurrencySymbol, sortTransactionsDesc } from '@/lib/utils';
+import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 
 type PeriodType = 'week' | 'month' | 'quarter' | 'year';
@@ -440,7 +441,7 @@ export default function Reports() {
     : null;
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
+    <div className="w-full space-y-4">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <Button
@@ -501,13 +502,16 @@ export default function Reports() {
       <div className="border border-border rounded-xl overflow-hidden bg-card text-card-foreground shadow-none">
         {/* Net Balance Centerpiece */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1.5 font-mono">
-            {t('reports.netBalance')}
-          </p>
+          <div className="flex items-center justify-center gap-2 h-5 mb-1.5">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono leading-none">
+              {t('reports.netBalance')}
+            </p>
+            <MagnitudeBadge amount={netBalance} memoryKey="reports-net-balance" />
+          </div>
           <AutoMarquee
             align="center"
             className={cn(
-              'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold px-2',
+              'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold px-2 leading-none',
               netBalance === 0
                 ? 'text-muted-foreground'
                 : netBalance > 0
@@ -517,7 +521,7 @@ export default function Reports() {
           >
             {netBalance < 0 ? '-' : netBalance > 0 ? '+' : ''}
             {currencySymbol}
-            <SpringNumber value={Math.abs(netBalance)} decimals={2} memoryKey="reports-net-balance" />
+            <SpringNumber value={Math.abs(netBalance)} memoryKey="reports-net-balance" />
           </AutoMarquee>
         </div>
 
@@ -525,16 +529,17 @@ export default function Reports() {
         <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border bg-card">
           {/* Indicator 1: Total Expense & Daily Avg */}
           <div className="p-4 flex flex-col justify-between gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5">
+            <div className="flex items-center justify-between h-5">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none">
                 <TrendingDown className="size-3.5 text-muted-foreground" />
                 <span>{t('reports.totalExpense')}</span>
               </span>
+              <MagnitudeBadge amount={totalExpense} memoryKey="reports-total-expense" />
             </div>
             <div>
-              <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
+              <p className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none">
                 {currencySymbol}
-                <SpringNumber value={totalExpense} decimals={2} memoryKey="reports-total-expense" />
+                <SpringNumber value={totalExpense} memoryKey="reports-total-expense" />
               </p>
               <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
                 {t('reports.dailyAverage', '日均支出')}: {currencySymbol}
@@ -548,16 +553,17 @@ export default function Reports() {
 
           {/* Indicator 2: Total Income & Savings Rate */}
           <div className="p-4 flex flex-col justify-between gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5">
+            <div className="flex items-center justify-between h-5">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none">
                 <TrendingUp className="size-3.5 text-emerald-500" />
                 <span>{t('reports.totalIncome', '總收入')}</span>
               </span>
+              <MagnitudeBadge amount={totalIncome} memoryKey="reports-total-income" />
             </div>
             <div>
-              <p className="text-2xl font-mono tracking-tight font-medium text-foreground">
+              <p className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none">
                 {currencySymbol}
-                <SpringNumber value={totalIncome} decimals={2} memoryKey="reports-total-income" />
+                <SpringNumber value={totalIncome} memoryKey="reports-total-income" />
               </p>
               <p className="text-[11px] font-mono mt-0.5">
                 {savingsRate !== null ? (
@@ -590,10 +596,7 @@ export default function Reports() {
                 <>
                   <p className="text-2xl font-mono tracking-tight font-medium text-foreground truncate select-text">
                     {currencySymbol}
-                    {peakExpenseTx.amount.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatAmountNumber(peakExpenseTx.amount)}
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5 select-text">
                     {peakExpenseTx.note ||
@@ -660,20 +663,14 @@ export default function Reports() {
                   <span className="text-muted-foreground">{t('reports.expense', '支出')}：</span>
                   <span className="font-bold text-foreground">
                     {currencySymbol}
-                    {expVal.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatAmountNumber(expVal)}
                   </span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t('reports.income', '收入')}：</span>
                   <span className="font-bold text-emerald-500">
                     {currencySymbol}
-                    {incVal.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatAmountNumber(incVal)}
                   </span>
                 </div>
                 <div>
@@ -690,10 +687,7 @@ export default function Reports() {
                   >
                     {netVal < 0 ? '-' : netVal > 0 ? '+' : ''}
                     {currencySymbol}
-                    {Math.abs(netVal).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatAmountNumber(Math.abs(netVal))}
                   </span>
                 </div>
               </div>
@@ -933,10 +927,7 @@ export default function Reports() {
                   </span>
                   <span className="text-sm font-bold text-foreground">
                     {currencySymbol}
-                    {currentTotal.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatAmountNumber(currentTotal)}
                   </span>
                 </div>
               </div>
@@ -969,7 +960,7 @@ export default function Reports() {
                                 ? 'bg-emerald-700 text-white'
                                 : 'bg-emerald-800 text-white'
                       )}
-                      title={`${cat.name}: ${cat.percentage.toFixed(1)}% (${currencySymbol}${cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })})`}
+                      title={`${cat.name}: ${cat.percentage.toFixed(1)}% (${currencySymbol}${formatAmountNumber(cat.amount)})`}
                     >
                       {cat.percentage >= 14 && (
                         <span className="truncate mr-1">{cat.name}</span>
@@ -1040,10 +1031,7 @@ export default function Reports() {
                     <div className="flex items-baseline justify-between font-mono">
                       <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                         {currencySymbol}
-                        {cat.amount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {formatAmountNumber(cat.amount)}
                       </span>
                       <span className="text-xs text-muted-foreground shrink-0">
                         {t('reports.transactionCount', { count: cat.transactions.length })}
@@ -1088,7 +1076,7 @@ export default function Reports() {
               <span className="truncate">{inspectCategory?.name}</span>
               <span className="text-sm font-mono font-bold text-foreground shrink-0">
                 {currencySymbol}
-                {inspectCategory?.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {inspectCategory ? formatAmountNumber(inspectCategory.amount) : ''}
               </span>
             </DialogTitle>
             <DialogDescription className="text-xs font-mono text-muted-foreground">

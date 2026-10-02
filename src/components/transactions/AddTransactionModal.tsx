@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles } from 'lucide-react';
-import { cn, getCurrencySymbol, formatDisplayAmount } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
@@ -1115,7 +1115,7 @@ export function AddTransactionModal({
                             {t('add.cardDeducted', '實扣')}
                           </span>
                           <span className="text-xs font-mono font-bold whitespace-nowrap">
-                            {selectedCurrency} {transferDeductedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            {selectedCurrency} {formatAmountNumber(transferDeductedAmount)}
                           </span>
                         </div>
                       </div>
@@ -1178,7 +1178,7 @@ export function AddTransactionModal({
                             {t('add.cardReceived', '實收')}
                           </span>
                           <span className="text-xs font-mono font-bold whitespace-nowrap">
-                            {selectedToCurrency} {transferReceivedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            {selectedToCurrency} {formatAmountNumber(transferReceivedAmount)}
                           </span>
                         </div>
                       </div>
@@ -1323,7 +1323,7 @@ export function AddTransactionModal({
                             {t('add.outflow', '出款')}
                           </span>
                           <span className="text-xs font-mono font-bold whitespace-nowrap">
-                            {fromCurrency} {parsedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            {fromCurrency} {formatAmountNumber(parsedAmount)}
                           </span>
                         </div>
                       </div>
@@ -1417,7 +1417,7 @@ export function AddTransactionModal({
                             {t('add.inflow', '到款')}
                           </span>
                           <span className="text-xs font-mono font-bold whitespace-nowrap">
-                            {toCurrency} {parsedAmountIn.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            {toCurrency} {formatAmountNumber(parsedAmountIn)}
                           </span>
                         </div>
                       </div>

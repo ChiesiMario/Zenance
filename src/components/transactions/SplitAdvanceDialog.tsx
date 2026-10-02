@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Button } from '@/components/ui/button';
 import { AmountInput } from '@/components/ui/AmountInput';
 import { Plus, Users, UserCheck, RotateCcw, Search, X, Check } from 'lucide-react';
-import { cn, sanitizeAmountInput } from '@/lib/utils';
+import { cn, sanitizeAmountInput, formatAmountNumber } from '@/lib/utils';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import type { Contact } from '@/services/db/db';
 
@@ -409,7 +409,7 @@ export function SplitAdvanceDialog({
                   {t('add.totalAmount', '消費總額')}
                 </span>
                 <span className="text-base font-mono font-semibold tracking-tight text-foreground truncate mt-1">
-                  {currencySymbol}{totalAmount.toFixed(2)}
+                  {currencySymbol}{formatAmountNumber(totalAmount)}
                 </span>
               </div>
               <div className="bg-card p-3 flex flex-col">
@@ -420,7 +420,7 @@ export function SplitAdvanceDialog({
                   "text-base font-mono font-semibold tracking-tight truncate mt-1",
                   isOverAllocated ? "text-destructive" : totalAdvance > 0 ? "text-amber-500" : "text-muted-foreground"
                 )}>
-                  {currencySymbol}{totalAdvance.toFixed(2)}
+                  {currencySymbol}{formatAmountNumber(totalAdvance)}
                 </span>
               </div>
             </div>
@@ -500,7 +500,7 @@ export function SplitAdvanceDialog({
                           selfExpense < 0 ? "text-destructive" : "text-foreground"
                         )}
                       >
-                        {currencySymbol}{selfExpense.toFixed(2)}
+                        {currencySymbol}{formatAmountNumber(selfExpense)}
                       </span>
                     </div>
                     {/* 佔位空間保持與移出按鈕對齊 */}

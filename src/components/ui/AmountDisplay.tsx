@@ -1,5 +1,5 @@
-import { getCurrencySymbol, cn } from '@/lib/utils';
-import { SpringNumber } from '@/components/ui/SpringNumber';
+import { getCurrencySymbol, cn, formatAmountNumber } from '@/lib/utils';
+import { SpringNumber, getRememberedNumber, setRememberedNumber } from '@/components/ui/SpringNumber';
 
 export interface AmountDisplayProps {
   amount: number;
@@ -31,19 +31,26 @@ export function AmountDisplay({
   memoryKey,
 }: AmountDisplayProps) {
   const effectiveMemoryKey = memoryKey || (animated ? `amt-${type}-${baseCurrency}-${className || 'd'}` : undefined);
+  
+  // 核心：若有記憶快取且當前數值恰好為 0（非同步資料庫載入中），優先沿用快取數值，避免 0 態閃爍與佈局抖動
+  const remembered = effectiveMemoryKey ? getRememberedNumber(effectiveMemoryKey) : undefined;
+  const isPendingZero = amount === 0 && remembered !== undefined && remembered !== 0;
+  const displayAmount = isPendingZero ? remembered : amount;
+
+  if (effectiveMemoryKey && amount !== 0) {
+    setRememberedNumber(effectiveMemoryKey, amount);
+  }
+
   const effectiveIsApproximate = isApproximate !== undefined
     ? isApproximate
     : Boolean(originalCurrency && originalCurrency !== baseCurrency);
   const symbol = getCurrencySymbol(baseCurrency);
-  const formattedAmount = Math.abs(amount).toLocaleString(undefined, { 
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2 
-  });
+  const formattedAmount = formatAmountNumber(Math.abs(displayAmount));
   
   let colorClass = '';
   let sign = '';
 
-  const isZero = Math.abs(amount) < 0.000001;
+  const isZero = Math.abs(displayAmount) < 0.000001;
 
   if (type === 'income') {
     colorClass = isZero ? 'text-foreground' : 'text-emerald-500';
@@ -58,7 +65,7 @@ export function AmountDisplay({
     if (isZero) {
       colorClass = 'text-foreground';
       sign = '';
-    } else if (amount < 0) {
+    } else if (displayAmount < 0) {
       colorClass = 'text-rose-500';
       sign = showSign ? '-' : '';
     } else {
@@ -69,7 +76,7 @@ export function AmountDisplay({
     if (isZero) {
       colorClass = 'text-foreground';
       sign = '';
-    } else if (amount > 0) {
+    } else if (displayAmount > 0) {
       colorClass = 'text-emerald-500';
       sign = '';
     } else {
@@ -77,7 +84,7 @@ export function AmountDisplay({
       sign = showSign ? '-' : '';
     }
   } else if (type === 'neutral') {
-    if (showSign && amount < 0 && !isZero) sign = '-';
+    if (showSign && displayAmount < 0 && !isZero) sign = '-';
   }
 
   return (
@@ -86,7 +93,7 @@ export function AmountDisplay({
       {sign}
       {symbol}
       {animated ? (
-        <SpringNumber value={Math.abs(amount)} decimals={2} memoryKey={effectiveMemoryKey} />
+        <SpringNumber value={Math.abs(displayAmount)} memoryKey={effectiveMemoryKey} />
       ) : (
         formattedAmount
       )}

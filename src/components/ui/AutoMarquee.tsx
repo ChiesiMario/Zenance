@@ -6,7 +6,7 @@ export interface AutoMarqueeProps {
   className?: string;
   contentClassName?: string;
   align?: 'left' | 'center' | 'right';
-  speed?: number; // 像素/秒，預設 35
+  speed?: number; // 像素/秒，預設 20
 }
 
 /**
@@ -37,16 +37,21 @@ export function AutoMarquee({
     const paddingLeft = parseFloat(style.paddingLeft || '0');
     const paddingRight = parseFloat(style.paddingRight || '0');
     const availableWidth = container.clientWidth - paddingLeft - paddingRight;
-    const contentWidth = content.scrollWidth;
 
+    // 關鍵防護：若容器處於 display: none 或尚未佈局 (clientWidth <= 0)，切勿執行錯誤測量
+    if (availableWidth <= 0) {
+      return;
+    }
+
+    const contentWidth = content.scrollWidth;
     const diff = contentWidth - availableWidth;
 
     if (diff > 3) {
-      setOverflowDistance(diff);
-      setIsOverflowing(true);
+      setOverflowDistance(prev => (Math.abs(prev - diff) > 1 ? diff : prev));
+      setIsOverflowing(prev => (prev ? prev : true));
     } else {
-      setOverflowDistance(0);
-      setIsOverflowing(false);
+      setOverflowDistance(prev => (prev === 0 ? prev : 0));
+      setIsOverflowing(prev => (!prev ? prev : false));
     }
   }, []);
 
@@ -79,7 +84,7 @@ export function AutoMarquee({
     <div
       ref={containerRef}
       className={cn(
-        'overflow-hidden max-w-full w-full',
+        'overflow-hidden max-w-full w-full [backface-visibility:hidden]',
         isOverflowing
           ? 'flex justify-start text-left'
           : align === 'center'
@@ -93,9 +98,9 @@ export function AutoMarquee({
       <div
         ref={contentRef}
         className={cn(
-          'whitespace-nowrap shrink-0 inline-block will-change-transform',
+          'whitespace-nowrap shrink-0 inline-flex items-center [backface-visibility:hidden]',
           isOverflowing &&
-            'animate-marquee-pingpong hover:[animation-play-state:paused] active:[animation-play-state:paused]',
+            'will-change-transform animate-marquee-pingpong hover:[animation-play-state:paused] active:[animation-play-state:paused]',
           contentClassName
         )}
         style={

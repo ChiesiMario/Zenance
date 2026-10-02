@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { type Ledger } from '@/services/db/db';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
+import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 import {
@@ -165,7 +166,7 @@ export default function Dashboard() {
 
   
   return (
-    <div className="animate-in fade-in duration-500 w-full">
+    <div className="w-full">
       <div className="flex items-center justify-between gap-4 mb-2">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[250px]">
@@ -394,27 +395,55 @@ export default function Dashboard() {
 
         {/* Top Summary row */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{t('dashboard.netBalance')}</p>
-          <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2">
-            <AmountDisplay amount={balance} baseCurrency={activeLedger?.baseCurrency} type="balance" animated />
+          <div className="flex items-center justify-center gap-2 h-5 mb-2">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.netBalance')}</p>
+            <MagnitudeBadge amount={balance} memoryKey="dashboard-net-balance" />
+          </div>
+          <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2 leading-none">
+            <AmountDisplay 
+              amount={balance} 
+              baseCurrency={activeLedger?.baseCurrency} 
+              type="balance" 
+              animated 
+              memoryKey="dashboard-net-balance"
+            />
           </AutoMarquee>
         </div>
 
         {/* Split Metrics */}
         <div className="grid grid-cols-2 gap-px bg-border">
           <div className="bg-card p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.income')}</p>
-            <div className="text-2xl font-mono tracking-tight font-medium">
+            <div className="flex items-center justify-between h-5 mb-1">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.income')}</p>
+              <MagnitudeBadge amount={income} memoryKey="dashboard-income" />
+            </div>
+            <div className="text-2xl font-mono tracking-tight font-medium leading-none">
               <AutoMarquee align="left">
-                <AmountDisplay amount={income} baseCurrency={activeLedger?.baseCurrency} type="income" animated />
+                <AmountDisplay 
+                  amount={income} 
+                  baseCurrency={activeLedger?.baseCurrency} 
+                  type="income" 
+                  animated 
+                  memoryKey="dashboard-income"
+                />
               </AutoMarquee>
             </div>
           </div>
           <div className="bg-card p-4">
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{t('dashboard.expense')}</p>
-            <div className="text-2xl font-mono tracking-tight font-medium">
+            <div className="flex items-center justify-between h-5 mb-1">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.expense')}</p>
+              <MagnitudeBadge amount={expense} memoryKey="dashboard-expense" />
+            </div>
+            <div className="text-2xl font-mono tracking-tight font-medium leading-none">
               <AutoMarquee align="left">
-                <AmountDisplay amount={expense} baseCurrency={activeLedger?.baseCurrency} type="expense" showSign={false} animated />
+                <AmountDisplay 
+                  amount={expense} 
+                  baseCurrency={activeLedger?.baseCurrency} 
+                  type="expense" 
+                  showSign={false} 
+                  animated 
+                  memoryKey="dashboard-expense"
+                />
               </AutoMarquee>
             </div>
           </div>

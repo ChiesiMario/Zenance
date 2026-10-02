@@ -16,7 +16,11 @@
       "unknown": "未知",
       "uncategorized": "未分類",
       "unknownAccount": "未知帳戶",
-      "listSeparator": "、"
+      "listSeparator": "、",
+      "magnitude": {
+        "wan": "萬",
+        "yi": "億"
+      }
     },
     "calendar": {
       "monthYearFormat": "yyyy 年 M 月",

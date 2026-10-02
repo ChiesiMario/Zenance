@@ -16,7 +16,12 @@
       "unknown": "Unknown",
       "uncategorized": "Uncategorized",
       "unknownAccount": "Unknown Account",
-      "listSeparator": ", "
+      "listSeparator": ", ",
+      "magnitude": {
+        "k": "K",
+        "m": "M",
+        "b": "B"
+      }
     },
     "calendar": {
       "monthYearFormat": "MMMM yyyy",

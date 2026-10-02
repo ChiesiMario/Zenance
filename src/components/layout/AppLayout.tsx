@@ -192,7 +192,7 @@ export function AppLayout() {
       <main 
         ref={mainRef} 
         onScroll={handleScroll}
-        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(1.125rem+env(safe-area-inset-top,0px))] pb-6 [scrollbar-gutter:stable]"
+        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-6 [scrollbar-gutter:stable]"
       >
         {/* Keep-Alive Tab Views */}
         {mountedTabs.has('/') && (
@@ -220,9 +220,9 @@ export function AppLayout() {
         {!isCurrentTab && <Outlet />}
       </main>
 
-      {/* Bottom Navigation - Flex-none container sticking natively to bottom edge with balanced safe area */}
-      <nav className="flex-none w-full bg-background border-t border-border z-50 pt-1 pb-[calc(env(safe-area-inset-bottom,0px)*0.4)]">
-        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-11">
+      {/* Bottom Navigation - Apple HIG Standard Icon-Only Tab Bar Spacing */}
+      <nav className="flex-none w-full bg-background/90 backdrop-blur-xl border-t border-border z-50">
+        <div className="w-full max-w-xl mx-auto flex justify-around items-start pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] h-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;

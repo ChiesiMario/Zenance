@@ -164,8 +164,8 @@ export default function Dashboard() {
 
   
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
-      <div className="flex items-center justify-between gap-4">
+    <div className="animate-in fade-in duration-500 w-full">
+      <div className="flex items-center justify-between gap-4 mb-2">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[250px]">
             <span className="truncate">
@@ -376,8 +376,9 @@ export default function Dashboard() {
         </div>
       </div>
       
-      {/* Top Overview Container */}
-      <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
+      <div className="space-y-4">
+        {/* Top Overview Container */}
+        <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         
         {/* Month Selector */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/10">
@@ -463,6 +464,7 @@ export default function Dashboard() {
 
       {/* Recent Transactions List Container */}
       <GroupedTransactionList transactions={filteredTransactions} />
+      </div>
     </div>
   );
 }

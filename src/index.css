@@ -227,7 +227,7 @@
 }
 
 @utility pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + var(--ios-status-blur-offset, 0px));
 }
 
 @utility mb-safe {
@@ -235,5 +235,21 @@
 }
 
 @utility mt-safe {
-  margin-top: env(safe-area-inset-top, 0px);
+  margin-top: calc(env(safe-area-inset-top, 0px) + var(--ios-status-blur-offset, 0px));
 }
+
+/* iOS 26/27 PWA Status Bar Blur & Shadow Countermeasure */
+:root {
+  --ios-status-blur-offset: 0px;
+}
+
+@media (display-mode: standalone) and (orientation: portrait) {
+  .is-ios {
+    --ios-status-blur-offset: 16px;
+  }
+
+  .is-ios #ios-status-bar-tint {
+    height: calc(env(safe-area-inset-top, 0px) + var(--ios-status-blur-offset)) !important;
+  }
+}
+

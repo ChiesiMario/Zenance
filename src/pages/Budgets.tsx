@@ -371,9 +371,9 @@ export default function Budgets() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
+    <div className="animate-in fade-in duration-500 w-full">
       {/* Header & Tabs */}
-      <div className="flex items-center justify-between h-8">
+      <div className="flex items-center justify-between h-8 mb-2">
         <h2 className="text-xl font-semibold tracking-tight leading-none">{t('budgets.title')}</h2>
 
         <div className="h-8 w-8 flex items-center justify-center">
@@ -392,8 +392,9 @@ export default function Budgets() {
         </div>
       </div>
 
-      {/* Segmented Control: Budgets (Dropdown) vs Rules */}
-      <SegmentedControl
+      <div className="space-y-4">
+        {/* Segmented Control: Budgets (Dropdown) vs Rules */}
+        <SegmentedControl
         value={activeSection}
         onChange={handleSectionChange}
         fullWidth
@@ -1224,6 +1225,7 @@ export default function Budgets() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

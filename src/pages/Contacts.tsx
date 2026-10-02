@@ -113,10 +113,10 @@ export default function Contacts() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
+    <div className="animate-in fade-in duration-500 w-full">
       
       {/* Top Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none cursor-pointer">
             <span>
@@ -203,7 +203,8 @@ export default function Contacts() {
         )}
       </div>
 
-      {currentView === 'active' && (
+      <div className="space-y-4">
+        {currentView === 'active' && (
         <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
           <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center relative">
             {hasForeignCurrency && (
@@ -285,6 +286,7 @@ export default function Contacts() {
           hideGroupTag={filterType !== 'all'}
           emptyMessage={currentView === 'archived' ? t('contacts.noArchivedContacts', '目前沒有任何已歸檔對象') : undefined}
         />
+      </div>
       </div>
     </div>
   );

@@ -167,8 +167,8 @@ export default function Accounts() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="animate-in fade-in duration-500 w-full">
+      <div className="flex items-center justify-between mb-2">
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none cursor-pointer">
             <span>
@@ -349,7 +349,8 @@ export default function Accounts() {
         )}
       </div>
 
-      {currentView === 'active' && (
+      <div className="space-y-4">
+        {currentView === 'active' && (
         <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
           <div className="p-6 border-b border-border flex flex-col items-start justify-center">
             <div className="w-full flex items-center justify-between mb-2">
@@ -582,6 +583,7 @@ export default function Accounts() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

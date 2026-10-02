@@ -188,11 +188,17 @@ export function AppLayout() {
 
   return (
     <div className="flex flex-col h-full min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground overflow-hidden">
+      {/* iOS PWA Status Bar Blur Shield & Color Sampler */}
+      <div 
+        id="ios-status-bar-tint" 
+        className="fixed top-0 left-0 right-0 h-[1px] bg-background z-[9999] pointer-events-none transition-colors duration-200" 
+      />
+      
       {/* Main Content Area with Keep-Alive View Stack */}
       <main 
         ref={mainRef} 
         onScroll={handleScroll}
-        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] pb-6 [scrollbar-gutter:stable]"
+        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.5rem+env(safe-area-inset-top,0px)+var(--ios-status-blur-offset,0px))] sm:pt-[calc(1rem+env(safe-area-inset-top,0px)+var(--ios-status-blur-offset,0px))] pb-6 [scrollbar-gutter:stable]"
       >
         {/* Keep-Alive Tab Views */}
         {mountedTabs.has('/') && (
@@ -220,9 +226,9 @@ export function AppLayout() {
         {!isCurrentTab && <Outlet />}
       </main>
 
-      {/* Bottom Navigation - Apple HIG Standard Icon-Only Tab Bar Spacing */}
-      <nav className="flex-none w-full bg-background/90 backdrop-blur-xl border-t border-border z-50">
-        <div className="w-full max-w-xl mx-auto flex justify-around items-start pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] h-auto">
+      {/* Bottom Navigation - Responsive Height with Safe Area Docking */}
+      <nav className="flex-none w-full bg-background/90 backdrop-blur-xl border-t border-border z-50 pb-[env(safe-area-inset-bottom,0px)]">
+        <div className="w-full max-w-xl mx-auto flex justify-around items-center h-14 sm:h-16">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -301,11 +307,13 @@ export function AppLayout() {
             return (
               <button
                 key={item.path}
+                type="button"
                 onClick={() => navigate(item.path)}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 outline-none",
+                  "flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 outline-none cursor-pointer",
                   isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
+                aria-label={item.label}
               >
                 <Icon className={cn("size-6 transition-transform duration-300", isActive && "scale-110")} strokeWidth={isActive ? 2.5 : 1.5} />
               </button>

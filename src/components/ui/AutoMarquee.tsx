@@ -7,13 +7,26 @@ export interface AutoMarqueeProps {
   contentClassName?: string;
   align?: 'left' | 'center' | 'right';
   speed?: number; // 像素/秒，預設 20
+  /**
+   * 是否處於即時輸入狀態。
+   * 為 true 時：動畫暫停，錨定在右側末位，確保打字時最新字元始終清晰可見且不晃動；
+   * 為 false 時：若內容超出容器，自動啟動平滑往復平移（Ping-Pong）跑馬燈。
+   */
+  isTyping?: boolean;
+  /**
+   * 跑馬燈起點方向。
+   * 'start': 從左側起點向右捲動（預設，適用於普通靜態展示）
+   * 'end': 從右側末尾向左捲動（適用於輸入完畢後以現時狀態無縫開跑）
+   */
+  startFrom?: 'start' | 'end';
 }
 
 /**
  * AutoMarquee: 超長文本自動跑馬燈組件
  * 當內容未超出容器寬度時，維持一般排版（居中、靠左或靠右）；
  * 當內容超出容器寬度時，自動禁止換行，並開啟絲滑的往復平移（Ping-Pong）跑馬燈動畫，
- * 兩端具備停頓停留，手指或滑鼠按下懸停時自動暫停。
+ * 兩端具備停頓停留，手指或滑鼠按下懸停時自動暫停；
+ * 支援輸入狀態鎖定，打字期間固定顯示末位，停頓後以現時狀態無縫開跑，絕不閃現跳動。
  */
 export function AutoMarquee({
   children,
@@ -21,6 +34,8 @@ export function AutoMarquee({
   contentClassName,
   align = 'center',
   speed = 20,
+  isTyping = false,
+  startFrom,
 }: AutoMarqueeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -79,6 +94,7 @@ export function AutoMarquee({
   // 動態計算動畫總週期：(滾動時間 + 兩端停頓時間) * 2
   // 停頓時間各約 1.4s，共 2.8s
   const duration = isOverflowing ? Math.max(5, overflowDistance / speed + 2.8) : 0;
+  const effectiveStartFrom = startFrom ?? (isTyping !== undefined ? 'end' : 'start');
 
   return (
     <div
@@ -86,7 +102,9 @@ export function AutoMarquee({
       className={cn(
         'overflow-hidden max-w-full w-full [backface-visibility:hidden]',
         isOverflowing
-          ? 'flex justify-start text-left'
+          ? effectiveStartFrom === 'end'
+            ? 'flex justify-end text-right'
+            : 'flex justify-start text-left'
           : align === 'center'
             ? 'flex justify-center text-center'
             : align === 'right'
@@ -99,16 +117,21 @@ export function AutoMarquee({
         ref={contentRef}
         className={cn(
           'whitespace-nowrap shrink-0 inline-flex items-center [backface-visibility:hidden]',
-          isOverflowing &&
-            'will-change-transform animate-marquee-pingpong hover:[animation-play-state:paused] active:[animation-play-state:paused]',
+          isOverflowing && !isTyping && (
+            effectiveStartFrom === 'end'
+              ? 'will-change-transform animate-marquee-pingpong-from-end hover:[animation-play-state:paused] active:[animation-play-state:paused]'
+              : 'will-change-transform animate-marquee-pingpong hover:[animation-play-state:paused] active:[animation-play-state:paused]'
+          ),
           contentClassName
         )}
         style={
           isOverflowing
-            ? ({
-                '--marquee-distance': `-${overflowDistance}px`,
-                '--marquee-duration': `${duration}s`,
-              } as React.CSSProperties)
+            ? isTyping
+              ? undefined
+              : ({
+                  '--marquee-distance': effectiveStartFrom === 'end' ? `${overflowDistance}px` : `-${overflowDistance}px`,
+                  '--marquee-duration': `${duration}s`,
+                } as React.CSSProperties)
             : undefined
         }
       >

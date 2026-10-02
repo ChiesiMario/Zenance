@@ -455,7 +455,7 @@ export default function Accounts() {
             const isGroupApproximate = isMultiCurrency || (singleCurrency !== baseCurrency);
 
             return (
-              <div key={groupId} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground animate-in fade-in slide-in-from-bottom-2 duration-500 flex flex-col">
+              <div key={groupId} className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground flex flex-col">
                 <div className="sticky top-0 z-10 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b border-border text-xs uppercase tracking-widest text-muted-foreground">
                   <span>{t(`accounts.${GROUP_I18N_KEYS[groupId]}` as any)}</span>
                   <AmountDisplay 

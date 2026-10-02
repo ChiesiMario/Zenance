@@ -283,4 +283,20 @@
   animation: marquee-pingpong var(--marquee-duration, 5s) cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
+@keyframes marquee-pingpong-from-end {
+  0%, 20% {
+    transform: translateX(0);
+  }
+  50%, 70% {
+    transform: translateX(var(--marquee-distance, 0px));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee-pingpong-from-end {
+  animation: marquee-pingpong-from-end var(--marquee-duration, 5s) cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+}
+
 

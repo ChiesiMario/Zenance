@@ -19,6 +19,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { NumericKeypad } from './NumericKeypad';
+import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { db, type Account } from '@/services/db/db';
@@ -76,6 +77,28 @@ export function AddTransactionModal({
   const [displayAmount, setDisplayAmount] = useState('');
   const [displayAmountIn, setDisplayAmountIn] = useState('');
   const [displayFeeAmount, setDisplayFeeAmount] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimerRef = useRef<number | null>(null);
+
+  const notifyTyping = () => {
+    setIsTyping(true);
+    if (typingTimerRef.current !== null) {
+      window.clearTimeout(typingTimerRef.current);
+    }
+    typingTimerRef.current = window.setTimeout(() => {
+      setIsTyping(false);
+      typingTimerRef.current = null;
+    }, 1200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current !== null) {
+        window.clearTimeout(typingTimerRef.current);
+      }
+    };
+  }, []);
+
   const [focusedField, setFocusedField] = useState<'out' | 'in' | 'fee'>('out');
   const [previousAmountField, setPreviousAmountField] = useState<'out' | 'in'>('out');
   const [accountSelectConfig, setAccountSelectConfig] = useState<{
@@ -997,12 +1020,16 @@ export function AddTransactionModal({
                   </button>
                 </div>
 
-                {/* Massive Monospace Amount Display */}
-                <div className="flex items-baseline justify-center gap-1.5 w-full py-1">
-                  <span className="text-xl font-medium text-muted-foreground tracking-tight">{selectedCurrency}</span>
-                  <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-text">
-                    {formatDisplayAmount(displayAmount)}
-                  </span>
+                {/* Massive Monospace Amount Display with Safe AutoMarquee */}
+                <div className="w-full max-w-full overflow-hidden px-4 py-1">
+                  <AutoMarquee align="center" isTyping={isTyping} className="max-w-full">
+                    <div className="inline-flex items-baseline justify-center gap-1.5 whitespace-nowrap">
+                      <span className="text-xl font-medium text-muted-foreground tracking-tight shrink-0">{selectedCurrency}</span>
+                      <span className="text-5xl font-mono font-bold tracking-tighter text-foreground select-text shrink-0">
+                        {formatDisplayAmount(displayAmount)}
+                      </span>
+                    </div>
+                  </AutoMarquee>
                 </div>
 
                 {errors.amount && <p className="text-xs font-medium text-destructive mt-1">{errors.amount.message}</p>}
@@ -1013,8 +1040,8 @@ export function AddTransactionModal({
             {/* Case B: Transfer -> [Amount] then [Fee Pill] then [Dual Cards] */}
             {type === 'transfer' && (
               <>
-                {/* Massive Monospace Amount Display (Transfer Field Focus Switchable) */}
-                <div className="w-full flex items-center justify-center py-1">
+                {/* Massive Monospace Amount Display (Transfer Field Focus Switchable) with Safe AutoMarquee */}
+                <div className="w-full max-w-full overflow-hidden px-4 py-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -1030,7 +1057,7 @@ export function AddTransactionModal({
                       }
                     }}
                     className={cn(
-                      "flex items-baseline justify-center gap-1.5 py-1 px-3 rounded-2xl transition-all cursor-pointer shadow-none",
+                      "w-full flex items-center justify-center py-1 px-2 rounded-2xl transition-all cursor-pointer shadow-none overflow-hidden",
                       (focusedField === 'out' || focusedField === 'in')
                         ? "opacity-100"
                         : "opacity-40 hover:opacity-80"
@@ -1043,16 +1070,20 @@ export function AddTransactionModal({
                         : t('add.transferAmount', '轉帳')
                     }
                   >
-                    <span className="text-xl font-medium text-muted-foreground tracking-tight">
-                      {isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in')) ? toCurrency : fromCurrency}
-                    </span>
-                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-text">
-                      {formatDisplayAmount(
-                        isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in'))
-                          ? displayAmountIn
-                          : displayAmount
-                      )}
-                    </span>
+                    <AutoMarquee align="center" isTyping={isTyping} className="max-w-full">
+                      <div className="inline-flex items-baseline justify-center gap-1.5 whitespace-nowrap">
+                        <span className="text-xl font-medium text-muted-foreground tracking-tight shrink-0">
+                          {isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in')) ? toCurrency : fromCurrency}
+                        </span>
+                        <span className="text-5xl font-mono font-bold tracking-tighter text-foreground select-text shrink-0">
+                          {formatDisplayAmount(
+                            isCrossCurrency && (focusedField === 'in' || (focusedField === 'fee' && previousAmountField === 'in'))
+                              ? displayAmountIn
+                              : displayAmount
+                          )}
+                        </span>
+                      </div>
+                    </AutoMarquee>
                   </button>
                 </div>
 
@@ -1227,8 +1258,8 @@ export function AddTransactionModal({
             {/* Case C: Loan -> [Amount] then [Avatars Row] then [Dual Cards] */}
             {type === 'loan' && (
               <>
-                {/* Massive Monospace Amount Display */}
-                <div className="w-full flex items-center justify-center py-1">
+                {/* Massive Monospace Amount Display with Safe AutoMarquee */}
+                <div className="w-full max-w-full overflow-hidden px-4 py-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -1239,19 +1270,23 @@ export function AddTransactionModal({
                       }
                     }}
                     className={cn(
-                      "flex items-baseline justify-center gap-1.5 py-1 px-3 rounded-2xl transition-all cursor-pointer shadow-none",
+                      "w-full flex items-center justify-center py-1 px-2 rounded-2xl transition-all cursor-pointer shadow-none overflow-hidden",
                       (focusedField === 'out' || focusedField === 'in')
                         ? "opacity-100"
                         : "opacity-40 hover:opacity-80"
                     )}
                     title={isCrossCurrency ? (focusedField === 'in' ? t('add.inflow', '到款') : t('add.outflow', '出款')) : t('add.loanAmount', '借貸金額')}
                   >
-                    <span className="text-xl font-medium text-muted-foreground tracking-tight">
-                      {isCrossCurrency && focusedField === 'in' ? toCurrency : fromCurrency}
-                    </span>
-                    <span className="font-mono text-5xl font-bold tracking-tighter text-foreground select-text">
-                      {formatDisplayAmount(isCrossCurrency && focusedField === 'in' ? displayAmountIn : displayAmount)}
-                    </span>
+                    <AutoMarquee align="center" isTyping={isTyping} className="max-w-full">
+                      <div className="inline-flex items-baseline justify-center gap-1.5 whitespace-nowrap">
+                        <span className="text-xl font-medium text-muted-foreground tracking-tight shrink-0">
+                          {isCrossCurrency && focusedField === 'in' ? toCurrency : fromCurrency}
+                        </span>
+                        <span className="text-5xl font-mono font-bold tracking-tighter text-foreground select-text shrink-0">
+                          {formatDisplayAmount(isCrossCurrency && focusedField === 'in' ? displayAmountIn : displayAmount)}
+                        </span>
+                      </div>
+                    </AutoMarquee>
                   </button>
                 </div>
 
@@ -1545,6 +1580,7 @@ export function AddTransactionModal({
                 : displayAmount
             } 
             onChange={(val) => {
+              notifyTyping();
               if (type === 'transfer' && focusedField === 'fee') {
                 setDisplayFeeAmount(val);
               } else if (isCrossCurrency && focusedField === 'in') {

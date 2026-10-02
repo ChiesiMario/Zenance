@@ -192,7 +192,7 @@ export function AppLayout() {
       <main 
         ref={mainRef} 
         onScroll={handleScroll}
-        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-20 [scrollbar-gutter:stable]"
+        className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] [scrollbar-gutter:stable]"
       >
         {/* Keep-Alive Tab Views */}
         {mountedTabs.has('/') && (
@@ -220,8 +220,8 @@ export function AppLayout() {
         {!isCurrentTab && <Outlet />}
       </main>
 
-      {/* Bottom Navigation - Frosted Glass (嚴格緊貼螢幕最底邊) */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full bg-background/80 backdrop-blur-xl border-t border-border z-50">
+      {/* Bottom Navigation - Frosted Glass with Safe Area Capsule Padding */}
+      <nav className="fixed bottom-0 left-0 right-0 w-full bg-background/80 backdrop-blur-xl border-t border-border z-50 pb-[env(safe-area-inset-bottom,0px)]">
         <div className="w-full max-w-xl mx-auto flex justify-around items-center h-14">
           {navItems.map((item) => {
             const Icon = item.icon;

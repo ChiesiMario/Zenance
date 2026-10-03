@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Delete, Check, Equal, ChevronDown } from 'lucide-react';
 import { cn, evaluateAmountExpression } from '@/lib/utils';
+import { triggerHaptic } from '@/lib/haptics';
 
 export interface AmountPopoverKeypadProps {
   value: string;
@@ -66,11 +67,13 @@ export function AmountPopoverKeypad({
 
   const handleKey = (key: string) => {
     if (key === 'C') {
+      triggerHaptic('light');
       onChange('');
       return;
     }
 
     if (key === 'DEL') {
+      triggerHaptic('light');
       if (!value) return;
       onChange(value.slice(0, -1));
       return;
@@ -79,24 +82,30 @@ export function AmountPopoverKeypad({
     if (key === '+' || key === '-') {
       if (value === '') {
         if (key === '-' && allowNegative) {
+          triggerHaptic('light');
           onChange('-');
+        } else {
+          triggerHaptic('warning');
         }
         return;
       }
 
       // Replace trailing operator or dot
       if (value.endsWith('+') || value.endsWith('-') || value.endsWith('.')) {
+        triggerHaptic('light');
         onChange(value.slice(0, -1) + key);
         return;
       }
 
       // If already an expression (e.g. 10+20), evaluate first then append operator
       if (isExpression) {
+        triggerHaptic('light');
         const evaluated = evaluateAmountExpression(value, allowNegative);
         onChange(evaluated + key);
         return;
       }
 
+      triggerHaptic('light');
       onChange(value + key);
       return;
     }
@@ -104,12 +113,15 @@ export function AmountPopoverKeypad({
     if (key === '.') {
       const { leadingText, operand } = getLastOperand(value);
       if (!operand) {
+        triggerHaptic('light');
         onChange(leadingText + '0.');
         return;
       }
       if (operand.includes('.')) {
+        triggerHaptic('warning');
         return;
       }
+      triggerHaptic('light');
       onChange(value + '.');
       return;
     }
@@ -118,12 +130,17 @@ export function AmountPopoverKeypad({
       const { operand } = getLastOperand(value);
       if (operand === '0') {
         // Disallow multiple leading zeros (e.g. 00)
+        triggerHaptic('warning');
         return;
       }
       if (operand.includes('.')) {
         const dec = operand.split('.')[1] || '';
-        if (dec.length >= 2) return;
+        if (dec.length >= 2) {
+          triggerHaptic('warning');
+          return;
+        }
       }
+      triggerHaptic('light');
       onChange(value + '0');
       return;
     }
@@ -131,12 +148,17 @@ export function AmountPopoverKeypad({
     if (key === '00') {
       const { leadingText, operand } = getLastOperand(value);
       if (!operand || operand === '0') {
+        triggerHaptic('light');
         onChange(leadingText + '0');
         return;
       }
       if (operand.includes('.')) {
         const dec = operand.split('.')[1] || '';
-        if (dec.length >= 2) return;
+        if (dec.length >= 2) {
+          triggerHaptic('warning');
+          return;
+        }
+        triggerHaptic('light');
         if (dec.length === 1) {
           onChange(value + '0');
         } else {
@@ -144,6 +166,7 @@ export function AmountPopoverKeypad({
         }
         return;
       }
+      triggerHaptic('light');
       onChange(value + '00');
       return;
     }
@@ -153,13 +176,18 @@ export function AmountPopoverKeypad({
       const { leadingText, operand } = getLastOperand(value);
       if (operand === '0') {
         // Disallow invalid leading zero: 0 followed by 5 becomes 5
+        triggerHaptic('light');
         onChange(leadingText + key);
         return;
       }
       if (operand.includes('.')) {
         const dec = operand.split('.')[1] || '';
-        if (dec.length >= 2) return;
+        if (dec.length >= 2) {
+          triggerHaptic('warning');
+          return;
+        }
       }
+      triggerHaptic('light');
       onChange(value + key);
       return;
     }
@@ -167,20 +195,25 @@ export function AmountPopoverKeypad({
     // Done or Evaluate (=)
     if (key === '=') {
       if (isExpression) {
+        triggerHaptic('light');
         const evaluated = evaluateAmountExpression(value, allowNegative);
         onChange(evaluated);
       } else {
+        triggerHaptic('medium');
         onSubmit?.();
         onClose?.();
       }
     }
   };
 
+  const btnBaseClass =
+    "h-12 text-lg sm:text-xl font-mono font-medium rounded-xl bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none";
+
   return (
     <div
       data-slot="amount-popover-keypad"
       className={cn(
-        "w-[280px] sm:w-[320px] rounded-xl bg-popover border border-border p-2.5 flex flex-col gap-2 text-popover-foreground select-none shadow-none outline-none",
+        "w-[280px] sm:w-[320px] rounded-xl bg-popover border border-border p-2.5 flex flex-col gap-2.5 text-popover-foreground select-none shadow-none outline-none",
         className
       )}
     >
@@ -200,7 +233,7 @@ export function AmountPopoverKeypad({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => handleKey('C')}
-            className="text-[11px] font-mono px-2 py-0.5 rounded bg-muted/60 text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="text-xs font-mono h-7 px-2.5 rounded-md bg-muted/60 text-foreground hover:bg-muted active:bg-foreground active:text-background transition-transform duration-75 active:scale-95 cursor-pointer"
             title={t('keypad.clear', '清空')}
           >
             C
@@ -209,22 +242,22 @@ export function AmountPopoverKeypad({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onClose?.()}
-            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:bg-foreground active:text-background transition-transform duration-75 active:scale-95 cursor-pointer"
             title={t('keypad.collapse', '收起鍵盤')}
           >
-            <ChevronDown className="size-3.5" />
+            <ChevronDown className="size-4" />
           </button>
         </div>
       </div>
 
       {/* 4x4 Grid Buttons */}
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-4 gap-2">
         {/* Row 1 */}
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('1')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           1
         </button>
@@ -232,7 +265,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('2')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           2
         </button>
@@ -240,7 +273,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('3')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           3
         </button>
@@ -248,10 +281,10 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('DEL')}
-          className="h-9 sm:h-10 rounded-lg bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className="h-12 rounded-xl bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none"
           title={t('keypad.backspace', '退格')}
         >
-          <Delete className="size-4.5" />
+          <Delete className="size-5" />
         </button>
 
         {/* Row 2 */}
@@ -259,7 +292,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('4')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           4
         </button>
@@ -267,7 +300,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('5')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           5
         </button>
@@ -275,7 +308,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('6')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           6
         </button>
@@ -283,7 +316,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('-')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           -
         </button>
@@ -293,7 +326,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('7')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           7
         </button>
@@ -301,7 +334,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('8')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           8
         </button>
@@ -309,7 +342,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('9')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           9
         </button>
@@ -317,7 +350,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('+')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           +
         </button>
@@ -327,7 +360,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('.')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           .
         </button>
@@ -335,7 +368,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('0')}
-          className="h-9 sm:h-10 text-base sm:text-lg font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className={btnBaseClass}
         >
           0
         </button>
@@ -343,7 +376,7 @@ export function AmountPopoverKeypad({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('00')}
-          className="h-9 sm:h-10 text-xs sm:text-sm font-mono tracking-wider rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow-none"
+          className="h-12 text-sm sm:text-base font-mono tracking-wider font-medium rounded-xl bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none"
         >
           00
         </button>
@@ -352,18 +385,18 @@ export function AmountPopoverKeypad({
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => handleKey('=')}
           className={cn(
-            "h-9 sm:h-10 rounded-lg flex items-center justify-center transition-all active:scale-95 border cursor-pointer shadow-none",
+            "h-12 rounded-xl flex items-center justify-center transition-transform duration-75 active:scale-[0.96] border cursor-pointer shadow-none select-none",
             isExpression
-              ? "bg-muted/60 text-foreground hover:bg-muted border-border/40 font-bold"
-              : "bg-primary text-primary-foreground hover:bg-primary/90 border-primary font-bold"
+              ? "bg-muted/60 text-foreground hover:bg-muted border-border/40 font-bold active:bg-foreground active:text-background active:border-foreground"
+              : "bg-primary text-primary-foreground hover:bg-primary/90 border-primary font-bold active:bg-primary/80"
           )}
           title={isExpression ? t('keypad.calculate', '計算') : t('keypad.done', '完成')}
         >
           {isExpression ? (
-            <Equal className="size-4.5" />
+            <Equal className="size-5" />
           ) : (
             <Check
-              className="size-4.5 stroke-[2.5]"
+              className="size-5 stroke-[2.5]"
               style={{
                 color: 'var(--primary-foreground)',
                 stroke: 'var(--primary-foreground)',

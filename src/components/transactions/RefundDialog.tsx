@@ -11,7 +11,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { getCurrencySymbol, cn, formatAmountNumber } from '@/lib/utils';
+import { getCurrencySymbol, cn, formatAmountNumber, sanitizeAmountInput } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 import { Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, Calendar, FileText } from 'lucide-react';
 
@@ -209,13 +209,13 @@ export function RefundDialog({
                   {currencySymbol}
                 </span>
                 <Input
-                  type="number"
-                  step="any"
+                  type="text"
                   inputMode="decimal"
                   placeholder="0.00"
                   value={amountStr}
                   onChange={(e) => {
-                    setAmountStr(e.target.value);
+                    const clean = sanitizeAmountInput(e.target.value);
+                    setAmountStr(clean);
                     setErrorMsg(null);
                   }}
                   className="border-none bg-transparent p-0 text-2xl font-bold font-mono tracking-tight text-foreground shadow-none focus-visible:ring-0 h-auto"

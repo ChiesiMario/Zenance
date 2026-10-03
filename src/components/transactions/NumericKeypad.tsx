@@ -68,15 +68,40 @@ const safeEvaluate = (expr: string): string => {
     if (/[+\-*/.]$/.test(expr)) return expr;
     // eslint-disable-next-line no-new-func
     const result = new Function('return ' + expr)();
-    if (typeof result === 'number' && !isNaN(result)) {
-      // Format to avoid long decimals
-      return parseFloat(result.toFixed(4)).toString();
+    if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+      // 嚴格四捨五入至最多 2 位小數
+      const rounded = Math.round(result * 100) / 100;
+      return rounded.toString();
     }
   } catch {
     // ignore
   }
   return expr;
 };
+
+/**
+ * 輔助函數：解析算式字串中的前綴運算式與最後一個正在輸入的操作數
+ */
+function getLastOperand(expr: string) {
+  const rest = expr.replace(/^[+-]/, '');
+  const lastOpIndex = Math.max(
+    rest.lastIndexOf('+'),
+    rest.lastIndexOf('-'),
+    rest.lastIndexOf('*'),
+    rest.lastIndexOf('/')
+  );
+  if (lastOpIndex === -1) {
+    return {
+      leadingText: '',
+      operand: expr,
+    };
+  }
+  const realOpIndex = (expr.length - rest.length) + lastOpIndex;
+  return {
+    leadingText: expr.slice(0, realOpIndex + 1),
+    operand: expr.slice(realOpIndex + 1),
+  };
+}
 
 export function NumericKeypad({
   value,
@@ -138,21 +163,109 @@ export function NumericKeypad({
 
     const operators = ['+', '-', '*', '/'];
     
-    // Prevent multiple operators in a row
-    if (operators.includes(key) && operators.includes(value.slice(-1))) {
+    // 運算符處理
+    if (operators.includes(key)) {
+      // 防止連續多個運算符
+      if (operators.includes(value.slice(-1))) {
+        triggerHaptic('light');
+        onChange(value.slice(0, -1) + key);
+        return;
+      }
+      
+      // 防止除開頭負號外以運算符開頭
+      if (value === '' && key !== '-') {
+        triggerHaptic('warning');
+        return;
+      }
+
       triggerHaptic('light');
-      onChange(value.slice(0, -1) + key);
-      return;
-    }
-    
-    // Prevent starting with an operator (except minus)
-    if (value === '' && operators.includes(key) && key !== '-') {
-      triggerHaptic('warning');
+      onChange(value + key);
       return;
     }
 
-    triggerHaptic('light');
-    onChange(value + key);
+    const { leadingText, operand } = getLastOperand(value);
+
+    // 小數點處理：限制單一操作數只能有一個小數點
+    if (key === '.') {
+      if (!operand || operand === '-' || operand === '+') {
+        triggerHaptic('light');
+        onChange(value + '0.');
+        return;
+      }
+      if (operand.includes('.')) {
+        triggerHaptic('warning');
+        return;
+      }
+      triggerHaptic('light');
+      onChange(value + '.');
+      return;
+    }
+
+    // 數字 0 處理
+    if (key === '0') {
+      if (operand === '0') {
+        // 防止重複的前導零 (如 00)
+        triggerHaptic('warning');
+        return;
+      }
+      if (operand.includes('.')) {
+        const dec = operand.split('.')[1] || '';
+        if (dec.length >= 2) {
+          triggerHaptic('warning');
+          return;
+        }
+      }
+      triggerHaptic('light');
+      onChange(value + '0');
+      return;
+    }
+
+    // 雙零 00 處理
+    if (key === '00') {
+      if (!operand || operand === '0' || operand === '-' || operand === '+') {
+        triggerHaptic('light');
+        onChange(leadingText + '0');
+        return;
+      }
+      if (operand.includes('.')) {
+        const dec = operand.split('.')[1] || '';
+        if (dec.length >= 2) {
+          triggerHaptic('warning');
+          return;
+        }
+        if (dec.length === 1) {
+          triggerHaptic('light');
+          onChange(value + '0');
+          return;
+        }
+        triggerHaptic('light');
+        onChange(value + '00');
+        return;
+      }
+      triggerHaptic('light');
+      onChange(value + '00');
+      return;
+    }
+
+    // 數字 1 ~ 9 處理
+    if (key >= '1' && key <= '9') {
+      if (operand === '0') {
+        // 0 後按 5 替換為 5 (避免 05)
+        triggerHaptic('light');
+        onChange(leadingText + key);
+        return;
+      }
+      if (operand.includes('.')) {
+        const dec = operand.split('.')[1] || '';
+        if (dec.length >= 2) {
+          triggerHaptic('warning');
+          return;
+        }
+      }
+      triggerHaptic('light');
+      onChange(value + key);
+      return;
+    }
   };
 
   const today = new Date().toISOString().split('T')[0];

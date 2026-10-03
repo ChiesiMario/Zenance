@@ -26,6 +26,8 @@ import { db, type Account } from '@/services/db/db';
 import type { SplitItem } from './SplitAdvanceDialog';
 import { v4 as uuidv4 } from 'uuid';
 
+const roundToTwo = (val: number): number => Math.round(val * 100) / 100;
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -270,8 +272,9 @@ export function AddTransactionModal({
         setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
         setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
         if (initialAmount && initialAmount > 0) {
-          setDisplayAmount(initialAmount.toString());
-          setValue('amount', initialAmount);
+          const roundedInit = roundToTwo(initialAmount);
+          setDisplayAmount(roundedInit.toString());
+          setValue('amount', roundedInit);
         } else {
           setDisplayAmount('');
         }
@@ -839,8 +842,8 @@ export function AddTransactionModal({
 
   const handleKeypadSubmit = () => {
     if (isCrossCurrency) {
-      const outVal = parseFloat(displayAmount) || 0;
-      const inVal = parseFloat(displayAmountIn) || 0;
+      const outVal = roundToTwo(parseFloat(displayAmount) || 0);
+      const inVal = roundToTwo(parseFloat(displayAmountIn) || 0);
       if (outVal <= 0) {
         toast.show(t('add.errors.outflowRequired', '請輸入出款金額'));
         setFocusedField('out');
@@ -854,13 +857,14 @@ export function AddTransactionModal({
       setValue('amount', outVal);
       setValue('transferInAmount', inVal);
     } else {
-      const val = parseFloat(displayAmount);
-      if (isNaN(val) || val <= 0) {
+      const parsed = parseFloat(displayAmount);
+      if (isNaN(parsed) || parsed <= 0) {
         if (type === 'transfer' && focusedField === 'fee') {
           setFocusedField('out');
         }
         return;
       }
+      const val = roundToTwo(parsed);
       setValue('amount', val);
       if (type === 'transfer') {
         setValue('transferInAmount', val);

@@ -75,44 +75,46 @@ export function ConfirmDialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
           data-slot="confirm-dialog-overlay"
-          className="fixed inset-0 isolate z-[75] bg-black/40 dark:bg-black/60 backdrop-blur-sm data-closed:hidden"
+          className="fixed inset-0 isolate z-[75] bg-background/70 backdrop-blur-sm data-closed:hidden"
         />
-        <DialogPrimitive.Popup
-          data-slot="confirm-dialog-content"
-          className={cn(
-            'fixed top-1/2 left-1/2 z-[75] grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-card p-5 text-sm text-card-foreground border border-border shadow-none duration-100 ease-out outline-none sm:max-w-[360px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0'
-          )}
-        >
-          <div className="flex flex-col gap-1.5 text-left">
-            {title && (
-              <h3 className="text-base font-semibold tracking-tight text-foreground">
-                {title}
-              </h3>
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 pointer-events-none">
+          <DialogPrimitive.Popup
+            data-slot="confirm-dialog-content"
+            className={cn(
+              'pointer-events-auto relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto gap-4 rounded-xl bg-card p-5 text-sm text-card-foreground border border-border shadow-none duration-100 ease-out outline-none sm:max-w-[360px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0'
             )}
-            <div className="text-sm text-muted-foreground leading-relaxed">
-              {description}
+          >
+            <div className="flex flex-col gap-1.5 text-left">
+              {title && (
+                <h3 className="text-base font-semibold tracking-tight text-foreground">
+                  {title}
+                </h3>
+              )}
+              <div className="text-sm text-muted-foreground leading-relaxed">
+                {description}
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="cursor-pointer w-full"
-              onClick={handleCancel}
-            >
-              {cancelText || t('common.cancel')}
-            </Button>
-            <Button
-              type="button"
-              variant={variant === 'destructive' ? 'destructive' : 'default'}
-              className="cursor-pointer w-full"
-              onClick={handleConfirm}
-            >
-              {confirmText || t('common.confirm')}
-            </Button>
-          </div>
-        </DialogPrimitive.Popup>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="cursor-pointer w-full"
+                onClick={handleCancel}
+              >
+                {cancelText || t('common.cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant={variant === 'destructive' ? 'destructive' : 'default'}
+                className="cursor-pointer w-full"
+                onClick={handleConfirm}
+              >
+                {confirmText || t('common.confirm')}
+              </Button>
+            </div>
+          </DialogPrimitive.Popup>
+        </div>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );

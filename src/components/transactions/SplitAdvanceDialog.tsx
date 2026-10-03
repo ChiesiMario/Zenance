@@ -77,7 +77,7 @@ function SelectContactsModal({
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       {/* 背景遮罩 */}
       <div
-        className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/70 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -390,7 +390,7 @@ export function SplitAdvanceDialog({
         disablePointerDismissal
       >
         <DialogContent
-          overlayClassName="z-[70] bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+          overlayClassName="z-[70] bg-background/70 backdrop-blur-sm"
           className="z-[70] max-w-[360px] sm:max-w-[360px] max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden border border-border shadow-none"
         >
           {/* Header */}

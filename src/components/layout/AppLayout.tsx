@@ -195,7 +195,7 @@ export function AppLayout() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground overflow-hidden">
+    <div className="flex flex-col h-full min-h-screen min-h-[100dvh] bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground overflow-hidden">
       {/* iOS PWA Status Bar Blur Shield & Color Sampler */}
       <div 
         id="ios-status-bar-tint" 

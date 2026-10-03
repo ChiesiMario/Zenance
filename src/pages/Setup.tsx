@@ -47,21 +47,21 @@ export default function Setup() {
 
   if (step === 0) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
-        <div className="w-full max-w-sm flex flex-col items-center text-center">
-          <div className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both">
+      <div className="flex min-h-screen min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
+        <div className="w-full max-w-sm flex flex-col items-center text-center animate-in fade-in duration-300">
+          <div className="mb-6">
             <Logo size={72} />
           </div>
           
-          <h1 className="text-4xl font-bold tracking-tight mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 fill-mode-both">
+          <h1 className="text-4xl font-bold tracking-tight mb-4">
             Zenance
           </h1>
           
-          <p className="text-muted-foreground mb-16 max-w-[280px] animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 fill-mode-both">
+          <p className="text-muted-foreground mb-16 max-w-[280px]">
             {t('setup.welcomeTagline')}
           </p>
 
-          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500 fill-mode-both">
+          <div className="w-full">
             <Button
               onClick={() => setStep(1)}
               className="w-full h-12 text-md font-medium"
@@ -76,8 +76,8 @@ export default function Setup() {
 
   if (step === 1) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
-        <div className="w-full max-w-sm flex flex-col items-center animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex min-h-screen min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
+        <div className="w-full max-w-sm flex flex-col items-center animate-in fade-in duration-300">
           <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-12">
             {t('setup.title')}
           </p>
@@ -122,8 +122,8 @@ export default function Setup() {
   }
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
-      <div className="w-full max-w-sm flex flex-col items-center text-center animate-in slide-in-from-right-8 fade-in duration-500">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
+      <div className="w-full max-w-sm flex flex-col items-center text-center animate-in fade-in duration-300">
         <div className="mb-8 rounded-full border border-border p-4 bg-muted/10">
           <Cloud className="size-10 text-primary" strokeWidth={1.5} />
         </div>

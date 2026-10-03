@@ -282,7 +282,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
                 style={{
                   paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
                 }}
-                className="fixed inset-x-0 bottom-0 z-[999] bg-popover border-t border-border px-3 pt-2 rounded-t-2xl shadow-none flex flex-col items-center animate-in slide-in-from-bottom duration-200"
+                className="fixed inset-x-0 bottom-0 z-[999] bg-popover border-t border-border px-3 pt-2 rounded-t-2xl shadow-none flex flex-col items-center [backface-visibility:hidden] [transform:translateZ(0)] will-change-transform animate-in slide-in-from-bottom duration-200"
               >
                 {/* Drag Handle Indicator */}
                 <div

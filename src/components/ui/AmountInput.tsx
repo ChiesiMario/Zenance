@@ -46,14 +46,14 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   const [coords, setCoords] = useState<Coords | null>(null);
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth < 640;
+      return window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches;
     }
     return false;
   });
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 640);
+      setIsMobile(window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -96,11 +96,9 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
     }
   };
 
+  // Only open custom popover on desktop; on mobile we use native decimal keyboard with native auto-scroll
   const openKeypad = () => {
-    if (disableKeypad) return;
-    if (typeof navigator !== 'undefined' && 'virtualKeyboard' in navigator) {
-      (navigator as any).virtualKeyboard?.hide?.();
-    }
+    if (disableKeypad || isMobile) return;
     const initialCoords = calculateCoords();
     if (initialCoords) {
       setCoords(initialCoords);
@@ -113,9 +111,9 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
     setCoords(null);
   };
 
-  // Re-calculate position before paint and on scroll/resize
+  // Re-calculate position before paint and on scroll/resize (desktop only)
   useLayoutEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isMobile) return;
 
     const nextCoords = calculateCoords();
     if (nextCoords) {
@@ -136,11 +134,11 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
       window.removeEventListener('resize', handleScrollOrResize);
       window.removeEventListener('scroll', handleScrollOrResize, { capture: true });
     };
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
-  // Click outside to close
+  // Click outside to close (desktop only)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isMobile) return;
 
     const handlePointerDown = (e: MouseEvent | TouchEvent) => {
       const target = e.target as Node | null;
@@ -159,7 +157,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
     };
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   const triggerChange = (nextVal: string) => {
     onValueChange?.(nextVal);
@@ -194,11 +192,20 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     openKeypad();
     onFocus?.(e);
-    if (!disableKeypad && typeof window !== 'undefined') {
+    if (isMobile) {
+      // Ensure input scrolls into visual viewport when soft keyboard appears
       setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 50);
+        inputRef.current?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+      }, 300);
     }
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const evaluated = evaluateAmountExpression(value, allowNegative);
+    if (evaluated && evaluated !== value) {
+      triggerChange(evaluated);
+    }
+    props.onBlur?.(e);
   };
 
   const handleInputClick = (e: React.MouseEvent<HTMLInputElement>) => {
@@ -209,14 +216,16 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
       closeKeypad();
+      inputRef.current?.blur();
     } else if (e.key === 'Enter') {
+      const evaluated = evaluateAmountExpression(value, allowNegative);
+      if (evaluated && evaluated !== value) {
+        triggerChange(evaluated);
+      }
       if (isOpen) {
-        const evaluated = evaluateAmountExpression(value, allowNegative);
-        if (evaluated && evaluated !== value) {
-          triggerChange(evaluated);
-        }
         closeKeypad();
       }
+      inputRef.current?.blur();
       onSubmitAmount?.();
     }
     onKeyDown?.(e);
@@ -235,16 +244,19 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
     onSubmitAmount?.();
   };
 
+  const effectiveInputMode = disableKeypad || isMobile ? "decimal" : "none";
+
   return (
     <>
       {unstyled ? (
         <input
           ref={inputRef}
           type="text"
-          inputMode={disableKeypad ? "decimal" : "none"}
+          inputMode={effectiveInputMode}
           value={value}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           onClick={handleInputClick}
           onKeyDown={handleInputKeyDown}
           className={cn('font-mono', className)}
@@ -254,10 +266,11 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
         <Input
           ref={inputRef}
           type="text"
-          inputMode={disableKeypad ? "decimal" : "none"}
+          inputMode={effectiveInputMode}
           value={value}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           onClick={handleInputClick}
           onKeyDown={handleInputKeyDown}
           className={cn('font-mono', className)}
@@ -267,65 +280,31 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
 
       {isOpen &&
         !disableKeypad &&
+        !isMobile &&
+        coords !== null &&
         typeof document !== 'undefined' &&
         createPortal(
-          isMobile ? (
-            <>
-              {/* Mobile Backdrop - Transparent */}
-              <div
-                className="fixed inset-0 z-[998] bg-transparent"
-                onClick={closeKeypad}
-              />
-              {/* Bottom Sheet Keypad */}
-              <div
-                ref={popoverRef}
-                style={{
-                  paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
-                }}
-                className="fixed inset-x-0 bottom-0 z-[999] bg-popover border-t border-border px-3 pt-2 rounded-t-2xl shadow-none flex flex-col items-center [backface-visibility:hidden] [transform:translateZ(0)] will-change-transform animate-in slide-in-from-bottom duration-200"
-              >
-                {/* Drag Handle Indicator */}
-                <div
-                  className="w-8 h-1 rounded-full bg-muted-foreground/30 mb-2 shrink-0 cursor-pointer hover:bg-muted-foreground/50 transition-colors"
-                  onClick={closeKeypad}
-                  aria-hidden="true"
-                />
-                <AmountPopoverKeypad
-                  value={value}
-                  onChange={handleKeypadChange}
-                  onSubmit={handleKeypadSubmit}
-                  onClose={closeKeypad}
-                  allowNegative={allowNegative}
-                  currencySymbol={currencySymbol}
-                  className="w-full max-w-sm border-0 p-0 bg-transparent"
-                />
-              </div>
-            </>
-          ) : (
-            coords !== null && (
-              <div
-                ref={popoverRef}
-                style={{
-                  position: 'fixed',
-                  top: `${coords.top}px`,
-                  left: `${coords.left}px`,
-                  width: `${coords.width}px`,
-                  zIndex: 999,
-                }}
-                className="animate-in fade-in-0 slide-in-from-bottom-3 duration-200 ease-out"
-              >
-                <AmountPopoverKeypad
-                  value={value}
-                  onChange={handleKeypadChange}
-                  onSubmit={handleKeypadSubmit}
-                  onClose={closeKeypad}
-                  allowNegative={allowNegative}
-                  currencySymbol={currencySymbol}
-                  className="w-full"
-                />
-              </div>
-            )
-          ),
+          <div
+            ref={popoverRef}
+            style={{
+              position: 'fixed',
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+              zIndex: 999,
+            }}
+            className="animate-in fade-in-0 slide-in-from-bottom-2 duration-150 ease-out"
+          >
+            <AmountPopoverKeypad
+              value={value}
+              onChange={handleKeypadChange}
+              onSubmit={handleKeypadSubmit}
+              onClose={closeKeypad}
+              allowNegative={allowNegative}
+              currencySymbol={currencySymbol}
+              className="w-full"
+            />
+          </div>,
           document.body
         )}
     </>

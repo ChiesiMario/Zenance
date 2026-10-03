@@ -31,9 +31,12 @@ trigger: always_on
 - **彈窗與居中規範**：
   - 嚴禁在彈窗本體上使用 `inset-0 m-auto` 或 `transform: translate(-50%, -50%)` 做幾何定位。
   - 所有浮層與 Modal 必須使用外層「全螢幕 Flex 容器居中（`fixed inset-0 flex items-center justify-center p-4 pointer-events-none`）」架構，彈窗本體為普通 block（`pointer-events-auto`），高度嚴格由內容自然撐開。
-- **動畫與效能規範**：
-  - 全站彈窗與過渡動畫只使用純合成器屬性「透明度（`opacity`）」，禁止使用覆蓋座標的複合 `transform` 縮放動畫（如 `zoom-in-95`）。
-  - 過渡時間嚴格控制在 `duration-100 ease-out` 內，呈現極致俐落、瞬時響應的工程師質感。
-- **視覺特效分離**：
-  - 毛玻璃（`backdrop-filter`）僅限用於靜態固定的 Header 或導航列。
-  - 任何帶有動態顯示/隱藏的遮罩層嚴禁執行帶動態 Alpha 漸變的毛玻璃計算；彈窗遮罩須瞬間就位或採用純色高對比遮罩（`bg-black/40`），徹底避免舊款 GPU 頻閃。
+  - **焦點管理**：彈窗掛載時禁止第 0 幀同步強奪焦點（`initialFocus={false}`），避免觸發整頁同步強制重排（Forced Synchronous Reflow）。
+- **動畫與彈窗彈出規範 (Instant Pop)**：
+  - Dialog / Modal 彈窗本體全面採用**「原生級瞬時彈出 (Instant Pop)」**，嚴禁在卡片上附加慢速 `animate-in fade-in` 動畫，徹底避免在舊款設備（如 A9/A10 晶片、iOS 15）上因底層光柵化搶佔時間片導致動畫殘缺與嚴重掉幀卡頓。
+  - 彈窗呈現應如同 Vercel、Raycast 及 macOS 原生 Alert 般即點即出、清脆乾脆。
+- **毛玻璃與遮罩規範 (Frosted Glassmorphism)**：
+  - 遮罩層全面使用語意化變數：`bg-background/80 backdrop-blur-[2px] data-closed:hidden`。在淺色模式下呈現純淨白霜牛奶玻璃，深色模式下呈現深邃黑曜石毛玻璃。
+  - 遮罩層嚴禁使用 `isolate`（避免觸發 WebKit 整頁圖層扁平化重繪）。
+  - 模糊半徑嚴格限制在 `2px`（`backdrop-blur-[2px]`），確保舊款 GPU 卷積計算耗時 `< 16ms`，維持滿幀 60fps。
+  - 遮罩層嚴禁使用動態 Alpha 漸變動畫，必須瞬間就位（`data-closed:hidden`），徹底杜絕 GPU 紋理重構頻閃。

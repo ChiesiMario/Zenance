@@ -33,7 +33,7 @@ function DialogOverlay({
       forceRender={forceRender}
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-[60] bg-background/70 backdrop-blur-sm data-closed:hidden",
+        "fixed inset-0 z-[60] bg-background/80 backdrop-blur-[2px] data-closed:hidden",
         className
       )}
       {...props}
@@ -66,10 +66,10 @@ function DialogContent({
       {fullscreen ? (
         <DialogPrimitive.Popup
           ref={contentRef}
-          initialFocus={initialFocus !== undefined ? initialFocus : () => contentRef.current}
+          initialFocus={initialFocus ?? false}
           data-slot="dialog-content"
           className={cn(
-            "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background overflow-hidden outline-none duration-100 ease-out data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+            "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background overflow-hidden outline-none",
             className
           )}
           {...props}
@@ -79,10 +79,10 @@ function DialogContent({
       ) : commandDeck ? (
         <DialogPrimitive.Popup
           ref={contentRef}
-          initialFocus={initialFocus !== undefined ? initialFocus : () => contentRef.current}
+          initialFocus={initialFocus ?? false}
           data-slot="dialog-content"
           className={cn(
-            "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background text-foreground outline-none px-4 pt-[calc(1rem+env(safe-area-inset-top,0px)+var(--ios-status-blur-offset,0px))] pb-4 overflow-y-auto overscroll-contain no-scrollbar duration-100 ease-out sm:fixed sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-[min(380px,calc(100vw-2rem))] sm:h-[min(600px,calc(100vh-3rem))] sm:h-[min(600px,calc(100dvh-3rem))] sm:max-h-[calc(100vh-3rem)] sm:max-h-[calc(100dvh-3rem))] sm:rounded-3xl sm:bg-card sm:text-card-foreground sm:border sm:border-border sm:p-6 sm:shadow-none sm:overflow-y-auto sm:overscroll-contain data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+            "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background text-foreground outline-none px-4 pt-[calc(1rem+env(safe-area-inset-top,0px)+var(--ios-status-blur-offset,0px))] pb-4 overflow-y-auto overscroll-contain no-scrollbar sm:fixed sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-[min(380px,calc(100vw-2rem))] sm:h-[min(600px,calc(100vh-3rem))] sm:h-[min(600px,calc(100dvh-3rem))] sm:max-h-[calc(100vh-3rem)] sm:max-h-[calc(100dvh-3rem))] sm:rounded-3xl sm:bg-card sm:text-card-foreground sm:border sm:border-border sm:p-6 sm:shadow-none sm:overflow-y-auto sm:overscroll-contain",
             className
           )}
           {...props}
@@ -93,10 +93,10 @@ function DialogContent({
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
           <DialogPrimitive.Popup
             ref={contentRef}
-            initialFocus={initialFocus !== undefined ? initialFocus : () => contentRef.current}
+            initialFocus={initialFocus ?? false}
             data-slot="dialog-content"
             className={cn(
-              "pointer-events-auto relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto gap-5 rounded-xl bg-card p-6 text-sm text-card-foreground border border-border shadow-none duration-100 ease-out outline-none sm:max-w-[400px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+              "pointer-events-auto relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto gap-5 rounded-xl bg-card p-6 text-sm text-card-foreground border border-border shadow-none outline-none sm:max-w-[400px]",
               className
             )}
             {...props}

@@ -77,14 +77,14 @@ function SelectContactsModal({
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       {/* 背景遮罩 */}
       <div
-        className="absolute inset-0 bg-background/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-background/80 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* 獨立 Modal 窗口 */}
       <div
-        className="relative z-10 w-full max-w-[300px] bg-card border border-border rounded-xl shadow-none flex flex-col max-h-[82vh] animate-in fade-in-0 duration-100 ease-out overflow-hidden"
+        className="relative z-10 w-full max-w-[300px] bg-card border border-border rounded-xl shadow-none flex flex-col max-h-[82vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -390,7 +390,7 @@ export function SplitAdvanceDialog({
         disablePointerDismissal
       >
         <DialogContent
-          overlayClassName="z-[70] bg-background/70 backdrop-blur-sm"
+          overlayClassName="z-[70] bg-background/80 backdrop-blur-[2px]"
           className="z-[70] max-w-[360px] sm:max-w-[360px] max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden border border-border shadow-none"
         >
           {/* Header */}

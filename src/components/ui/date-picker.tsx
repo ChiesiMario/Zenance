@@ -60,13 +60,13 @@ export function DatePicker({
           <div className="fixed inset-0 z-[100] flex items-center justify-center isolate">
             {/* Full-screen Backdrop */}
             <div
-              className="absolute inset-0 bg-background/70 backdrop-blur-sm"
+              className="absolute inset-0 bg-background/80 backdrop-blur-[2px]"
               onClick={() => setIsOpen(false)}
               aria-hidden="true"
             />
 
             {/* Calendar Popup */}
-            <div className="relative z-10 w-auto flex flex-col items-center justify-center animate-in fade-in-0 duration-100 ease-out">
+            <div className="relative z-10 w-auto flex flex-col items-center justify-center">
               <Calendar
                 selected={selectedDate}
                 onSelect={(d: Date) => {

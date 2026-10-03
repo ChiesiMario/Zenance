@@ -268,7 +268,7 @@ export default function BudgetDetails() {
 
   if (budgets && !budget) {
     return (
-      <div className="animate-in fade-in duration-500 w-full space-y-4">
+      <div className="w-full space-y-4">
         <div className="flex items-center h-8">
           <Button
             variant="ghost"
@@ -290,7 +290,7 @@ export default function BudgetDetails() {
   }
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
+    <div className="w-full space-y-4">
       {/* Top Header Navigation & Period Info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-2 min-w-0">

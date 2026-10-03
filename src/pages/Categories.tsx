@@ -60,7 +60,7 @@ export default function Categories() {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 w-full space-y-4">
+    <div className="w-full space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8 -ml-2 cursor-pointer text-muted-foreground hover:text-foreground">

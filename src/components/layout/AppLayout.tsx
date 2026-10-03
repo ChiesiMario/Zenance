@@ -248,10 +248,10 @@ export function AppLayout() {
                     key={item.path}
                     type="button"
                     onClick={() => toast.show(t('alerts.noAccounts'))}
-                    className="flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 opacity-40 text-muted-foreground hover:text-foreground cursor-pointer"
+                    className="flex flex-col items-center justify-center w-full h-full gap-1 opacity-40 text-muted-foreground hover:text-foreground cursor-pointer"
                     aria-label={t('nav.add')}
                   >
-                    <Icon className="size-6 transition-transform duration-300" strokeWidth={1.5} />
+                    <Icon className="size-6" strokeWidth={1.5} />
                   </button>
                 );
               }
@@ -259,9 +259,9 @@ export function AppLayout() {
               return (
                 <DropdownMenu key={item.path}>
                   <DropdownMenuTrigger
-                    className="flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 text-muted-foreground hover:text-foreground"
+                    className="flex flex-col items-center justify-center w-full h-full gap-1 text-muted-foreground hover:text-foreground outline-none cursor-pointer"
                   >
-                    <Icon className="size-6 transition-transform duration-300" strokeWidth={1.5} />
+                    <Icon className="size-6" strokeWidth={1.5} />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="center" className="mb-4 w-max bg-card text-card-foreground border border-border shadow-none rounded-xl p-1.5">
                     <div className="flex flex-row items-center gap-1">
@@ -318,12 +318,12 @@ export function AppLayout() {
                 type="button"
                 onClick={() => navigate(item.path)}
                 className={cn(
-                  "flex flex-col items-center justify-center w-full h-full gap-1 transition-all duration-300 outline-none cursor-pointer",
+                  "flex flex-col items-center justify-center w-full h-full gap-1 outline-none cursor-pointer",
                   isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
                 aria-label={item.label}
               >
-                <Icon className={cn("size-6 transition-transform duration-300", isActive && "scale-110")} strokeWidth={isActive ? 2.5 : 1.5} />
+                <Icon className="size-6" strokeWidth={isActive ? 2.5 : 1.5} />
               </button>
             );
           })}

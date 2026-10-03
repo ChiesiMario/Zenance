@@ -45,7 +45,7 @@ export function DatePicker({
         disabled={disabled}
         onClick={() => setIsOpen(true)}
         className={cn(
-          "h-9 w-full px-3 rounded-lg border border-border bg-background/50 hover:bg-muted/50 text-foreground transition-colors cursor-pointer text-xs font-mono flex items-center justify-between gap-2 shadow-none disabled:opacity-50 disabled:cursor-not-allowed select-none",
+          "h-10 w-full px-3 rounded-lg border border-border bg-background/50 hover:bg-muted/50 text-foreground transition-colors cursor-pointer text-sm font-mono flex items-center justify-between gap-2 shadow-none disabled:opacity-50 disabled:cursor-not-allowed select-none",
           className
         )}
       >

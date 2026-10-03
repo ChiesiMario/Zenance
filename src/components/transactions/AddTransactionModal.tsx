@@ -1518,52 +1518,60 @@ export function AddTransactionModal({
           {/* Category Pills (for expense / income) */}
           {(type === 'expense' || type === 'income') && (
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full">
-              {displayedPills.map(cat => {
-                const isSelected = selectedCategoryId === cat.id;
-                const isPredicted = predictedResult?.category.id === cat.id;
-                return (
+              {filteredCategories.length > 0 ? (
+                <>
+                  {displayedPills.map(cat => {
+                    const isSelected = selectedCategoryId === cat.id;
+                    const isPredicted = predictedResult?.category.id === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic('selection');
+                          setIsUserSelectedCat(true);
+                          setValue('categoryId', cat.id, { shouldValidate: true });
+                          setIsCategoryWarning(false);
+                        }}
+                        className={cn(
+                          "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
+                            : isCategoryWarning
+                              ? "bg-muted/80 border-destructive/80 text-foreground hover:border-foreground/40"
+                              : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                        )}
+                      >
+                        {isPredicted && (
+                          <Sparkles className={cn("w-3 h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
+                        )}
+                        <span>{cat.name}</span>
+                      </button>
+                    );
+                  })}
                   <button
-                    key={cat.id}
                     type="button"
                     onClick={() => {
-                      triggerHaptic('selection');
-                      setIsUserSelectedCat(true);
-                      setValue('categoryId', cat.id, { shouldValidate: true });
+                      setIsCatPickerOpen(true);
                       setIsCategoryWarning(false);
                     }}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
-                      isSelected
-                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
-                        : isCategoryWarning
-                          ? "bg-muted/80 border-destructive/80 text-foreground hover:border-foreground/40"
-                          : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                      "px-2.5 py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1",
+                      isCategoryWarning
+                        ? "border-destructive/80 text-foreground hover:border-foreground/50"
+                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                     )}
+                    title={t('add.moreCategories', '更多分類')}
                   >
-                    {isPredicted && (
-                      <Sparkles className={cn("w-3 h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
-                    )}
-                    <span>{cat.name}</span>
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">{t('common.more', '更多')}</span>
                   </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCatPickerOpen(true);
-                  setIsCategoryWarning(false);
-                }}
-                className={cn(
-                  "px-2.5 py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1",
-                  isCategoryWarning
-                    ? "border-destructive/80 text-foreground hover:border-foreground/50"
-                    : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
-                )}
-                title={t('add.moreCategories', '更多分類')}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="text-[11px]">{t('common.more', '更多')}</span>
-              </button>
+                </>
+              ) : (
+                <div className="w-full flex items-center justify-center py-1 text-xs text-muted-foreground select-none">
+                  <span>{t('add.noCategoriesAvailable')}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -1646,6 +1654,11 @@ export function AddTransactionModal({
               </DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto no-scrollbar py-2">
+              {filteredCategories.length === 0 && (
+                <div className="col-span-4 py-4 text-center text-xs text-muted-foreground">
+                  {t('add.noCategoriesAvailable')}
+                </div>
+              )}
               {frequentCategories.map(cat => {
                 const isSelected = selectedCategoryId === cat.id;
                 const total = categoryMonthlyTotals[cat.id] || 0;

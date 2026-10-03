@@ -618,7 +618,7 @@ export default function BudgetDetails() {
             <DialogTitle>{t('budgets.editBudget')}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto px-1">
+          <div className="grid gap-4 py-4 overflow-y-auto overflow-x-hidden px-1 overscroll-contain">
             {/* Budget Name */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -654,31 +654,19 @@ export default function BudgetDetails() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
-                    <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground select-none">
-                      <input
-                        type="checkbox"
-                        checked={isUnlimited}
-                        onChange={e => {
-                          const checked = e.target.checked;
-                          setIsUnlimited(checked);
-                          if (checked) {
-                            setFormEndDate('');
-                          } else if (!formEndDate) {
-                            setFormEndDate(todayStr);
-                          }
-                        }}
-                        className="rounded border-border size-3 cursor-pointer"
-                      />
-                      <span>{t('budgets.noEndDate')}</span>
-                    </label>
-                  </div>
+                  <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
                   {isUnlimited ? (
-                    <div className="h-9 px-3 rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground flex items-center justify-between text-xs font-mono select-none">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUnlimited(false);
+                        if (!formEndDate) setFormEndDate(todayStr);
+                      }}
+                      className="w-full h-10 px-3 rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground flex items-center justify-between text-sm font-mono transition-colors cursor-pointer select-none"
+                    >
                       <span className="italic">{t('budgets.manualEnd')}</span>
-                      <InfinityIcon className="size-3.5 opacity-60" />
-                    </div>
+                      <InfinityIcon className="size-4 opacity-60" />
+                    </button>
                   ) : (
                     <DatePicker
                       value={formEndDate}
@@ -688,6 +676,24 @@ export default function BudgetDetails() {
                       }}
                     />
                   )}
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant={isUnlimited ? "default" : "outline"}
+                    onClick={() => {
+                      const next = !isUnlimited;
+                      setIsUnlimited(next);
+                      if (next) {
+                        setFormEndDate('');
+                      } else if (!formEndDate) {
+                        setFormEndDate(todayStr);
+                      }
+                    }}
+                    className="w-full h-7 text-xs gap-1.5 cursor-pointer font-normal"
+                  >
+                    <InfinityIcon className="size-3.5" />
+                    <span>{t('budgets.noEndDate')}</span>
+                  </Button>
                 </div>
               </div>
             )}
@@ -705,29 +711,35 @@ export default function BudgetDetails() {
                 </span>
               </div>
               <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 flex flex-wrap gap-1.5 bg-background">
-                {expenseCategories.map(cat => {
-                  const isSelected = formCategoryIds.includes(cat.id);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setFormCategoryIds(prev =>
-                          isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
-                        );
-                      }}
-                      className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
-                        isSelected
-                          ? 'bg-foreground text-background border-foreground font-medium'
-                          : 'border-border bg-card text-card-foreground hover:bg-muted'
-                      )}
-                    >
-                      {isSelected && <Check className="h-3 w-3" />}
-                      <span>{cat.name}</span>
-                    </button>
-                  );
-                })}
+                {expenseCategories.length > 0 ? (
+                  expenseCategories.map(cat => {
+                    const isSelected = formCategoryIds.includes(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setFormCategoryIds(prev =>
+                            isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
+                          );
+                        }}
+                        className={cn(
+                          'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
+                          isSelected
+                            ? 'bg-foreground text-background border-foreground font-medium'
+                            : 'border-border bg-card text-card-foreground hover:bg-muted'
+                        )}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                        <span>{cat.name}</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="w-full py-4 text-center text-xs text-muted-foreground">
+                    {t('budgets.noCategoriesAvailable')}
+                  </div>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
                 {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}

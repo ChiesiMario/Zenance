@@ -867,7 +867,7 @@ export default function Budgets() {
             <DialogTitle>{t('budgets.addBudget')}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-1 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="space-y-4 py-1 overflow-y-auto overflow-x-hidden pr-1 overscroll-contain">
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.name')}
@@ -898,49 +898,37 @@ export default function Budgets() {
               <div className="flex gap-1.5 flex-wrap">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={activePreset === 'month' && !isUnlimited ? "default" : "outline"}
                   size="sm"
                   onClick={() => applyDatePreset('month')}
-                  className={cn(
-                    "text-xs h-7 px-2.5 cursor-pointer",
-                    activePreset === 'month' && !isUnlimited && "bg-foreground text-background border-foreground font-medium"
-                  )}
+                  className="text-xs h-7 px-2.5 cursor-pointer font-medium"
                 >
                   {t('budgets.presetThisMonth')}
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={activePreset === 'year' && !isUnlimited ? "default" : "outline"}
                   size="sm"
                   onClick={() => applyDatePreset('year')}
-                  className={cn(
-                    "text-xs h-7 px-2.5 cursor-pointer",
-                    activePreset === 'year' && !isUnlimited && "bg-foreground text-background border-foreground font-medium"
-                  )}
+                  className="text-xs h-7 px-2.5 cursor-pointer font-medium"
                 >
                   {t('budgets.presetThisYear')}
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={activePreset === 'next30' && !isUnlimited ? "default" : "outline"}
                   size="sm"
                   onClick={() => applyDatePreset('next30')}
-                  className={cn(
-                    "text-xs h-7 px-2.5 cursor-pointer",
-                    activePreset === 'next30' && !isUnlimited && "bg-foreground text-background border-foreground font-medium"
-                  )}
+                  className="text-xs h-7 px-2.5 cursor-pointer font-medium"
                 >
                   {t('budgets.presetNext30Days')}
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={isUnlimited ? "default" : "outline"}
                   size="sm"
                   onClick={() => applyDatePreset('unlimited')}
-                  className={cn(
-                    "text-xs h-7 px-2.5 cursor-pointer flex items-center gap-1",
-                    isUnlimited && "bg-foreground text-background border-foreground font-medium"
-                  )}
+                  className="text-xs h-7 px-2.5 cursor-pointer flex items-center gap-1 font-medium"
                 >
                   <InfinityIcon className="size-3" />
                   <span>{t('budgets.presetUnlimited')}</span>
@@ -960,23 +948,16 @@ export default function Budgets() {
                 />
               </div>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
-                  <label className="inline-flex items-center gap-1 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground select-none">
-                    <input
-                      type="checkbox"
-                      checked={isUnlimited}
-                      onChange={e => handleToggleUnlimited(e.target.checked)}
-                      className="rounded border-border size-3 cursor-pointer"
-                    />
-                    <span>{t('budgets.noEndDate')}</span>
-                  </label>
-                </div>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
                 {isUnlimited ? (
-                  <div className="h-9 px-3 rounded-md border border-dashed border-border bg-muted/30 text-muted-foreground flex items-center justify-between text-xs font-mono select-none">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleUnlimited(false)}
+                    className="w-full h-10 px-3 rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground flex items-center justify-between text-sm font-mono transition-colors cursor-pointer select-none"
+                  >
                     <span className="italic">{t('budgets.manualEnd')}</span>
-                    <InfinityIcon className="size-3.5 opacity-60" />
-                  </div>
+                    <InfinityIcon className="size-4 opacity-60" />
+                  </button>
                 ) : (
                   <DatePicker
                     value={formBudgetEndDate}
@@ -1003,29 +984,35 @@ export default function Budgets() {
                 </span>
               </div>
               <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 flex flex-wrap gap-1.5 bg-background">
-                {expenseCategories.map(cat => {
-                  const isSelected = formBudgetCategoryIds.includes(cat.id);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setFormBudgetCategoryIds(prev =>
-                          isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
-                        );
-                      }}
-                      className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
-                        isSelected
-                          ? 'bg-foreground text-background border-foreground font-medium'
-                          : 'border-border bg-card text-card-foreground hover:bg-muted'
-                      )}
-                    >
-                      {isSelected && <Check className="h-3 w-3" />}
-                      <span>{cat.name}</span>
-                    </button>
-                  );
-                })}
+                {expenseCategories.length > 0 ? (
+                  expenseCategories.map(cat => {
+                    const isSelected = formBudgetCategoryIds.includes(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setFormBudgetCategoryIds(prev =>
+                            isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
+                          );
+                        }}
+                        className={cn(
+                          'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
+                          isSelected
+                            ? 'bg-foreground text-background border-foreground font-medium'
+                            : 'border-border bg-card text-card-foreground hover:bg-muted'
+                        )}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                        <span>{cat.name}</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="w-full py-4 text-center text-xs text-muted-foreground">
+                    {t('budgets.noCategoriesAvailable')}
+                  </div>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
                 {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
@@ -1063,28 +1050,26 @@ export default function Budgets() {
             <DialogTitle>{editingRule ? t('budgets.editRule') : t('budgets.addRule')}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-1 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="space-y-4 py-1 overflow-y-auto overflow-x-hidden pr-1 overscroll-contain">
             {/* Rule Cycle Selection */}
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.ruleCycle')}
               </label>
-              <div className="grid grid-cols-2 gap-2 border border-border rounded-lg p-1 bg-muted/40">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  variant={formRulePeriodType === 'monthly' ? 'default' : 'ghost'}
-                  size="sm"
+                  variant={formRulePeriodType === 'monthly' ? 'default' : 'outline'}
                   onClick={() => setFormRulePeriodType('monthly')}
-                  className="text-xs h-8 cursor-pointer"
+                  className="text-sm h-10 cursor-pointer"
                 >
                   {t('budgets.cycleMonthly')}
                 </Button>
                 <Button
                   type="button"
-                  variant={formRulePeriodType === 'yearly' ? 'default' : 'ghost'}
-                  size="sm"
+                  variant={formRulePeriodType === 'yearly' ? 'default' : 'outline'}
                   onClick={() => setFormRulePeriodType('yearly')}
-                  className="text-xs h-8 cursor-pointer"
+                  className="text-sm h-10 cursor-pointer"
                 >
                   {t('budgets.cycleYearly')}
                 </Button>
@@ -1126,29 +1111,35 @@ export default function Budgets() {
                 </span>
               </div>
               <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 flex flex-wrap gap-1.5 bg-background">
-                {expenseCategories.map(cat => {
-                  const isSelected = formRuleCategoryIds.includes(cat.id);
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setFormRuleCategoryIds(prev =>
-                          isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
-                        );
-                      }}
-                      className={cn(
-                        'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
-                        isSelected
-                          ? 'bg-foreground text-background border-foreground font-medium'
-                          : 'border-border bg-card text-card-foreground hover:bg-muted'
-                      )}
-                    >
-                      {isSelected && <Check className="h-3 w-3" />}
-                      <span>{cat.name}</span>
-                    </button>
-                  );
-                })}
+                {expenseCategories.length > 0 ? (
+                  expenseCategories.map(cat => {
+                    const isSelected = formRuleCategoryIds.includes(cat.id);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setFormRuleCategoryIds(prev =>
+                            isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
+                          );
+                        }}
+                        className={cn(
+                          'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
+                          isSelected
+                            ? 'bg-foreground text-background border-foreground font-medium'
+                            : 'border-border bg-card text-card-foreground hover:bg-muted'
+                        )}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                        <span>{cat.name}</span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="w-full py-4 text-center text-xs text-muted-foreground">
+                    {t('budgets.noCategoriesAvailable')}
+                  </div>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
                 {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}

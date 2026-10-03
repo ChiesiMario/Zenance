@@ -33,7 +33,7 @@ function DialogOverlay({
       forceRender={forceRender}
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-[60] bg-overlay backdrop-blur-[2px] data-closed:hidden",
+        "fixed inset-0 z-[60] bg-overlay backdrop-blur-[2px] data-closed:hidden touch-none",
         className
       )}
       {...props}
@@ -69,7 +69,7 @@ function DialogContent({
           initialFocus={initialFocus ?? false}
           data-slot="dialog-content"
           className={cn(
-            "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background overflow-hidden outline-none",
+            "fixed inset-0 z-[60] flex flex-col w-full h-full bg-background overflow-hidden overscroll-contain outline-none",
             className
           )}
           {...props}
@@ -90,13 +90,16 @@ function DialogContent({
           {children}
         </DialogPrimitive.Popup>
       ) : (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none touch-none">
           <DialogPrimitive.Popup
             ref={contentRef}
             initialFocus={initialFocus ?? false}
             data-slot="dialog-content"
             className={cn(
-              "pointer-events-auto relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto gap-5 rounded-xl bg-card p-6 text-sm text-card-foreground border border-border shadow-none outline-none sm:max-w-[400px]",
+              "pointer-events-auto relative flex flex-col w-full max-w-[calc(100%-2rem)] max-h-[min(88vh,calc(100%-2rem))] max-h-[min(88dvh,calc(100%-2rem))] overflow-hidden overscroll-contain rounded-xl bg-card p-5 sm:p-6 text-sm text-card-foreground border border-border shadow-none outline-none sm:max-w-[400px]",
+              "[&>*:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not(form)]:flex-1 [&>*:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not(form)]:min-h-0 [&>*:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not(form)]:overflow-y-auto [&>*:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not(form)]:overflow-x-hidden [&>*:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not(form)]:overscroll-contain",
+              "[&>form]:flex [&>form]:flex-col [&>form]:flex-1 [&>form]:min-h-0 [&>form]:overflow-hidden",
+              "[&>form>*:not([data-slot=dialog-footer])]:flex-1 [&>form>*:not([data-slot=dialog-footer])]:min-h-0 [&>form>*:not([data-slot=dialog-footer])]:overflow-y-auto [&>form>*:not([data-slot=dialog-footer])]:overflow-x-hidden [&>form>*:not([data-slot=dialog-footer])]:overscroll-contain",
               className
             )}
             {...props}
@@ -108,7 +111,7 @@ function DialogContent({
                 render={
                   <Button
                     variant="ghost"
-                    className="absolute top-4 right-4 h-8 w-8 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                    className="absolute top-4 right-4 h-8 w-8 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer z-10"
                     size="icon-sm"
                   />
                 }
@@ -128,7 +131,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1.5 text-left", className)}
+      className={cn("flex flex-col gap-1.5 text-left shrink-0 pb-3", className)}
       {...props}
     />
   )
@@ -146,7 +149,7 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-row items-center justify-between gap-2 pt-2 [&>*:only-child]:ml-auto",
+        "flex flex-row items-center justify-between gap-2 pt-3 shrink-0 mt-auto [&>*:only-child]:ml-auto [&_button]:h-10 [&_button]:text-sm",
         className
       )}
       {...props}

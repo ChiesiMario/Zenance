@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/AmountInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { Plus, Wallet, ChevronDown, Check, RefreshCcw } from 'lucide-react';
 import {
   DropdownMenu,
@@ -317,23 +318,11 @@ export default function Accounts() {
                       {t('accounts.excludeFromStatsDesc')}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={newAccountExcludeFromStats}
-                    onClick={() => setNewAccountExcludeFromStats(!newAccountExcludeFromStats)}
-                    className={cn(
-                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                      newAccountExcludeFromStats ? "bg-primary" : "bg-muted"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow-sm ring-0 transition duration-200 ease-in-out",
-                        newAccountExcludeFromStats ? "translate-x-4" : "translate-x-0"
-                      )}
-                    />
-                  </button>
+                  <Switch
+                    checked={newAccountExcludeFromStats}
+                    onCheckedChange={setNewAccountExcludeFromStats}
+                    aria-label={t('accounts.excludeFromStats')}
+                  />
                 </div>
               </div>
               <DialogFooter>

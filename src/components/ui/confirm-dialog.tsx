@@ -75,13 +75,13 @@ export function ConfirmDialog({
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
           data-slot="confirm-dialog-overlay"
-          className="fixed inset-0 z-[75] bg-overlay backdrop-blur-[2px] data-closed:hidden"
+          className="fixed inset-0 z-[75] bg-overlay backdrop-blur-[2px] data-closed:hidden touch-none"
         />
-        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 pointer-events-none">
+        <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 pointer-events-none touch-none">
           <DialogPrimitive.Popup
             data-slot="confirm-dialog-content"
             className={cn(
-              'pointer-events-auto relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto gap-4 rounded-xl bg-card p-5 text-sm text-card-foreground border border-border shadow-none outline-none sm:max-w-[360px]'
+              'pointer-events-auto relative grid w-full max-w-[calc(100%-2rem)] max-h-[calc(100%-2rem)] overflow-y-auto overscroll-contain gap-4 rounded-xl bg-card p-5 text-sm text-card-foreground border border-border shadow-none outline-none sm:max-w-[360px]'
             )}
           >
             <div className="flex flex-col gap-1.5 text-left">

@@ -132,7 +132,7 @@ function SelectContactsModal({
         </div>
 
         {/* 候選對象列表 */}
-        <div className="flex-1 overflow-y-auto divide-y divide-border">
+        <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-border">
           {filtered.length > 0 ? (
             filtered.map(c => {
               const isSelected = selectedIds.has(c.id);
@@ -401,7 +401,7 @@ export function SplitAdvanceDialog({
           </DialogHeader>
 
           {/* Scrollable Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
             {/* 金額概覽面板 (Flat Design) */}
             <div className="grid grid-cols-2 gap-px bg-border rounded-lg border border-border overflow-hidden">
               <div className="bg-card p-3 flex flex-col">
@@ -581,7 +581,7 @@ export function SplitAdvanceDialog({
           </div>
 
           {/* Footer */}
-          <DialogFooter className="p-3 border-t border-border bg-card flex flex-row items-center justify-end gap-2 sm:justify-end">
+          <DialogFooter className="p-3 bg-card flex flex-row items-center justify-end gap-2 sm:justify-end">
             <DialogClose render={<Button variant="outline" size="sm" type="button" />}>
               {t('common.cancel', '取消')}
             </DialogClose>

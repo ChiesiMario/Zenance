@@ -10,7 +10,7 @@ import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { cn, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
+import { cn, sortTransactionsDesc, formatAmountNumber, isBalanceAdjustmentTx } from '@/lib/utils';
 import { Logo } from '@/components/ui/Logo';
 import { RefundDialog } from './RefundDialog';
 import type { Transaction } from '@/services/db/db';
@@ -407,11 +407,24 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   // 當前選中的交易是否為退款子交易
   const isCurrentActiveRefund = activeLocation.isChild;
 
-  // 當前選中的交易是否為不可退款類型（轉帳或借貸不可退）
+  // 當前選中的交易是否為餘額調整交易
+  const isAdjustmentRoot = useMemo(() => {
+    return isBalanceAdjustmentTx(activeRootTx, allCategories);
+  }, [activeRootTx, allCategories]);
+
+  const isCurrentAdjustment = useMemo(() => {
+    return isBalanceAdjustmentTx(currentTransaction, allCategories);
+  }, [currentTransaction, allCategories]);
+
+  // 當前選中的交易是否為不可退款類型（轉帳、借貸或餘額調整不可退）
   const isNonRefundableType = useMemo(() => {
     if (!activeRootTx) return true;
+    if (isAdjustmentRoot) return true;
     return activeRootTx.type !== 'expense' && activeRootTx.type !== 'income';
-  }, [activeRootTx]);
+  }, [activeRootTx, isAdjustmentRoot]);
+
+  // 當前交易是否不允許編輯（餘額調整交易或退款憑證不可編輯）
+  const isEditDisabled = isCurrentAdjustment || isCurrentActiveRefund;
 
   // 退款彈窗開關
   const [isRefundDialogOpen, setIsRefundDialogOpen] = useState(false);
@@ -1297,11 +1310,18 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               {/* 3. 編輯 */}
               <button
                 type="button"
+                disabled={isEditDisabled}
                 onClick={() => {
+                  if (isEditDisabled) return;
                   setEditingTransactionId(currentTransaction.id);
                   onClose();
                 }}
-                className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+                className={cn(
+                  "h-8.5 flex items-center justify-center transition-all outline-none text-[11px] tracking-wide",
+                  isEditDisabled
+                    ? "text-muted-foreground/30 cursor-not-allowed"
+                    : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 cursor-pointer"
+                )}
               >
                 <span>{t('dashboard.edit', '編輯')}</span>
               </button>

@@ -285,6 +285,8 @@
       "difference": "Difference",
       "balanceAdjustment": "Balance Adjustment",
       "balanceAdjustmentNote": "Manual Balance Adjustment",
+      "balanceAdjustmentCannotEdit": "Balance adjustment transactions cannot be edited",
+      "balanceAdjustmentCannotRefund": "Balance adjustment transactions cannot be refunded",
       "noAccounts": "No accounts found",
       "noAccountsDesc": "Create your first account to start tracking your assets and cash flow.",
       "archived": "Archived",

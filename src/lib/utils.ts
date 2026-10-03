@@ -173,3 +173,22 @@ export function evaluateAmountExpression(expr: string, allowNegative = false): s
   }
   return expr;
 }
+
+/**
+ * 判斷一筆交易是否為「餘額調整」系統交易：
+ * - 排除退款子交易（具有 parentId）
+ * - 必須為 income 或 expense
+ * - 關聯的分類必須是系統分類（isSystem === true），且非退款分類
+ */
+export function isBalanceAdjustmentTx(
+  tx?: { type: string; category?: string; parentId?: string } | null,
+  categories?: { id: string; isSystem?: boolean; name?: string }[]
+): boolean {
+  if (!tx || tx.parentId) return false;
+  if (tx.type !== 'income' && tx.type !== 'expense') return false;
+  const cat = categories?.find((c) => c.id === tx.category);
+  if (!cat?.isSystem) return false;
+  const name = cat.name || '';
+  const isRefundCat = name.includes('退款') || name.toLowerCase().includes('refund');
+  return !isRefundCat;
+}

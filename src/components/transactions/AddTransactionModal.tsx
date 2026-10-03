@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles } from 'lucide-react';
-import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber, isBalanceAdjustmentTx } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
@@ -57,7 +57,7 @@ export function AddTransactionModal({
 }: Props) {
   const { t } = useTranslation();
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactions();
-  const { categories, addCategory } = useCategories();
+  const { categories, allCategories, addCategory } = useCategories();
   const [splits, setSplits] = useState<SplitItem[]>([]);
   const { wallets: accounts, contacts } = useAccounts();
   const { activeLedgerId } = useAppStore();
@@ -197,6 +197,12 @@ export function AddTransactionModal({
   useEffect(() => {
     if (isOpen) {
       if (transactionToEdit) {
+        if (isBalanceAdjustmentTx(transactionToEdit, allCategories)) {
+          toast.show(t('accounts.balanceAdjustmentCannotEdit', '餘額調整交易不允許編輯'));
+          onClose();
+          return;
+        }
+
         // Edit mode
         if (transactionToEdit.splitGroupId) {
           const groupTxs = transactions?.filter(t => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];

@@ -284,6 +284,8 @@
       "difference": "差额",
       "balanceAdjustment": "余额调整",
       "balanceAdjustmentNote": "手动余额调整",
+      "balanceAdjustmentCannotEdit": "余额调整交易不允许编辑",
+      "balanceAdjustmentCannotRefund": "余额调整交易不允许退款",
       "noAccounts": "暂无任何账户",
       "noAccountsDesc": "创建您的第一个账户以开始管理资产与收支。",
       "archived": "已归档",

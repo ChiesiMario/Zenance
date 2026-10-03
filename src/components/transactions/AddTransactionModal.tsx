@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles } from 'lucide-react';
-import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber, isBalanceAdjustmentTx } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber, isBalanceAdjustmentTx, getLocalDateString } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
@@ -184,7 +184,7 @@ export function AddTransactionModal({
       transferInAmount: undefined,
       feeCategoryId: undefined,
       budgetId: initialType === 'income' ? 'none' : 'auto',
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
       note: '',
     },
   });
@@ -273,8 +273,20 @@ export function AddTransactionModal({
         });
       } else {
         // Add mode
+        const today = getLocalDateString();
         setType(initialType);
-        reset();
+        reset({
+          amount: '' as unknown as number,
+          categoryId: initialCategoryId || '',
+          accountId: initialAccountId || '',
+          fromAccountId: '',
+          toAccountId: initialToAccountId || '',
+          transferInAmount: undefined,
+          feeCategoryId: undefined,
+          budgetId: initialType === 'income' ? 'none' : 'auto',
+          date: today,
+          note: initialNote || '',
+        });
         setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
         setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
         if (initialAmount && initialAmount > 0) {
@@ -312,8 +324,20 @@ export function AddTransactionModal({
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer' | 'loan', newLoanType?: 'borrow' | 'lend') => {
     if (newType === type && (!newLoanType || newLoanType === loanType)) return;
     triggerHaptic('selection');
+    const currentDate = watch('date') || getLocalDateString();
     setType(newType);
-    reset();
+    reset({
+      amount: '' as unknown as number,
+      categoryId: '',
+      accountId: watch('accountId') || '',
+      fromAccountId: '',
+      toAccountId: '',
+      transferInAmount: undefined,
+      feeCategoryId: undefined,
+      budgetId: newType === 'income' ? 'none' : 'auto',
+      date: currentDate,
+      note: watch('note') || '',
+    });
     setValue('budgetId', newType === 'income' ? 'none' : 'auto');
     setDisplayAmount('');
     setDisplayAmountIn('');

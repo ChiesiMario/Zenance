@@ -16,7 +16,7 @@ import {
   Gift
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
+import { cn, getLocalDateString } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -268,7 +268,7 @@ export function NumericKeypad({
     }
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const dateDisplay = date === today ? t('add.today', 'Today') : date.slice(5); // e.g. 08-18
 
   // Show budget selector for expense and income
@@ -334,7 +334,7 @@ export function NumericKeypad({
     }
 
     // Fallback: ongoing budgets
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     const ongoing = budgets.filter(b => !b.deleted && (!b.endDate || b.endDate >= todayStr));
     if (ongoing.length > 0) {
       return ongoing;

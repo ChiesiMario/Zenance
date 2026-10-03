@@ -192,3 +192,14 @@ export function isBalanceAdjustmentTx(
   const isRefundCat = name.includes('退款') || name.toLowerCase().includes('refund');
   return !isRefundCat;
 }
+
+/**
+ * 取得當前設備本地時區的 YYYY-MM-DD 日期字串，徹底避免 UTC 凌晨跨日時差
+ */
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+

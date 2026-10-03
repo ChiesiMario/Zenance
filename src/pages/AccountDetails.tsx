@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
+import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber, getLocalDateString } from '@/lib/utils';
 import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
@@ -140,7 +140,7 @@ export default function AccountDetails() {
         type: diffType,
         category: category.id,
         accountId: id,
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         note: ''
       });
     }

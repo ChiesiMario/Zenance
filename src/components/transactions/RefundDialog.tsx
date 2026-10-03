@@ -11,7 +11,7 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { getCurrencySymbol, cn, formatAmountNumber, sanitizeAmountInput } from '@/lib/utils';
+import { getCurrencySymbol, cn, formatAmountNumber, sanitizeAmountInput, getLocalDateString } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 import { Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, Calendar, FileText } from 'lucide-react';
 
@@ -39,7 +39,7 @@ export function RefundDialog({
 
   const [accountId, setAccountId] = useState<string>('');
   const [amountStr, setAmountStr] = useState<string>('');
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(getLocalDateString());
   const [note, setNote] = useState<string>('');
   const [isAccountSelectOpen, setIsAccountSelectOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +56,7 @@ export function RefundDialog({
     if (open && transaction) {
       setAccountId(transaction.accountId);
       setAmountStr(maxRefundable > 0 ? String(maxRefundable) : '');
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getLocalDateString());
       
       const defaultNote = isExpenseRefund
         ? t('refund.defaultExpenseRefundNote', {

@@ -40,6 +40,7 @@ import { useStorageStatus } from '@/hooks/useStorageStatus';
 import { useDatabaseHealth } from '@/hooks/useDatabaseHealth';
 import { DatabaseHealthModal } from '@/components/fsck/DatabaseHealthModal';
 import { isE2EEEnabled, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
+import { isCryptoSupported } from '@/services/crypto/webCrypto';
 import { useRollingBackups } from '@/hooks/useRollingBackups';
 import {
   db,
@@ -204,6 +205,10 @@ export default function Settings() {
   };
 
   const handleSavePinLock = async () => {
+    if (!hasCryptoSupport) {
+      toast.show(t('security.requiresHttpsToast'));
+      return;
+    }
     if (lockPinInput.length < 4) {
       toast.show(t('security.pinInvalid'));
       return;
@@ -249,6 +254,7 @@ export default function Settings() {
     }
   };
 
+  const hasCryptoSupport = isCryptoSupported();
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
   const activeCount = categories?.length ?? 0;
   const archivedCount = archivedCategories?.length ?? 0;
@@ -791,6 +797,10 @@ export default function Settings() {
           {/* 端到端加密 E2EE */}
           <div
             onClick={() => {
+              if (!hasCryptoSupport) {
+                toast.show(t('settings.requiresHttpsToast'));
+                return;
+              }
               if (!e2eeActive) {
                 setE2eePassphrase('');
                 setE2eeConfirmPassphrase('');
@@ -800,11 +810,18 @@ export default function Settings() {
                 handleDisableE2EE();
               }
             }}
-            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+            className={cn(
+              "h-12 px-4 flex items-center justify-between transition-colors",
+              !hasCryptoSupport
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:bg-muted/40 cursor-pointer group"
+            )}
           >
             <span className="text-sm font-normal text-foreground">{t('settings.e2ee')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
-              {e2eeActive ? (
+              {!hasCryptoSupport ? (
+                <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
+              ) : e2eeActive ? (
                 <span className="text-emerald-500">AES-256</span>
               ) : (
                 <span>{t('settings.notEnabled')}</span>
@@ -816,6 +833,10 @@ export default function Settings() {
           {/* 應用程式安全鎖 */}
           <div
             onClick={() => {
+              if (!hasCryptoSupport) {
+                toast.show(t('security.requiresHttpsToast'));
+                return;
+              }
               if (!isLockConfigured) {
                 setLockPinInput('');
                 setLockPinConfirm('');
@@ -824,11 +845,18 @@ export default function Settings() {
                 setIsLockSettingsModalOpen(true);
               }
             }}
-            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+            className={cn(
+              "h-12 px-4 flex items-center justify-between transition-colors",
+              !hasCryptoSupport
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:bg-muted/40 cursor-pointer group"
+            )}
           >
             <span className="text-sm font-normal text-foreground">{t('security.lockSettings')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
-              {isLockConfigured ? (
+              {!hasCryptoSupport ? (
+                <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
+              ) : isLockConfigured ? (
                 <span className="text-emerald-500">
                   PIN · {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0)}
                 </span>

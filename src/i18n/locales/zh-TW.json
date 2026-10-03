@@ -642,7 +642,8 @@
       "restoreSummary": "{{txCount}} 筆交易 · {{accCount}} 個帳戶 · {{catCount}} 個分類",
       "snapshotDaily": "昨日快照",
       "snapshotWeekly": "上週快照",
-      "snapshotMonthly": "上月快照"
+      "snapshotMonthly": "上月快照",
+      "requiresHttpsToast": "端到端加密涉及密碼學計算，僅在 HTTPS 或 Localhost 安全連線下開放"
     },
     "reports": {
       "title": "財務報表",
@@ -770,7 +771,9 @@
       "resetWarningNoE2ee": "重設後安全鎖將關閉，您可以在進入應用後於設定頁重新設定新 PIN 碼。",
       "confirmDisableLock": "確認解除安全鎖",
       "biometricButtonTitle": "使用指紋 / 人臉辨識解鎖",
-      "enableLockFailed": "啟用安全鎖失敗"
+      "enableLockFailed": "啟用安全鎖失敗",
+      "requiresHttps": "需要 HTTPS",
+      "requiresHttpsToast": "此功能涉及本機硬體級加密，僅在 HTTPS 或 Localhost 安全連線下開放"
     },
     "fsck": {
       "title": "資料庫健康診斷與自癒",

@@ -642,7 +642,8 @@
       "restoreSummary": "{{txCount}} transactions · {{accCount}} accounts · {{catCount}} categories",
       "snapshotDaily": "Yesterday's Snapshot",
       "snapshotWeekly": "Last Week's Snapshot",
-      "snapshotMonthly": "Last Month's Snapshot"
+      "snapshotMonthly": "Last Month's Snapshot",
+      "requiresHttpsToast": "End-to-End Encryption requires a secure connection (HTTPS or Localhost)"
     },
     "reports": {
       "title": "Analytics & Reports",
@@ -770,7 +771,9 @@
       "resetWarningNoE2ee": "The lock will be disabled. You can set a new PIN in Settings after entering the app.",
       "confirmDisableLock": "Confirm Disable Lock",
       "biometricButtonTitle": "Unlock with Fingerprint / Face ID",
-      "enableLockFailed": "Failed to enable security lock"
+      "enableLockFailed": "Failed to enable security lock",
+      "requiresHttps": "Requires HTTPS",
+      "requiresHttpsToast": "This feature requires a secure connection (HTTPS or Localhost)"
     },
     "fsck": {
       "title": "Database Health & Self-Healing",

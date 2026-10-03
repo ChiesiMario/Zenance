@@ -87,6 +87,38 @@
 
 ---
 
+### 案例 6：Tailwind CSS v4 `bg-background/80` 依賴 `color-mix()` 導致 iOS 15 遮罩呈現 100% 實白/實黑
+- **現象**：在 iPhone 7 Plus 與 iPhone SE 1（最高支援至 iOS 15.8.x）上打開 Dialog，背景遮罩不是半透明毛玻璃，而是 100% 完全不透明的純白（淺色模式）或純黑（深色模式），下層所有頁面內容被徹底遮蔽。而在 iOS >= 16.2、Android、Windows 上則一切正常。
+- **底層根本原因 (Root Cause)**：
+  - Tailwind CSS v4 在處理帶動態 CSS 變數的透明度修飾符（例如 `bg-background/80`，其中 `--color-background: var(--background)` 引用 HEX 色值 `#ffffff` / `#000000`）時，產生的 CSS 是基於現代 CSS Color Module Level 4 的 `color-mix()` 函式：
+    ```css
+    .bg-background\/80 {
+      background-color: var(--color-background); /* 實色 Fallback */
+    }
+    @supports (color: color-mix(in lab, red, red)) {
+      .bg-background\/80 {
+        background-color: color-mix(in oklab, var(--color-background) 80%, transparent);
+      }
+    }
+    ```
+  - **WebKit 支援門檻**：Apple WebKit 直到 **Safari 16.2 / iOS 16.2** 才實作 `color-mix()`。iOS 15 內建的 WebKit 完全不支援 `color-mix()`，因此 `@supports` 判定為 `false`。
+  - **Fallback 觸發**：WebKit 被迫退回最外層的 fallback：`background-color: var(--color-background)`。因為 `--background` 分別是純白 `#ffffff` 或純黑 `#000000`，因此遮罩瞬間變成不帶任何 Alpha 通道的 100% 實色大幕布！
+- **標準解法 (Standard Fix)**：
+  - **全面採用專屬語意變數 `bg-overlay`**：
+    在 `src/index.css` 的 `@theme` 註冊 `--color-overlay: var(--overlay)`，並在 `:root` 和 `.dark` 直接內嵌 RGBA Alpha 通道：
+    ```css
+    :root {
+      --overlay: rgba(255, 255, 255, 0.8); /* 80% 白霜牛奶玻璃 */
+    }
+    .dark {
+      --overlay: rgba(0, 0, 0, 0.8);       /* 80% 深邃黑曜石毛玻璃 */
+    }
+    ```
+  - 編譯產物直接為 `background-color: var(--color-overlay);`，無任何 `color-mix()` 依賴，100% 原生相容所有版本的 WebKit / Blink / Gecko 瀏覽器。
+  - 所有 Dialog、ConfirmDialog、Select、DropdownMenu 遮罩層全面使用 `bg-overlay backdrop-blur-[2px]`。
+
+---
+
 ## 3. Zenance 跨端通用架構規範總覽 (Architecture Contract)
 
 ### 規範 1：樹狀百分比高度 (100% Tree Height)
@@ -109,10 +141,11 @@
 ### 規範 4：語意化白霜毛玻璃 (Frosted Glassmorphism)
 - 全站彈窗遮罩統一使用：
   ```tsx
-  className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-[2px] data-closed:hidden"
+  className="fixed inset-0 z-[60] bg-overlay backdrop-blur-[2px] data-closed:hidden"
   ```
   - **淺色模式**：自動對應純淨白霜牛奶玻璃（`rgba(255, 255, 255, 0.8)` + 2px 模糊）。
   - **深色模式**：自動對應深邃黑曜石毛玻璃（`rgba(0, 0, 0, 0.8)` + 2px 模糊）。
+  - **禁止在 CSS 變數上直接使用 Tailwind 透明度修飾符（如 `bg-background/80`）**：避免 Tailwind v4 編譯為 `color-mix()` 導致在 iOS <= 15 上 fallback 回退為 100% 實色。遮罩一律使用 `--color-overlay: var(--overlay)`（內嵌 RGBA 數值）。
   - 邊界嚴格依賴卡片自身的 1px 細黑邊框（`border border-border`），維持扁平化無陰影（Flat Design）的純粹美學。
   - 嚴禁附加 `isolate`，嚴禁在遮罩上執行慢速動態透明度過渡。
 
@@ -127,4 +160,4 @@
 | **彈窗動畫** | 卡片附加 `animate-in fade-in` 或 `zoom-in-95` | 原生級瞬時彈出（Instant Pop），即點即現 |
 | **焦點處理** | 掛載瞬間調用 `.focus()` 強奪焦點 | `initialFocus={false}`，防同步強制重排 |
 | **遮罩濾鏡** | 全螢幕動態毛玻璃跑 `fade-in` 或使用 `isolate` | 遮罩瞬間就位（`data-closed:hidden`），無 `isolate`，半徑 2px |
-| **主題色階** | 淺色模式下遮罩寫死 `bg-black/40` 造成暗沉泥灰 | 採用語意變數 `bg-background/80` 呈現純淨白霜與純黑沉浸 |
+| **遮罩透明度** | 直接在 HEX 變數上使用 Tailwind 修飾符（如 `bg-background/80`，觸發 `color-mix()` 導致 iOS 15 Fallback 成 100% 實色） | 採用內嵌 RGBA 的專屬語意變數 `bg-overlay`（`rgba(255,255,255,0.8)` / `rgba(0,0,0,0.8)`） |

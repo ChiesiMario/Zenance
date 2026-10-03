@@ -699,7 +699,10 @@ export default function Settings() {
           <div className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors">
             <span className="text-sm font-normal text-foreground">{t('settings.theme')}</span>
             <Select value={theme} onValueChange={(v) => setTheme(v as any)}>
-              <SelectTrigger className="border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-1 text-xs font-mono text-muted-foreground hover:text-foreground h-auto p-0 cursor-pointer">
+              <SelectTrigger
+                size="custom"
+                className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+              >
                 <SelectValue className="flex-none text-right">
                   {getThemeLabel(theme)}
                 </SelectValue>
@@ -719,7 +722,10 @@ export default function Settings() {
               value={currentLang}
               onValueChange={(v) => i18n.changeLanguage(v || 'en')}
             >
-              <SelectTrigger className="border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-1 text-xs font-mono text-muted-foreground hover:text-foreground h-auto p-0 cursor-pointer">
+              <SelectTrigger
+                size="custom"
+                className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+              >
                 <SelectValue className="flex-none text-right">
                   {getLanguageLabel(currentLang)}
                 </SelectValue>
@@ -1363,7 +1369,10 @@ export default function Settings() {
                   }
                 }}
               >
-                <SelectTrigger className="border-none shadow-none focus:ring-0 bg-transparent text-right justify-end [&>span]:mr-1 text-xs font-mono h-auto p-0 cursor-pointer text-foreground">
+                <SelectTrigger
+                  size="custom"
+                  className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                >
                   <SelectValue className="flex-none text-right">
                     {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0, true)}
                   </SelectValue>

@@ -36,7 +36,8 @@ trigger: always_on
   - Dialog / Modal 彈窗本體全面採用**「原生級瞬時彈出 (Instant Pop)」**，嚴禁在卡片上附加慢速 `animate-in fade-in` 動畫，徹底避免在舊款設備（如 A9/A10 晶片、iOS 15）上因底層光柵化搶佔時間片導致動畫殘缺與嚴重掉幀卡頓。
   - 彈窗呈現應如同 Vercel、Raycast 及 macOS 原生 Alert 般即點即出、清脆乾脆。
 - **毛玻璃與遮罩規範 (Frosted Glassmorphism)**：
-  - 遮罩層全面使用語意化變數：`bg-background/80 backdrop-blur-[2px] data-closed:hidden`。在淺色模式下呈現純淨白霜牛奶玻璃，深色模式下呈現深邃黑曜石毛玻璃。
+  - 遮罩層全面使用專屬語意化變數：`bg-overlay backdrop-blur-[2px] data-closed:hidden`。在淺色模式下呈現純淨白霜牛奶玻璃（`rgba(255, 255, 255, 0.8)`），深色模式下呈現深邃黑曜石毛玻璃（`rgba(0, 0, 0, 0.8)`）。
+  - **嚴禁在動態 CSS 變數上直接使用 Tailwind 透明度修飾符（如 `bg-background/80`）**：Tailwind CSS v4 會將帶動態變數的透明度編譯為 CSS `color-mix()` 函式；而 iOS <= 15 的舊版 WebKit（如 iPhone 7P、SE 1）完全不支援 `color-mix()`，會觸發其 Fallback 回退機制變成 100% 完全不透明實色（純白或純黑），造成遮罩覆蓋整個螢幕。所有遮罩一律使用 `--color-overlay: var(--overlay)`（內嵌 RGBA Alpha 通道），確保全平台 WebKit 均能原生解析。
   - 遮罩層嚴禁使用 `isolate`（避免觸發 WebKit 整頁圖層扁平化重繪）。
   - 模糊半徑嚴格限制在 `2px`（`backdrop-blur-[2px]`），確保舊款 GPU 卷積計算耗時 `< 16ms`，維持滿幀 60fps。
   - 遮罩層嚴禁使用動態 Alpha 漸變動畫，必須瞬間就位（`data-closed:hidden`），徹底杜絕 GPU 紋理重構頻閃。

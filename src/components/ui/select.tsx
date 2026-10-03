@@ -77,7 +77,7 @@ function SelectContent({
   >) {
   return (
     <SelectPrimitive.Portal>
-      <SelectPrimitive.Backdrop className="fixed inset-0 z-[60] bg-background/80 duration-100 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+      <SelectPrimitive.Backdrop className="fixed inset-0 z-[60] bg-overlay duration-100 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}

@@ -372,7 +372,7 @@ export function NumericKeypad({
               <div className="fixed inset-0 z-[100] flex items-center justify-center isolate">
                 {/* Full-screen Backdrop */}
                 <div 
-                  className="absolute inset-0 bg-background/80 backdrop-blur-[2px]" 
+                  className="absolute inset-0 bg-overlay backdrop-blur-[2px]" 
                   onClick={() => setIsCalendarOpen(false)}
                   aria-hidden="true" 
                 />

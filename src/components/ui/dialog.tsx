@@ -33,7 +33,7 @@ function DialogOverlay({
       forceRender={forceRender}
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-[60] bg-background/80 backdrop-blur-[2px] data-closed:hidden",
+        "fixed inset-0 z-[60] bg-overlay backdrop-blur-[2px] data-closed:hidden",
         className
       )}
       {...props}
@@ -62,7 +62,7 @@ function DialogContent({
 
   return (
     <DialogPortal container={container}>
-      <DialogOverlay className={cn(commandDeck && "bg-background/80", overlayClassName)} />
+      <DialogOverlay className={cn(commandDeck && "bg-overlay", overlayClassName)} />
       {fullscreen ? (
         <DialogPrimitive.Popup
           ref={contentRef}

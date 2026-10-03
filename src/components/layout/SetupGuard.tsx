@@ -8,7 +8,7 @@ export function SetupGuard({ children }: { children: React.ReactNode }) {
   // If ledgers is undefined, Dexie is still loading
   if (ledgers === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex h-full min-h-full items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground text-sm">Loading...</div>
       </div>
     );

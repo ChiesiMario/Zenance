@@ -47,7 +47,7 @@ export default function Setup() {
 
   if (step === 0) {
     return (
-      <div className="flex min-h-screen min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
+      <div className="flex h-full min-h-full flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
         <div className="w-full max-w-sm flex flex-col items-center text-center animate-in fade-in duration-300">
           <div className="mb-6">
             <Logo size={72} />
@@ -76,7 +76,7 @@ export default function Setup() {
 
   if (step === 1) {
     return (
-      <div className="flex min-h-screen min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
+      <div className="flex h-full min-h-full flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
         <div className="w-full max-w-sm flex flex-col items-center animate-in fade-in duration-300">
           <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-12">
             {t('setup.title')}
@@ -122,7 +122,7 @@ export default function Setup() {
   }
 
   return (
-    <div className="flex min-h-screen min-h-[100dvh] flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
+    <div className="flex h-full min-h-full flex-col items-center justify-center bg-background px-5 selection:bg-primary selection:text-primary-foreground">
       <div className="w-full max-w-sm flex flex-col items-center text-center animate-in fade-in duration-300">
         <div className="mb-8 rounded-full border border-border p-4 bg-muted/10">
           <Cloud className="size-10 text-primary" strokeWidth={1.5} />

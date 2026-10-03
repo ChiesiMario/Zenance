@@ -41,3 +41,9 @@ trigger: always_on
   - 遮罩層嚴禁使用 `isolate`（避免觸發 WebKit 整頁圖層扁平化重繪）。
   - 模糊半徑嚴格限制在 `2px`（`backdrop-blur-[2px]`），確保舊款 GPU 卷積計算耗時 `< 16ms`，維持滿幀 60fps。
   - 遮罩層嚴禁使用動態 Alpha 漸變動畫，必須瞬間就位（`data-closed:hidden`），徹底杜絕 GPU 紋理重構頻閃。
+- **彈窗動作按鈕佈局 (Dialog Footer Actions)**：
+  - 手機端與全平台 DialogFooter 按鈕嚴格採用**單行水平並排 (`flex flex-row items-center justify-between`)**。
+  - **嚴禁在移動端退化為垂直倒序堆疊 (`flex-col-reverse`)**，避免主要按鈕上下割裂與非必要的縱向空間浪費。
+  - 遵循「**取消在最左側 (Cancel on Left)、確認/新增在最右側 (Confirm/Add on Right)**」的人機工程學規範，符合雙手與單手拇指操作直覺。
+  - 當彈窗僅有單一按鈕（如關閉/確定）時，必須自動靠右對齊 (`[&>*:only-child]:ml-auto`)。
+

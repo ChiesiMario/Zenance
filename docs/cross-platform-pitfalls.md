@@ -149,6 +149,12 @@
   - 邊界嚴格依賴卡片自身的 1px 細黑邊框（`border border-border`），維持扁平化無陰影（Flat Design）的純粹美學。
   - 嚴禁附加 `isolate`，嚴禁在遮罩上執行慢速動態透明度過渡。
 
+### 規範 5：彈窗動作按鈕水平並排 (Horizontal Action Buttons)
+- 彈窗底部的操作按鈕在手機端與桌面端統一採用**單行水平並排 (`flex flex-row items-center justify-between`)**。
+- **嚴禁在移動端退化為垂直倒序堆疊 (`flex-col-reverse`)**：避免確認按鈕在上、取消按鈕在下的上下割裂與空間浪費。
+- 遵循「**取消在最左側 (Cancel on Left)、確認/新增在最右側 (Confirm/Add on Right)**」的人機工程學規範，符合雙手與單手拇指操作直覺。
+- 只有單一按鈕（如關閉/確定）時，自動靠右對齊 (`[&>*:only-child]:ml-auto`)。
+
 ---
 
 ## 4. 開發檢查清單 (Do's and Don'ts)
@@ -161,3 +167,5 @@
 | **焦點處理** | 掛載瞬間調用 `.focus()` 強奪焦點 | `initialFocus={false}`，防同步強制重排 |
 | **遮罩濾鏡** | 全螢幕動態毛玻璃跑 `fade-in` 或使用 `isolate` | 遮罩瞬間就位（`data-closed:hidden`），無 `isolate`，半徑 2px |
 | **遮罩透明度** | 直接在 HEX 變數上使用 Tailwind 修飾符（如 `bg-background/80`，觸發 `color-mix()` 導致 iOS 15 Fallback 成 100% 實色） | 採用內嵌 RGBA 的專屬語意變數 `bg-overlay`（`rgba(255,255,255,0.8)` / `rgba(0,0,0,0.8)`） |
+| **彈窗操作按鈕** | 移動端使用 `flex-col-reverse` 倒序垂直堆疊 | 統一使用 `flex-row justify-between`，取消居左、確認居右並排於同一行 |
+

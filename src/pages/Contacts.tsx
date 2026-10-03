@@ -162,7 +162,7 @@ export default function Contacts() {
                     <Button 
                       type="button" 
                       variant={newContactGroup === 'personal' ? 'default' : 'outline'} 
-                      className="cursor-pointer" 
+                      className="h-10 text-sm cursor-pointer" 
                       onClick={() => setNewContactGroup('personal')}
                     >
                       {t('contacts.groupPersonal')}
@@ -170,7 +170,7 @@ export default function Contacts() {
                     <Button 
                       type="button" 
                       variant={newContactGroup === 'organization' ? 'default' : 'outline'} 
-                      className="cursor-pointer" 
+                      className="h-10 text-sm cursor-pointer" 
                       onClick={() => setNewContactGroup('organization')}
                     >
                       {t('contacts.groupOrganization')}
@@ -187,6 +187,7 @@ export default function Contacts() {
                     value={newContactName}
                     onChange={(e) => setNewContactName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddContact()}
+                    className="h-10 text-sm"
                   />
                 </div>
               </div>

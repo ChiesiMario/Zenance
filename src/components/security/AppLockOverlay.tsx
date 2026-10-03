@@ -144,7 +144,7 @@ export function AppLockOverlay() {
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background/95 backdrop-blur-2xl text-foreground select-none p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background text-foreground select-none p-4 animate-in fade-in duration-200">
       {view === 'pin' ? (
         <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
           {/* Top Logo & Status */}

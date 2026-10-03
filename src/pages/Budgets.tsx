@@ -495,7 +495,7 @@ export default function Budgets() {
                   : daysInfo.status === 'ongoing'
                     ? daysInfo.days === 0
                       ? t('budgets.dueToday', '今日到期')
-                      : `剩 ${daysInfo.days} 天`
+                      : t('budgets.daysRemaining', { count: daysInfo.days })
                     : t('budgets.startsInDays', { count: daysInfo.days, defaultValue: `${daysInfo.days} 天後開始` });
 
               const showDaily = !isOver && daysInfo.status === 'ongoing' && daysInfo.days > 0;
@@ -532,7 +532,7 @@ export default function Budgets() {
                         {countdownLabel ? ` · ${countdownLabel}` : ''}
                         {showDaily && (
                           <>
-                            {' · 每日 '}
+                            {t('budgets.daily')}
                             <AmountDisplay
                               amount={Math.round(remaining / daysInfo.days)}
                               baseCurrency={activeLedger?.baseCurrency}

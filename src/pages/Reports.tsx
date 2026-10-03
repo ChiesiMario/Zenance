@@ -319,6 +319,7 @@ export default function Reports() {
       }
     } else if (periodType === 'month') {
       const daysInMonth = endDate.getDate();
+      const isZh = i18n.language.startsWith('zh');
       for (let day = 1; day <= daysInMonth; day++) {
         const currentDay = new Date(startDate);
         currentDay.setDate(day);
@@ -326,7 +327,7 @@ export default function Reports() {
         const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
         const { expense, income } = calculateDayTotals(dayTxs);
         points.push({
-          label: `${day}日`,
+          label: isZh ? `${day}日` : `${day}`,
           fullLabel: `${format(currentDay, 'yyyy/MM/dd')}`,
           expense,
           income,
@@ -335,6 +336,7 @@ export default function Reports() {
       }
     } else if (periodType === 'quarter') {
       const startM = startDate.getMonth();
+      const isZh = i18n.language.startsWith('zh');
       for (let i = 0; i < 3; i++) {
         const m = (startM + i) % 12;
         const monthTxs = periodTransactions.filter(tx => {
@@ -343,14 +345,15 @@ export default function Reports() {
         });
         const { expense, income } = calculateDayTotals(monthTxs);
         points.push({
-          label: `${m + 1}月`,
-          fullLabel: `${getYear(currentDate)} 年 ${m + 1} 月`,
+          label: isZh ? `${m + 1}月` : format(new Date(2000, m, 1), 'MMM'),
+          fullLabel: isZh ? `${getYear(currentDate)} 年 ${m + 1} 月` : format(new Date(getYear(currentDate), m, 1), 'MMMM yyyy'),
           expense,
           income,
           dateKey: `${getYear(currentDate)}-${String(m + 1).padStart(2, '0')}`,
         });
       }
     } else {
+      const isZh = i18n.language.startsWith('zh');
       for (let m = 0; m < 12; m++) {
         const monthTxs = periodTransactions.filter(tx => {
           const dateObj = parseISO(tx.date);
@@ -358,8 +361,8 @@ export default function Reports() {
         });
         const { expense, income } = calculateDayTotals(monthTxs);
         points.push({
-          label: `${m + 1}月`,
-          fullLabel: `${getYear(currentDate)} 年 ${m + 1} 月`,
+          label: isZh ? `${m + 1}月` : format(new Date(2000, m, 1), 'MMM'),
+          fullLabel: isZh ? `${getYear(currentDate)} 年 ${m + 1} 月` : format(new Date(getYear(currentDate), m, 1), 'MMMM yyyy'),
           expense,
           income,
           dateKey: `${getYear(currentDate)}-${String(m + 1).padStart(2, '0')}`,

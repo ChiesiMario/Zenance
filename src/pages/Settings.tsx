@@ -161,25 +161,25 @@ export default function Settings() {
 
   const handleEnableE2EE = async () => {
     if (!e2eePassphrase.trim() || e2eePassphrase.length < 6) {
-      toast.show('密碼長度需至少 6 個字元');
+      toast.show(t('settings.e2eeMinLength'));
       return;
     }
     if (e2eePassphrase !== e2eeConfirmPassphrase) {
-      toast.show('兩次輸入的密碼不一致');
+      toast.show(t('settings.e2eeMismatch'));
       return;
     }
     try {
       const { recoveryKey } = await setupE2EE(e2eePassphrase);
       setGeneratedRecoveryKey(recoveryKey);
       setE2eeActive(true);
-      toast.show('端到端加密已成功啟用！');
+      toast.show(t('settings.e2eeEnabledSuccess'));
 
       // 啟用加密後立即以端到端加密重新推送 Dropbox 雲端上的所有備份
       if (isAuthenticated && isOnline) {
         syncNow('overwrite_remote');
       }
     } catch (err: any) {
-      toast.show('啟用失敗：' + (err?.message || '未知錯誤'));
+      toast.show(t('settings.e2eeEnableFailed') + (err?.message || ''));
     }
   };
 
@@ -195,7 +195,7 @@ export default function Settings() {
 
     disableE2EE();
     setE2eeActive(false);
-    toast.show('已停用端到端加密');
+    toast.show(t('settings.e2eeDisabledSuccess'));
 
     // 停用加密後立即將雲端備份覆蓋還原為標準明文格式
     if (isAuthenticated && isOnline) {
@@ -205,11 +205,11 @@ export default function Settings() {
 
   const handleSavePinLock = async () => {
     if (lockPinInput.length < 4) {
-      toast.show('PIN 碼需至少 4 位數');
+      toast.show(t('security.pinInvalid'));
       return;
     }
     if (lockPinInput !== lockPinConfirm) {
-      toast.show('兩次輸入的 PIN 碼不一致');
+      toast.show(t('security.pinMismatch'));
       return;
     }
     const success = await enableLock(lockPinInput, lockEnableBio, 0);
@@ -217,35 +217,35 @@ export default function Settings() {
       setIsLockSetupModalOpen(false);
       setLockPinInput('');
       setLockPinConfirm('');
-      toast.show('安全鎖已成功啟用');
+      toast.show(t('security.lockEnabledSuccess'));
     } else {
-      toast.show('啟用安全鎖失敗');
+      toast.show(t('security.enableLockFailed'));
     }
   };
 
   const handleRequestPersistence = async () => {
     const granted = await requestPersistence();
-    toast.show(granted ? '已獲得瀏覽器持久化儲存授權！' : '瀏覽器未授權持久化，將依設備容量自動管理');
+    toast.show(granted ? t('settings.persistenceGranted') : t('settings.persistenceDenied'));
   };
 
   const handleRestoreFromOpfs = async (filename: string) => {
     try {
       const parsed = await loadOpfsBackupForRestore(filename);
       if (!parsed) {
-        toast.show('解析時光機快照失敗');
+        toast.show(t('settings.snapshotParseFailed'));
         return;
       }
       setPendingBackup(parsed as any);
       setIsRestoreModalOpen(true);
     } catch {
-      toast.show('讀取快照失敗');
+      toast.show(t('settings.snapshotReadFailed'));
     }
   };
 
   const handleExportOpfs = async (filename: string) => {
     const success = await exportOpfsBackupFile(filename);
     if (!success) {
-      toast.show('導出檔案失敗');
+      toast.show(t('settings.exportFileFailed'));
     }
   };
 
@@ -268,15 +268,15 @@ export default function Settings() {
   const getLockTimeoutLabel = (minutes: number = 0, full: boolean = false) => {
     switch (minutes) {
       case 0:
-        return '立即';
+        return t('security.timeoutImmediately');
       case 1:
-        return full ? '閒置 1 分鐘' : '1 分鐘';
+        return full ? t('security.timeoutIdleMinutes', { minutes: 1 }) : t('security.timeoutMinutes', { minutes: 1 });
       case 5:
-        return full ? '閒置 5 分鐘' : '5 分鐘';
+        return full ? t('security.timeoutIdleMinutes', { minutes: 5 }) : t('security.timeoutMinutes', { minutes: 5 });
       case 15:
-        return full ? '閒置 15 分鐘' : '15 分鐘';
+        return full ? t('security.timeoutIdleMinutes', { minutes: 15 }) : t('security.timeoutMinutes', { minutes: 15 });
       default:
-        return full ? `閒置 ${minutes} 分鐘` : `${minutes} 分鐘`;
+        return full ? t('security.timeoutIdleMinutes', { minutes }) : t('security.timeoutMinutes', { minutes });
     }
   };
 
@@ -380,7 +380,7 @@ export default function Settings() {
       toast.show(t('settings.exportSuccess'));
     } catch (error) {
       console.error('Export error:', error);
-      toast.show('匯出失敗，請重試');
+      toast.show(t('settings.exportFailed'));
     }
   };
 
@@ -618,7 +618,7 @@ export default function Settings() {
       setPendingBackup(null);
     } catch (error) {
       console.error('Restore error:', error);
-      toast.show('還原失敗，請重試');
+      toast.show(t('settings.restoreFailed'));
     } finally {
       setIsRestoring(false);
     }
@@ -658,7 +658,7 @@ export default function Settings() {
       }, 700);
     } catch (error) {
       console.error('Clear error:', error);
-      toast.show('清除失敗，請重試');
+      toast.show(t('settings.clearFailed'));
       setIsClearing(false);
     }
   };
@@ -745,7 +745,7 @@ export default function Settings() {
           >
             <span className="text-sm font-normal text-foreground">{t('settings.manageCategories')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
-              <span>{activeCount} 活躍{archivedCount > 0 ? ` · ${archivedCount} 封存` : ''}</span>
+              <span>{t('settings.activeCount', { count: activeCount })}{archivedCount > 0 ? ` · ${t('settings.archivedCount', { count: archivedCount })}` : ''}</span>
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
           </Link>
@@ -772,7 +772,7 @@ export default function Settings() {
               ) : isSyncing ? (
                 <span className="text-primary">{t('settings.syncing')}</span>
               ) : !isOnline ? (
-                <span className="text-amber-500">離線</span>
+                <span className="text-amber-500">{t('common.offline')}</span>
               ) : (
                 <span className="text-emerald-500">{t('settings.connected')}</span>
               )}
@@ -802,12 +802,12 @@ export default function Settings() {
             }}
             className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
-            <span className="text-sm font-normal text-foreground">端到端加密 (E2EE)</span>
+            <span className="text-sm font-normal text-foreground">{t('settings.e2ee')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
               {e2eeActive ? (
                 <span className="text-emerald-500">AES-256</span>
               ) : (
-                <span>未啟用</span>
+                <span>{t('settings.notEnabled')}</span>
               )}
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
@@ -826,14 +826,14 @@ export default function Settings() {
             }}
             className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
-            <span className="text-sm font-normal text-foreground">應用程式安全鎖</span>
+            <span className="text-sm font-normal text-foreground">{t('security.lockSettings')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
               {isLockConfigured ? (
                 <span className="text-emerald-500">
-                  PIN 碼 · {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0)}
+                  PIN · {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0)}
                 </span>
               ) : (
-                <span>未開啟</span>
+                <span>{t('security.statusDisabled')}</span>
               )}
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
@@ -857,16 +857,16 @@ export default function Settings() {
             }}
             className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
-            <span className="text-sm font-normal text-foreground">資料庫健康診斷</span>
+            <span className="text-sm font-normal text-foreground">{t('fsck.title')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
               {healthReport ? (
                 healthReport.score === 100 ? (
-                  <span className="text-emerald-500">100分 · 良好</span>
+                  <span className="text-emerald-500">{t('fsck.scoreGood')}</span>
                 ) : (
-                  <span className="text-amber-500">{healthReport.score}分 · 需修復</span>
+                  <span className="text-amber-500">{t('fsck.scoreNeedRepair', { score: healthReport.score })}</span>
                 )
               ) : (
-                <span>立即體檢</span>
+                <span>{t('fsck.checkNow')}</span>
               )}
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
@@ -882,12 +882,12 @@ export default function Settings() {
               !isPersisted && "cursor-pointer hover:bg-muted/40"
             )}
           >
-            <span className="text-sm font-normal text-foreground">本機持久化保護</span>
+            <span className="text-sm font-normal text-foreground">{t('settings.persistenceProtection')}</span>
             <div className="flex items-center gap-2 text-xs font-mono">
               {isPersisted ? (
-                <span className="text-emerald-500">已保護</span>
+                <span className="text-emerald-500">{t('settings.persistenceProtected')}</span>
               ) : (
-                <span className="text-amber-500">申請保護</span>
+                <span className="text-amber-500">{t('settings.requestPersistence')}</span>
               )}
               {estimate && (
                 <>
@@ -903,9 +903,9 @@ export default function Settings() {
             onClick={() => setIsTimeMachineModalOpen(true)}
             className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
-            <span className="text-sm font-normal text-foreground">本機時光機備份</span>
+            <span className="text-sm font-normal text-foreground">{t('settings.timeMachineBackup')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
-              <span>{opfsSnapshots.length} 份快照</span>
+              <span>{t('settings.snapshotsCount', { count: opfsSnapshots.length })}</span>
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
@@ -950,7 +950,7 @@ export default function Settings() {
           >
             <span className="text-sm font-normal text-destructive">{t('settings.clearData')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-destructive/70 group-hover:text-destructive">
-              <span>重置</span>
+              <span>{t('settings.clearDataAction')}</span>
               <ChevronRight className="size-3.5 opacity-70" />
             </div>
           </div>
@@ -968,7 +968,7 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
               <Cloud className="size-5 text-primary" />
-              <span>Dropbox 雲端同步</span>
+              <span>{t('settings.dropboxSyncModalTitle')}</span>
             </DialogTitle>
           </DialogHeader>
 
@@ -1039,23 +1039,31 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
               <History className="size-5 text-primary" />
-              <span>本機時光機快照</span>
+              <span>{t('settings.timeMachineModalTitle')}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              由瀏覽器私有磁碟 (OPFS) 靜默輪換保留最近 3 份歷史存檔。
+              {t('settings.timeMachineModalDesc')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
             {opfsSnapshots.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground font-sans">
-                目前尚無快照，記帳後將自動於閒置時生成。
+                {t('settings.noSnapshotsYet')}
               </div>
             ) : (
               opfsSnapshots.map((snap) => (
                 <div key={snap.id} className="p-3 flex items-center justify-between">
                   <div>
-                    <span className="font-sans font-medium text-foreground block">{snap.title}</span>
+                    <span className="font-sans font-medium text-foreground block">
+                      {snap.id === 'daily'
+                        ? t('settings.snapshotDaily')
+                        : snap.id === 'weekly'
+                          ? t('settings.snapshotWeekly')
+                          : snap.id === 'monthly'
+                            ? t('settings.snapshotMonthly')
+                            : snap.title}
+                    </span>
                     <span className="text-[10px] text-muted-foreground">{snap.date} · {snap.sizeFormatted}</span>
                   </div>
                   <div className="flex gap-2">
@@ -1064,7 +1072,7 @@ export default function Settings() {
                       onClick={() => handleExportOpfs(snap.filename)}
                       className="text-muted-foreground hover:text-foreground cursor-pointer text-xs"
                     >
-                      導出
+                      {t('settings.exportAction')}
                     </button>
                     <button
                       type="button"
@@ -1074,7 +1082,7 @@ export default function Settings() {
                       }}
                       className="text-emerald-500 hover:underline cursor-pointer text-xs font-medium"
                     >
-                      還原
+                      {t('settings.restoreAction')}
                     </button>
                   </div>
                 </div>
@@ -1090,11 +1098,11 @@ export default function Settings() {
               disabled={isOpfsBackingUp || !isOpfsSupported}
               onClick={async () => {
                 const ok = await triggerOpfsBackup(true);
-                toast.show(ok ? '已成功生成最新本機快照！' : '快照建立失敗');
+                toast.show(ok ? t('settings.snapshotSuccess') : t('settings.snapshotFailed'));
               }}
             >
               <RefreshCw className={cn("size-3.5", isOpfsBackingUp && "animate-spin")} />
-              <span>立即建立快照</span>
+              <span>{t('settings.createSnapshotNow')}</span>
             </Button>
           </div>
         </DialogContent>
@@ -1119,10 +1127,10 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
               <Cloud className="size-5 text-primary" />
-              <span>檢測到雲端現存資料</span>
+              <span>{t('settings.remoteConflictTitle')}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              雲端檢測到 {remoteRecordCount} 筆交易記錄，本機現有 {localRecordCount} 筆交易記錄。請選擇首次連線的處理策略：
+              {t('settings.remoteConflictDesc', { remote: remoteRecordCount, local: localRecordCount })}
             </DialogDescription>
           </DialogHeader>
 
@@ -1137,13 +1145,13 @@ export default function Settings() {
               </div>
               <div className="flex-1">
                 <div className="text-sm font-medium text-foreground flex items-center justify-between">
-                  <span>保留雙方所有資料（智能合併）</span>
+                  <span>{t('settings.mergeStrategyTitle')}</span>
                   <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    推薦
+                    {t('settings.recommended')}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-normal mt-0.5">
-                  自動融合本機與雲端的記錄，若有修改以最新時間戳為準。
+                  {t('settings.mergeStrategyDesc')}
                 </p>
               </div>
             </button>
@@ -1158,10 +1166,10 @@ export default function Settings() {
               </div>
               <div className="flex-1">
                 <div className="text-sm font-medium text-foreground">
-                  以雲端資料覆蓋本機
+                  {t('settings.overwriteLocalTitle')}
                 </div>
                 <p className="text-xs text-muted-foreground leading-normal mt-0.5">
-                  清空本機資料庫，完全採用雲端的記錄。
+                  {t('settings.overwriteLocalDesc')}
                 </p>
               </div>
             </button>
@@ -1176,10 +1184,10 @@ export default function Settings() {
               </div>
               <div className="flex-1">
                 <div className="text-sm font-medium text-foreground">
-                  以本機資料覆蓋雲端
+                  {t('settings.overwriteRemoteTitle')}
                 </div>
                 <p className="text-xs text-muted-foreground leading-normal mt-0.5">
-                  以本機資料為準，完全覆寫雲端同步檔。
+                  {t('settings.overwriteRemoteDesc')}
                 </p>
               </div>
             </button>
@@ -1193,10 +1201,10 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
               <KeyRound className="size-5 text-primary" />
-              <span>啟用端到端加密 (E2EE)</span>
+              <span>{t('settings.enableE2eeTitle')}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              設定一組同步金鑰密碼。資料在離開本機前將以 AES-256-GCM 加密，雲端伺服器僅儲存密文。
+              {t('settings.enableE2eeDesc')}
             </DialogDescription>
           </DialogHeader>
 
@@ -1204,11 +1212,11 @@ export default function Settings() {
             <div className="space-y-3 pt-1">
               <div>
                 <label className="text-xs font-medium text-muted-foreground block mb-1">
-                  設定加密密碼（至少 6 位）
+                  {t('settings.e2eePassphraseLabel')}
                 </label>
                 <Input
                   type="password"
-                  placeholder="輸入密碼..."
+                  placeholder={t('settings.e2eePassphrasePlaceholder')}
                   value={e2eePassphrase}
                   onChange={(e) => setE2eePassphrase(e.target.value)}
                   className="h-9 text-xs"
@@ -1217,11 +1225,11 @@ export default function Settings() {
 
               <div>
                 <label className="text-xs font-medium text-muted-foreground block mb-1">
-                  再次確認密碼
+                  {t('settings.confirmE2eePassphraseLabel')}
                 </label>
                 <Input
                   type="password"
-                  placeholder="再次輸入密碼..."
+                  placeholder={t('settings.confirmE2eePassphrasePlaceholder')}
                   value={e2eeConfirmPassphrase}
                   onChange={(e) => setE2eeConfirmPassphrase(e.target.value)}
                   className="h-9 text-xs"
@@ -1232,20 +1240,20 @@ export default function Settings() {
                 className="w-full h-9 text-xs mt-2 cursor-pointer"
                 onClick={handleEnableE2EE}
               >
-                立即啟用
+                {t('settings.enableNow')}
               </Button>
             </div>
           ) : (
             <div className="space-y-3 pt-1">
               <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col gap-1.5">
                 <span className="text-[11px] font-medium text-primary uppercase tracking-wider">
-                  緊急救援金鑰 (Recovery Key)
+                  {t('settings.recoveryKeyTitle')}
                 </span>
                 <p className="text-xs font-mono font-bold text-foreground select-all break-all py-1">
                   {generatedRecoveryKey}
                 </p>
                 <span className="text-[10px] text-muted-foreground leading-normal">
-                  請將此金鑰妥善保存在密碼管理器或實體紙張上。若遺忘密碼，這是解鎖雲端帳本的唯一憑證。
+                  {t('settings.recoveryKeyDesc')}
                 </span>
               </div>
 
@@ -1260,13 +1268,13 @@ export default function Settings() {
                   }}
                 >
                   {isRecoveryCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                  <span>{isRecoveryCopied ? '已複製' : '複製救援金鑰'}</span>
+                  <span>{isRecoveryCopied ? t('settings.copied') : t('settings.copyRecoveryKey')}</span>
                 </Button>
                 <Button
                   className="flex-1 h-9 text-xs cursor-pointer"
                   onClick={() => setIsE2eeModalOpen(false)}
                 >
-                  完成
+                  {t('settings.done')}
                 </Button>
               </div>
             </div>
@@ -1280,23 +1288,23 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
               <ShieldCheck className="size-5 text-primary" />
-              <span>設定應用程式安全鎖</span>
+              <span>{t('security.lockSetupTitle')}</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              設定 4~6 位數 PIN 碼，防止他人借用手機或查看多工後台時窺探記帳隱私。
+              {t('security.lockSetupDesc')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 pt-1">
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">
-                設定 PIN 碼 (4-6 位數字)
+                {t('security.pinLengthLabel')}
               </label>
               <Input
                 type="password"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="輸入 4-6 位數字..."
+                placeholder={t('security.pinPlaceholder')}
                 value={lockPinInput}
                 onChange={(e) => setLockPinInput(e.target.value.replace(/\D/g, ''))}
                 className="h-9 text-xs tracking-widest font-mono text-center"
@@ -1305,13 +1313,13 @@ export default function Settings() {
 
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">
-                確認 PIN 碼
+                {t('security.confirmPinLabel')}
               </label>
               <Input
                 type="password"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="再次輸入 PIN 碼..."
+                placeholder={t('security.confirmPinPlaceholder')}
                 value={lockPinConfirm}
                 onChange={(e) => setLockPinConfirm(e.target.value.replace(/\D/g, ''))}
                 className="h-9 text-xs tracking-widest font-mono text-center"
@@ -1322,7 +1330,7 @@ export default function Settings() {
               <div className="p-2.5 rounded-lg border border-border bg-muted/20 flex items-center justify-between">
                 <span className="text-xs font-medium flex items-center gap-1.5">
                   <Fingerprint className="size-4 text-primary" />
-                  <span>支援 Touch ID / FaceID</span>
+                  <span>{t('security.biometricSupport')}</span>
                 </span>
                 <input
                   type="checkbox"
@@ -1337,7 +1345,7 @@ export default function Settings() {
               className="w-full h-9 text-xs mt-2 cursor-pointer"
               onClick={handleSavePinLock}
             >
-              確認開啟
+              {t('security.enableLock')}
             </Button>
           </div>
         </DialogContent>
@@ -1349,18 +1357,18 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
               <ShieldCheck className="size-5 text-primary" />
-              <span>應用程式安全鎖</span>
+              <span>{t('security.lockSettings')}</span>
             </DialogTitle>
           </DialogHeader>
 
           <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
             <div className="p-3 flex items-center justify-between">
-              <span className="text-muted-foreground font-sans">狀態</span>
-              <span className="text-emerald-500 font-medium">已啟用 PIN 碼保護</span>
+              <span className="text-muted-foreground font-sans">{t('security.status')}</span>
+              <span className="text-emerald-500 font-medium">{t('security.statusActive')}</span>
             </div>
 
             <div className="p-3 flex items-center justify-between">
-              <span className="text-muted-foreground font-sans">自動鎖定</span>
+              <span className="text-muted-foreground font-sans">{t('security.autoLock')}</span>
               <Select
                 value={String(appLockConfig?.timeoutMinutes ?? 0)}
                 onValueChange={(val) => {
@@ -1378,10 +1386,10 @@ export default function Settings() {
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent align="end">
-                  <SelectItem value="0">立即</SelectItem>
-                  <SelectItem value="1">閒置 1 分鐘</SelectItem>
-                  <SelectItem value="5">閒置 5 分鐘</SelectItem>
-                  <SelectItem value="15">閒置 15 分鐘</SelectItem>
+                  <SelectItem value="0">{t('security.timeoutImmediately')}</SelectItem>
+                  <SelectItem value="1">{t('security.timeoutIdleMinutes', { minutes: 1 })}</SelectItem>
+                  <SelectItem value="5">{t('security.timeoutIdleMinutes', { minutes: 5 })}</SelectItem>
+                  <SelectItem value="15">{t('security.timeoutIdleMinutes', { minutes: 15 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1390,7 +1398,7 @@ export default function Settings() {
               <div className="p-3 flex items-center justify-between">
                 <span className="text-muted-foreground font-sans flex items-center gap-1.5">
                   <Fingerprint className="size-3.5 text-primary" />
-                  <span>生物辨識解鎖</span>
+                  <span>{t('security.biometricUnlock')}</span>
                 </span>
                 <input
                   type="checkbox"
@@ -1411,10 +1419,10 @@ export default function Settings() {
               onClick={() => {
                 disableLock();
                 setIsLockSettingsModalOpen(false);
-                toast.show('已關閉安全鎖');
+                toast.show(t('security.disableLockSuccess'));
               }}
             >
-              關閉安全鎖
+              {t('security.disableLock')}
             </Button>
           </div>
         </DialogContent>
@@ -1453,7 +1461,7 @@ export default function Settings() {
                   <span className="font-mono text-xs text-muted-foreground">{ledger.baseCurrency}</span>
                 </div>
                 <div className="text-xs text-muted-foreground font-mono">
-                  {txs?.length ?? 0} 筆交易 · {accs?.length ?? 0} 個帳戶 · {cats?.length ?? 0} 個分類
+                  {t('settings.restoreSummary', { txCount: txs?.length ?? 0, accCount: accs?.length ?? 0, catCount: cats?.length ?? 0 })}
                 </div>
               </div>
             ))}
@@ -1474,7 +1482,7 @@ export default function Settings() {
                 <div className="text-sm font-medium text-foreground flex items-center justify-between">
                   <span>{t('settings.restoreMergeTitle')}</span>
                   <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    推薦
+                    {t('settings.recommended')}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground leading-normal mt-0.5">

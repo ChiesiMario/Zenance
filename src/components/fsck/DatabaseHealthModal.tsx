@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ export function DatabaseHealthModal({
   onScan,
   onHeal,
 }: DatabaseHealthModalProps) {
+  const { t } = useTranslation();
   const [justRepaired, setJustRepaired] = useState(false);
 
   const handleRepair = async () => {
@@ -54,10 +56,10 @@ export function DatabaseHealthModal({
         <DialogHeader>
           <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
             <Activity className="size-5 text-primary" />
-            <span>資料庫健康診斷與自癒</span>
+            <span>{t('fsck.title')}</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-            深度掃描資料庫中是否存在懸掛外鍵、浮點精度偏差或月度快照漂移。
+            {t('fsck.desc')}
           </DialogDescription>
         </DialogHeader>
 
@@ -65,15 +67,15 @@ export function DatabaseHealthModal({
           <div className="py-8 flex flex-col items-center justify-center text-center gap-3">
             <RefreshCw className="size-7 text-primary animate-spin" />
             <span className="text-xs text-muted-foreground font-mono">
-              正在深度掃描全庫實體關聯...
+              {t('fsck.scanning')}
             </span>
           </div>
         ) : !report ? (
           <div className="py-6 flex flex-col items-center justify-center text-center gap-3">
             <ShieldCheck className="size-8 text-muted-foreground/60" strokeWidth={1.5} />
-            <p className="text-xs text-muted-foreground">尚未執行全庫健康診斷</p>
+            <p className="text-xs text-muted-foreground">{t('fsck.notScanned')}</p>
             <Button size="sm" className="h-8 text-xs cursor-pointer" onClick={onScan}>
-              立即開始體檢
+              {t('fsck.startScan')}
             </Button>
           </div>
         ) : isHealthy ? (
@@ -82,17 +84,17 @@ export function DatabaseHealthModal({
               <CheckCircle2 className="size-8 text-emerald-500" />
               <div>
                 <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 block">
-                  資料庫狀態極佳 (100分)
+                  {t('fsck.healthy')}
                 </span>
                 <span className="text-[11px] text-muted-foreground mt-0.5 block">
-                  未發現任何懸掛外鍵、精度偏差或壞點
+                  {t('fsck.noIssues')}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center justify-between text-[11px] font-mono text-muted-foreground px-1">
-              <span>已檢測記錄: {report.totalRecordsScanned} 筆</span>
-              <span>耗時: {report.durationMs}ms</span>
+              <span>{t('fsck.scannedRecords', { count: report.totalRecordsScanned })}</span>
+              <span>{t('fsck.duration', { ms: report.durationMs })}</span>
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -101,13 +103,13 @@ export function DatabaseHealthModal({
                 className="flex-1 h-9 text-xs cursor-pointer"
                 onClick={onScan}
               >
-                重新檢查
+                {t('fsck.recheck')}
               </Button>
               <Button
                 className="flex-1 h-9 text-xs cursor-pointer"
                 onClick={() => onOpenChange(false)}
               >
-                完成
+                {t('fsck.done')}
               </Button>
             </div>
           </div>
@@ -118,11 +120,11 @@ export function DatabaseHealthModal({
               <div className="flex items-center gap-2">
                 <AlertTriangle className="size-4 text-amber-500 shrink-0" />
                 <span className="font-medium text-foreground">
-                  檢測到 {report.issues.length} 項微小異常
+                  {t('fsck.issuesFound', { count: report.issues.length })}
                 </span>
               </div>
               <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                評分: {report.score}分
+                {t('fsck.score', { score: report.score })}
               </span>
             </div>
 
@@ -152,7 +154,7 @@ export function DatabaseHealthModal({
                   </div>
                   <p className="text-foreground text-[11px] leading-snug">{iss.description}</p>
                   <p className="text-muted-foreground/80 text-[10px] leading-tight">
-                    ↳ 修復方式: {iss.suggestedAction}
+                    {t('fsck.fixMethod', { action: iss.suggestedAction })}
                   </p>
                 </div>
               ))}
@@ -166,7 +168,7 @@ export function DatabaseHealthModal({
                 disabled={isHealing}
                 onClick={onScan}
               >
-                重新掃描
+                {t('fsck.rescan')}
               </Button>
               <Button
                 className="flex-1 h-9 text-xs cursor-pointer gap-1.5 bg-primary text-primary-foreground"
@@ -176,17 +178,17 @@ export function DatabaseHealthModal({
                 {isHealing ? (
                   <>
                     <RefreshCw className="size-3.5 animate-spin" />
-                    <span>修復中...</span>
+                    <span>{t('fsck.repairing')}</span>
                   </>
                 ) : justRepaired ? (
                   <>
                     <Check className="size-3.5" />
-                    <span>修復完成</span>
+                    <span>{t('fsck.repaired')}</span>
                   </>
                 ) : (
                   <>
                     <Wrench className="size-3.5" />
-                    <span>一鍵安全修復 ({report.issues.length})</span>
+                    <span>{t('fsck.oneClickRepair', { count: report.issues.length })}</span>
                   </>
                 )}
               </Button>

@@ -831,6 +831,14 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
       tx.note === 'Manual Balance Adjustment';
     const hasNote = tx.note && !(isAdj && isDefaultNote);
 
+    const effectiveType = isChild ? tx.type : cardType;
+    const amountColorClass = (() => {
+      if (effectiveType === 'income') return 'text-emerald-500 dark:text-emerald-400';
+      if (effectiveType === 'expense') return 'text-rose-500 dark:text-rose-400';
+      if (effectiveType === 'transfer') return 'text-blue-500 dark:text-blue-400';
+      return 'text-foreground';
+    })();
+
     return (
       <div
         key={tx.id}
@@ -885,7 +893,12 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           {/* Category Capsule / Transfer Route & Status Badges */}
           <div className="flex items-center justify-center gap-1.5 mb-1.5 flex-wrap">
             {isChild ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 leading-none shrink-0">
+              <span className={cn(
+                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border leading-none shrink-0",
+                tx.type === 'expense'
+                  ? "bg-rose-500/10 text-rose-500 dark:text-rose-400 border-rose-500/20"
+                  : "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border-emerald-500/20"
+              )}>
                 {tx.type === 'income' ? t('refund.title', '支出退款') : t('refund.title', '收入退款')}
               </span>
             ) : tx.type === 'transfer' ? (
@@ -946,9 +959,9 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 originalCurrency={isDirectOriginal ? undefined : tx.originalCurrency}
                 baseCurrency={cardBaseCurrency}
                 isApproximate={isDirectOriginal ? false : undefined}
-                type={isChild ? 'income' : (cardType as any)}
-                className={isChild ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"}
-                showSign={isChild ? true : undefined}
+                type={effectiveType as any}
+                className={amountColorClass}
+                showSign={false}
               />
             </AutoMarquee>
           </div>

@@ -646,7 +646,8 @@
       "snapshotDaily": "昨日快照",
       "snapshotWeekly": "上周快照",
       "snapshotMonthly": "上月快照",
-      "requiresHttpsToast": "端到端加密涉及密码学计算，仅在 HTTPS 或 Localhost 安全连接下开放"
+      "requiresHttpsToast": "端到端加密涉及密码学计算，仅在 HTTPS 或 Localhost 安全连接下开放",
+      "storageRequiresHttpsToast": "本机持久化存储与时光机备份仅在 HTTPS 或 Localhost 安全连接下开放"
     },
     "reports": {
       "title": "财务报表",

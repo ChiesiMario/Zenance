@@ -646,7 +646,8 @@
       "snapshotDaily": "Yesterday's Snapshot",
       "snapshotWeekly": "Last Week's Snapshot",
       "snapshotMonthly": "Last Month's Snapshot",
-      "requiresHttpsToast": "End-to-End Encryption requires a secure connection (HTTPS or Localhost)"
+      "requiresHttpsToast": "End-to-End Encryption requires a secure connection (HTTPS or Localhost)",
+      "storageRequiresHttpsToast": "Local persistence and Time Machine backup require a secure connection (HTTPS or Localhost)"
     },
     "reports": {
       "title": "Analytics & Reports",

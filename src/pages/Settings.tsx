@@ -41,6 +41,7 @@ import { useDatabaseHealth } from '@/hooks/useDatabaseHealth';
 import { DatabaseHealthModal } from '@/components/fsck/DatabaseHealthModal';
 import { isE2EEEnabled, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
 import { isCryptoSupported } from '@/services/crypto/webCrypto';
+import { isSecureEnvironment } from '@/services/storage/storageManager';
 import { useRollingBackups } from '@/hooks/useRollingBackups';
 import {
   db,
@@ -229,6 +230,10 @@ export default function Settings() {
   };
 
   const handleRequestPersistence = async () => {
+    if (!isSecureEnv) {
+      toast.show(t('settings.storageRequiresHttpsToast'));
+      return;
+    }
     const granted = await requestPersistence();
     toast.show(granted ? t('settings.persistenceGranted') : t('settings.persistenceDenied'));
   };
@@ -255,6 +260,7 @@ export default function Settings() {
   };
 
   const hasCryptoSupport = isCryptoSupported();
+  const isSecureEnv = isSecureEnvironment();
   const currentLang = i18n.resolvedLanguage || i18n.language || 'en';
   const activeCount = categories?.length ?? 0;
   const archivedCount = archivedCategories?.length ?? 0;
@@ -826,7 +832,9 @@ export default function Settings() {
               ) : (
                 <span>{t('settings.notEnabled')}</span>
               )}
-              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              {hasCryptoSupport && (
+                <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              )}
             </div>
           </div>
 
@@ -863,7 +871,9 @@ export default function Settings() {
               ) : (
                 <span>{t('security.statusDisabled')}</span>
               )}
-              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              {hasCryptoSupport && (
+                <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              )}
             </div>
           </div>
         </div>
@@ -903,21 +913,29 @@ export default function Settings() {
           {/* 持久化存儲 */}
           <div
             onClick={() => {
+              if (!isSecureEnv) {
+                toast.show(t('settings.storageRequiresHttpsToast'));
+                return;
+              }
               if (!isPersisted) handleRequestPersistence();
             }}
             className={cn(
               "h-12 px-4 flex items-center justify-between transition-colors",
-              !isPersisted && "cursor-pointer hover:bg-muted/40"
+              !isSecureEnv
+                ? "opacity-60 cursor-not-allowed"
+                : !isPersisted && "cursor-pointer hover:bg-muted/40"
             )}
           >
             <span className="text-sm font-normal text-foreground">{t('settings.persistenceProtection')}</span>
             <div className="flex items-center gap-2 text-xs font-mono">
-              {isPersisted ? (
+              {!isSecureEnv ? (
+                <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
+              ) : isPersisted ? (
                 <span className="text-emerald-500">{t('settings.persistenceProtected')}</span>
               ) : (
                 <span className="text-amber-500">{t('settings.requestPersistence')}</span>
               )}
-              {estimate && (
+              {isSecureEnv && estimate && (
                 <>
                   <span className="text-muted-foreground/40">·</span>
                   <span className="text-muted-foreground">{estimate.usageFormatted}</span>
@@ -928,13 +946,30 @@ export default function Settings() {
 
           {/* 本機時光機快照 */}
           <div
-            onClick={() => setIsTimeMachineModalOpen(true)}
-            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
+            onClick={() => {
+              if (!isSecureEnv || !isOpfsSupported) {
+                toast.show(t('settings.storageRequiresHttpsToast'));
+                return;
+              }
+              setIsTimeMachineModalOpen(true);
+            }}
+            className={cn(
+              "h-12 px-4 flex items-center justify-between transition-colors",
+              !isSecureEnv || !isOpfsSupported
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:bg-muted/40 cursor-pointer group"
+            )}
           >
             <span className="text-sm font-normal text-foreground">{t('settings.timeMachineBackup')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
-              <span>{t('settings.snapshotsCount', { count: opfsSnapshots.length })}</span>
-              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              {!isSecureEnv || !isOpfsSupported ? (
+                <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
+              ) : (
+                <span>{t('settings.snapshotsCount', { count: opfsSnapshots.length })}</span>
+              )}
+              {isSecureEnv && isOpfsSupported && (
+                <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+              )}
             </div>
           </div>
 

@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { db, type Ledger, type Wallet, type Contact, type Category, type Budget, type BudgetRule, type Transaction } from '@/services/db/db';
-import { formatBytes } from './storageManager';
+import { formatBytes, isSecureEnvironment } from './storageManager';
 
 const OPFS_DIR_NAME = 'zenance_backups';
 const OPFS_META_KEY = 'zenance_opfs_rolling_meta';
@@ -41,6 +41,7 @@ export interface ParsedZipBackup {
  * 檢測當前瀏覽器環境是否原生支援 OPFS (Origin Private File System)
  */
 export function isOPFSSupported(): boolean {
+  if (!isSecureEnvironment()) return false;
   return typeof navigator !== 'undefined' && Boolean(navigator.storage?.getDirectory);
 }
 

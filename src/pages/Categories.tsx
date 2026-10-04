@@ -60,7 +60,7 @@ export default function Categories() {
   };
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full max-w-md mx-auto space-y-4 pb-20">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8 -ml-2 cursor-pointer text-muted-foreground hover:text-foreground">

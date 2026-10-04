@@ -698,7 +698,8 @@
       "item": "ITEM",
       "details": "DETAILS",
       "createdAt": "Created",
-      "updatedAt": "Updated"
+      "updatedAt": "Updated",
+      "toggleAmountCompact": "Click to toggle between full amount and compact format"
     },
     "refund": {
       "title": "Refund",

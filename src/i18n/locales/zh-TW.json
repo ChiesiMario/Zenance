@@ -698,7 +698,8 @@
       "item": "項目",
       "details": "明細",
       "createdAt": "建立時間",
-      "updatedAt": "修改時間"
+      "updatedAt": "修改時間",
+      "toggleAmountCompact": "點擊切換完整金額與金融縮寫"
     },
     "refund": {
       "title": "退款",

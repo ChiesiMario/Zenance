@@ -1,4 +1,4 @@
-import { getCurrencySymbol, cn, formatAmountNumber } from '@/lib/utils';
+import { getCurrencySymbol, cn, formatAmountNumber, formatCompactNumber } from '@/lib/utils';
 import { SpringNumber, getRememberedNumber, setRememberedNumber } from '@/components/ui/SpringNumber';
 
 export interface AmountDisplayProps {
@@ -17,6 +17,10 @@ export interface AmountDisplayProps {
    * Unique memory key for persisting previous numeric value across page transitions
    */
   memoryKey?: string;
+  /**
+   * Whether to display amount in compact notation (e.g. 10k, 1.2M)
+   */
+  compact?: boolean;
 }
 
 export function AmountDisplay({
@@ -29,6 +33,7 @@ export function AmountDisplay({
   className,
   animated = false,
   memoryKey,
+  compact = false,
 }: AmountDisplayProps) {
   const effectiveMemoryKey = memoryKey || (animated ? `amt-${type}-${baseCurrency}-${className || 'd'}` : undefined);
   
@@ -45,7 +50,9 @@ export function AmountDisplay({
     ? isApproximate
     : Boolean(originalCurrency && originalCurrency !== baseCurrency);
   const symbol = getCurrencySymbol(baseCurrency);
-  const formattedAmount = formatAmountNumber(Math.abs(displayAmount));
+  const formattedAmount = compact
+    ? formatCompactNumber(Math.abs(displayAmount))
+    : formatAmountNumber(Math.abs(displayAmount));
   
   let colorClass = '';
   let sign = '';
@@ -92,7 +99,7 @@ export function AmountDisplay({
       {effectiveIsApproximate && '≈ '}
       {sign}
       {symbol}
-      {animated ? (
+      {animated && !compact ? (
         <SpringNumber value={Math.abs(displayAmount)} memoryKey={effectiveMemoryKey} />
       ) : (
         formattedAmount

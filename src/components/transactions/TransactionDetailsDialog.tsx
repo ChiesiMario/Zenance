@@ -98,6 +98,81 @@ function TreeBranchConnector({
   );
 }
 
+interface VoucherHeroAmountProps {
+  amount: number;
+  originalCurrency?: string;
+  baseCurrency?: string;
+  isApproximate?: boolean;
+  type?: 'income' | 'expense' | 'transfer' | 'loan' | 'neutral' | 'balance';
+  className?: string;
+  isActive: boolean;
+}
+
+function VoucherHeroAmount({
+  amount,
+  originalCurrency,
+  baseCurrency,
+  isApproximate,
+  type,
+  className,
+  isActive,
+}: VoucherHeroAmountProps) {
+  const { t } = useTranslation();
+  const [isCompactLocked, setIsCompactLocked] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+
+  const isLargeAmount = Math.abs(amount) >= 10000;
+  const showCompact = isLargeAmount && (isCompactLocked || isHovering);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isLargeAmount) return;
+    e.stopPropagation();
+    setIsCompactLocked((prev) => {
+      const next = !prev;
+      if (!next) {
+        setIsHovering(false);
+      }
+      return next;
+    });
+  };
+
+  const handleMouseEnter = () => {
+    if (!isLargeAmount) return;
+    setIsHovering(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (!isLargeAmount) return;
+    setIsHovering(false);
+  };
+
+  return (
+    <div
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      title={isLargeAmount ? t('receipt.toggleAmountCompact') : undefined}
+      className={cn(
+        "w-full max-w-full overflow-hidden text-3xl sm:text-4xl font-mono tracking-tighter font-extrabold select-all py-1.5 leading-tight flex items-center justify-center transition-opacity duration-150",
+        isLargeAmount && "cursor-pointer hover:opacity-90 active:scale-[0.99]"
+      )}
+    >
+      <AutoMarquee align="center" startFrom="start" active={isActive} className="max-w-full">
+        <AmountDisplay
+          amount={amount}
+          originalCurrency={originalCurrency}
+          baseCurrency={baseCurrency}
+          isApproximate={isApproximate}
+          type={type}
+          className={className}
+          showSign={false}
+          compact={showCompact}
+        />
+      </AutoMarquee>
+    </div>
+  );
+}
+
 interface Props {
   transactionId: string | null;
   onClose: () => void;
@@ -964,20 +1039,16 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
             )}
           </div>
 
-          {/* Hero Amount Monospace Display with AutoMarquee */}
-          <div className="w-full max-w-full overflow-hidden text-3xl sm:text-4xl font-mono tracking-tighter font-extrabold select-all py-1.5 leading-tight flex items-center justify-center">
-            <AutoMarquee align="center" active={isActive} className="max-w-full">
-              <AmountDisplay
-                amount={cardAmount}
-                originalCurrency={isDirectOriginal ? undefined : tx.originalCurrency}
-                baseCurrency={cardBaseCurrency}
-                isApproximate={isDirectOriginal ? false : undefined}
-                type={effectiveType as any}
-                className={amountColorClass}
-                showSign={false}
-              />
-            </AutoMarquee>
-          </div>
+          {/* Hero Amount Monospace Display with AutoMarquee & Interactive Compact Amount */}
+          <VoucherHeroAmount
+            amount={cardAmount}
+            originalCurrency={isDirectOriginal ? undefined : tx.originalCurrency}
+            baseCurrency={cardBaseCurrency}
+            isApproximate={isDirectOriginal ? false : undefined}
+            type={effectiveType as any}
+            className={amountColorClass}
+            isActive={isActive}
+          />
 
           {/* 若為主交易且存在已退款金額，顯示已退款提示 */}
           {!isChild && (() => {

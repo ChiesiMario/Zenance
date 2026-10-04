@@ -1,57 +1,75 @@
-# Root Cause 診斷報告：新增分類與選擇帳戶 Dialog 本體被自身背景遮罩覆蓋與模糊
+# Root Cause 診斷報告：交易詳情大金額懸停非正中間位置高速頻閃
 
 ## 1. 故障現象描述
-使用者在新增交易視窗中點擊「新增分類」彈窗或「選擇帳戶」彈窗時，彈出的卡片本體（包含標題、輸入框與按鈕），連同背景畫面全部被一層白色的毛玻璃遮罩（Backdrop）所覆蓋與模糊化。
+在交易詳情卡片中，面對 1 萬以上的大金額，當使用者將滑鼠懸停在金額的「非正中間位置」（如偏左側或偏右側）時，金額與跑馬燈組件會發生極高頻率（每秒約 60 次）的閃爍（Hover Strobe / Jitter），只有當滑鼠精確停留在水平正中間時才不會頻閃。
 
 ---
 
 ## 2. 核心代碼定位
-1. **底層彈窗外層容器 z-index 自動連動正則表達式**：
-   - 檔案：`src/components/ui/dialog.tsx`
-   - 代碼位置（第 65～67 行）：
+
+1. **懸停事件掛載節點與自適應寬度（Inline-Flex）**：
+   - 檔案：`src/components/transactions/TransactionDetailsDialog.tsx`
+   - 代碼位置（`VoucherHeroAmount` 組件）：
      ```tsx
-     const extractedZIndex =
-       (typeof className === 'string' ? className.match(/\bz-(?:\[\d+\]|\d+)\b/)?.[0] : undefined) ||
-       (typeof overlayClassName === 'string' ? overlayClassName.match(/\bz-(?:\[\d+\]|\d+)\b/)?.[0] : undefined)
+     <div
+       onClick={handleClick}
+       onMouseEnter={handleMouseEnter}
+       onMouseLeave={handleMouseLeave}
+       className={cn(
+         "inline-flex items-center justify-center transition-opacity duration-150 select-text",
+         isLargeAmount && "cursor-pointer hover:opacity-90 active:scale-[0.99]"
+       )}
+     >
+       <AmountDisplay ... compact={showCompact} />
+     </div>
      ```
-2. **居中 Flex 外層容器**：
-   - 檔案：`src/components/ui/dialog.tsx`
-   - 代碼位置（第 99～103 行）：
+2. **跑馬燈外層容器與居中佈局排版**：
+   - 檔案：`src/components/ui/AutoMarquee.tsx`
+   - 代碼位置（第 106～124 行）：
      ```tsx
-     <div className={cn(
-       "fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none touch-none",
-       extractedZIndex,
-       wrapperClassName
-     )}>
+     <div
+       ref={containerRef}
+       className={cn(
+         'overflow-hidden max-w-full w-full [backface-visibility:hidden]',
+         isOverflowing
+           ? ...
+           : align === 'center'
+             ? 'flex justify-center text-center'
+             : ...
+       )}
+     >
      ```
-3. **調用端傳入的 Tailwind 任意值類名**：
-   - 檔案：`src/components/transactions/AddTransactionModal.tsx`（第 1753～1754 行）
-   - 檔案：`src/components/accounts/AccountSelectDialog.tsx`（第 145 行）
-   - 代碼：`className="z-[70] ..."` 與 `overlayClassName="z-[70]"`
 
 ---
 
 ## 3. 底層根本原因剖析 (Why & Root Cause)
 
-### 根因：正則表達式單詞邊界 `\b` 陷阱導致 `z-[70]` 匹配完全失效，彈窗外層容器層級始終停留在 `z-[60]`，被 `z-[70]` 遮罩覆蓋
+### 根因：DOM 碰撞偵測（Hit-Testing）邊界突變引發的「懸停正反饋震盪循環（Hover Flip-Flop Strobe）」
 
-1. **正則單詞邊界 `\b` 對中括號 `]` 失效**：
-   - 在正則表達式 `/\bz-(?:\[\d+\]|\d+)\b/` 中，結尾使用了 `\b`（Word Boundary，單詞邊界）。
-   - 在正則規範中，`\b` 定義為 `\w`（ASCII 字母、數字、底線）與 `\W`（非字母數字字符）之間的交界。
-   - 在 Tailwind CSS 的任意值語法 `z-[70]` 中，最後一個字符為中括號 `]`，屬於 `\W`（非單詞字符）。
-   - 當 `z-[70]` 後方緊接著空格（如 `"z-[70] sm:max-w-[320px]"`）時，空格亦屬於 `\W`。
-   - 由於 `]` 與空格均為 `\W`，兩者之間**不存在單詞邊界**，導致正則表達式評估結果永遠為 `null`：
-     ```js
-     'z-[70] sm:max-w-[320px]'.match(/\bz-(?:\[\d+\]|\d+)\b/) // => null
-     ```
-2. **提取變數 `extractedZIndex` 恆為 `undefined`**：
-   - 無論調用端在 `className` 或是 `overlayClassName` 傳入 `z-[70]`、`z-[80]` 等 Tailwind 任意值類名，`extractedZIndex` 始終為 `undefined`。
-3. **外層 Flex 容器層級無法提升，仍固定在 `z-[60]`**：
-   - 由於未匹配成功，`cn("fixed inset-0 z-[60] ...", extractedZIndex, wrapperClassName)` 中完全沒有注入 `z-[70]`。
-   - 外層居中 Flex 容器的樣式依然維持寫死的 **`z-[60]`**。
-4. **遮罩組件成功解析為 `z-[70]`**：
-   - 遮罩節點 `<DialogOverlay>` 透過 `cn("fixed inset-0 z-[60] ...", overlayClassName)` 渲染，`overlayClassName="z-[70]"` 經由 `tailwind-merge` 成功將遮罩的層級提升至 **`z-[70]`**。
-5. **最終呈現現象**：
-   - 遮罩層：`fixed inset-0 z-[70]`
-   - 彈窗外層容器：`fixed inset-0 z-[60]`
-   - 在瀏覽器 CSS 堆疊上下文計算中，`70 > 60`。遮罩直接覆蓋在包含整個彈窗卡片的外層容器正前方，導致新增分類 Dialog 與選擇帳戶 Dialog 的本體連同背景一併被遮罩模糊化。
+1. **初始狀態（完整長金額狀態，DOM 寬度大）**：
+   - 當金額為完整數字時（如 `¥123,456,789.00`），文字長度極長，`VoucherHeroAmount` 的幾何寬度佔據了容器大部分甚至全部寬度（例如寬度為 280px）。
+   - 此時使用者將滑鼠移動至偏左側或偏右側（例如距離卡片左側 40px 的位置），滑鼠落入該 280px 的 DOM 碰撞矩形內。
+
+2. **觸發 `mouseenter` 進入縮寫狀態**：
+   - 瀏覽器 Hit-Testing 判定游標進入 `VoucherHeroAmount`，觸發 `handleMouseEnter`，`isHovering` 變為 `true`。
+   - 組件將 `compact` 切換為 `true`，金額瞬間縮短為金融縮寫（如 `¥123.5M`）。
+
+3. **幾何邊界驟縮與父容器居中對齊（Bounding Rect Collapse & Centering）**：
+   - 金融縮寫文字極短（寬度由 280px 驟降至約 60px）。
+   - 由於寬度遠小於卡片容器，`AutoMarquee` 判定為未溢出，外層生效 `justify-center text-center`。
+   - 這使得 `VoucherHeroAmount` 的整個 DOM 節點瞬間向卡片正中央收縮，其有效點擊/碰撞區域僅剩正中間寬度 60px 的範圍（約卡片水平 130px～190px 之間）。
+
+4. **游標被動脫離 DOM 節點，引發 `mouseleave`**：
+   - 使用者的滑鼠實體位置依然停留在偏左側（40px 處），但下方的 DOM 元素已在第 1 幀之內瞬間收縮至中央（130px 以外）。
+   - 游標下方瞬間變為外層父容器的空白間距，不再命中 `VoucherHeroAmount` 節點。
+   - 瀏覽器在下一幀的 Hit-Testing 中偵測到游標已不在該節點邊界內，**立刻觸發 `mouseleave` 事件**。
+
+5. **觸發 `mouseleave` 恢復完整長金額**：
+   - `handleMouseLeave` 執行，`isHovering` 變為 `false`，`compact` 變回 `false`。
+   - 金額瞬間切換回 280px 的完整數字。
+   - `VoucherHeroAmount` 的幾何寬度瞬間再次擴展至 280px，重新覆蓋了游標所在的偏左側（40px）位置。
+
+6. **重新被游標覆蓋，再次觸發 `mouseenter`，形成每秒 60 幀的無限震盪**：
+   - 游標再次進入擴展後的節點 ➔ 觸發 `mouseenter` ➔ 節點縮小至中央 ➔ 游標脫離 ➔ 觸發 `mouseleave` ➔ 節點放大覆蓋游標 ➔ 觸發 `mouseenter`...
+   - 整個循環在瀏覽器渲染幀（每秒 60 次）中持續震盪，產生劇烈的高頻頻閃。
+   - 只有當滑鼠恰好停留在正中間 60px 的交集範圍內時，DOM 節點縮小後仍能包覆住游標，才不會發生游標脫離現象。

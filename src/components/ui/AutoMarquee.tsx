@@ -101,7 +101,7 @@ export function AutoMarquee({
   // 動態計算動畫總週期：(滾動時間 + 兩端停頓時間) * 2
   // 停頓時間各約 1.4s，共 2.8s
   const duration = isOverflowing ? Math.max(5, overflowDistance / speed + 2.8) : 0;
-  const effectiveStartFrom = startFrom ?? (isTyping !== undefined ? 'end' : 'start');
+  const effectiveStartFrom = startFrom ?? (isTyping ? 'end' : 'start');
 
   return (
     <div

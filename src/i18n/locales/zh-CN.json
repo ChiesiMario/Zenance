@@ -698,7 +698,8 @@
       "item": "项目",
       "details": "明细",
       "createdAt": "创建时间",
-      "updatedAt": "修改时间"
+      "updatedAt": "修改时间",
+      "toggleAmountCompact": "点击切换完整金额与金融缩写"
     },
     "refund": {
       "title": "退款",

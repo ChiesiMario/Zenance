@@ -29,6 +29,7 @@ import {
 } from 'date-fns';
 import { useCategories } from '@/hooks/useCategories';
 import { useDateRangeTransactions } from '@/hooks/useMonthTransactions';
+import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
@@ -163,6 +164,20 @@ export default function Reports() {
   const startStr = useMemo(() => format(startDate, 'yyyy-MM-dd'), [startDate]);
   const endStr = useMemo(() => format(endDate, 'yyyy-MM-dd'), [endDate]);
   const { transactions: rangeTransactions } = useDateRangeTransactions(startStr, endStr);
+  const { transactions: allTransactions } = useTransactions();
+
+  // 建立 parentId -> 累計退款總額 索引表 (支援跨期退款完整扣除)
+  const refundsByParentId = useMemo(() => {
+    const map = new Map<string, number>();
+    const source = allTransactions || rangeTransactions || [];
+    for (const t of source) {
+      if (!t.deleted && t.parentId) {
+        const prev = map.get(t.parentId) || 0;
+        map.set(t.parentId, prev + t.amount);
+      }
+    }
+    return map;
+  }, [allTransactions, rangeTransactions]);
 
   // Filter transactions in this period
   const periodTransactions = useMemo(() => {
@@ -214,12 +229,51 @@ export default function Reports() {
     return (netBalance / totalIncome) * 100;
   }, [netBalance, totalIncome]);
 
-  // Single peak expense transaction
-  const peakExpenseTx = useMemo(() => {
-    const expenseList = periodTransactions.filter(tx => tx.type === 'expense' && !tx.parentId);
-    if (expenseList.length === 0) return null;
-    return expenseList.reduce((max, tx) => (tx.amount > max.amount ? tx : max), expenseList[0]);
-  }, [periodTransactions]);
+  // 單筆最高支出（排除轉入、轉賬、轉出、借貸、退款子交易及系統分類，並扣除關聯退款）
+  const peakExpenseItem = useMemo(() => {
+    const validExpenses = periodTransactions.filter(tx => {
+      if (tx.parentId) return false;
+      if (tx.type !== 'expense') return false;
+      const cat = allCategories?.find(c => c.id === tx.category);
+      if (cat?.isSystem) return false;
+      return true;
+    });
+
+    let maxItem: { tx: Transaction; netAmount: number } | null = null;
+    for (const tx of validExpenses) {
+      const totalRefunded = refundsByParentId.get(tx.id) || 0;
+      const netAmount = Math.max(0, tx.amount - totalRefunded);
+      if (netAmount > 0) {
+        if (!maxItem || netAmount > maxItem.netAmount) {
+          maxItem = { tx, netAmount };
+        }
+      }
+    }
+    return maxItem;
+  }, [periodTransactions, allCategories, refundsByParentId]);
+
+  // 單筆最高收入（排除轉入、轉賬、轉出、借貸、退款子交易及系統分類，並扣除關聯退款）
+  const peakIncomeItem = useMemo(() => {
+    const validIncomes = periodTransactions.filter(tx => {
+      if (tx.parentId) return false;
+      if (tx.type !== 'income') return false;
+      const cat = allCategories?.find(c => c.id === tx.category);
+      if (cat?.isSystem) return false;
+      return true;
+    });
+
+    let maxItem: { tx: Transaction; netAmount: number } | null = null;
+    for (const tx of validIncomes) {
+      const totalRefunded = refundsByParentId.get(tx.id) || 0;
+      const netAmount = Math.max(0, tx.amount - totalRefunded);
+      if (netAmount > 0) {
+        if (!maxItem || netAmount > maxItem.netAmount) {
+          maxItem = { tx, netAmount };
+        }
+      }
+    }
+    return maxItem;
+  }, [periodTransactions, allCategories, refundsByParentId]);
 
   // Category breakdown generator (with contra-accounting deduction)
   const getCategoryBreakdown = useMemo(() => {
@@ -504,7 +558,7 @@ export default function Reports() {
       {/* Primary KPI Overview Card (Vercel Metrics Style) */}
       <div className="border border-border rounded-xl overflow-hidden bg-card text-card-foreground shadow-none">
         {/* Net Balance Centerpiece */}
-        <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
+        <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center min-w-0 overflow-hidden">
           <div className="relative flex items-center justify-center h-5 mb-1.5 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono leading-none">
               {t('reports.netBalance')}
@@ -516,7 +570,7 @@ export default function Reports() {
           <AutoMarquee
             align="center"
             className={cn(
-              'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold px-2 leading-none',
+              'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold px-2 leading-none max-w-full',
               netBalance === 0
                 ? 'text-muted-foreground'
                 : netBalance > 0
@@ -530,23 +584,33 @@ export default function Reports() {
           </AutoMarquee>
         </div>
 
-        {/* 3-Column Analytical Indicators Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border bg-card">
+        {/* 4-Indicator Grid (2x2 Symmetric Matrix Layout across all viewports) */}
+        <div className="grid grid-cols-2 gap-px bg-border">
           {/* Indicator 1: Total Expense & Daily Avg */}
-          <div className="p-4 flex flex-col justify-between gap-2">
-            <div className="flex items-center justify-between h-5">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none">
-                <TrendingDown className="size-3.5 text-muted-foreground" />
+          <div className="bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between h-5 min-w-0">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none shrink-0">
+                <TrendingDown className="size-3.5 text-muted-foreground shrink-0" />
                 <span>{t('reports.totalExpense')}</span>
               </span>
               <MagnitudeBadge amount={totalExpense} memoryKey="reports-total-expense" />
             </div>
-            <div>
-              <p className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none">
-                {currencySymbol}
-                <SpringNumber value={totalExpense} memoryKey="reports-total-expense" />
-              </p>
-              <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+            <div className="min-w-0">
+              <div className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none min-w-0">
+                <AutoMarquee align="left">
+                  <span className="whitespace-nowrap inline-flex items-center select-text">
+                    {currencySymbol}
+                    <SpringNumber value={totalExpense} memoryKey="reports-total-expense" />
+                  </span>
+                </AutoMarquee>
+              </div>
+              <p
+                className="text-[11px] font-mono text-muted-foreground mt-0.5 truncate select-text"
+                title={`${t('reports.dailyAverage', '日均支出')}: ${currencySymbol}${dailyAverage.toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 1,
+                })}`}
+              >
                 {t('reports.dailyAverage', '日均支出')}: {currencySymbol}
                 {dailyAverage.toLocaleString(undefined, {
                   minimumFractionDigits: 0,
@@ -556,21 +620,88 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Indicator 2: Total Income & Savings Rate */}
-          <div className="p-4 flex flex-col justify-between gap-2">
-            <div className="flex items-center justify-between h-5">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none">
-                <TrendingUp className="size-3.5 text-emerald-500" />
+          {/* Indicator 2: Peak Single Expense */}
+          <div
+            onClick={() => {
+              if (peakExpenseItem) {
+                setSelectedTransactionId(peakExpenseItem.tx.id);
+              }
+            }}
+            className={cn(
+              "bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden transition-colors",
+              peakExpenseItem && "cursor-pointer hover:bg-muted/30 group"
+            )}
+          >
+            <div className="flex items-center justify-between h-5 min-w-0">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none shrink-0">
+                <Flame className="size-3.5 text-amber-500 shrink-0" />
+                <span>{t('reports.peakExpense')}</span>
+              </span>
+              <MagnitudeBadge
+                amount={peakExpenseItem ? peakExpenseItem.netAmount : 0}
+                memoryKey="reports-peak-expense"
+              />
+            </div>
+            <div className="min-w-0">
+              {peakExpenseItem ? (
+                <>
+                  <div className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none min-w-0">
+                    <AutoMarquee align="left">
+                      <span className="whitespace-nowrap inline-flex items-center select-text">
+                        {currencySymbol}
+                        {formatAmountNumber(peakExpenseItem.netAmount)}
+                      </span>
+                    </AutoMarquee>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5 min-w-0">
+                    <p
+                      className="text-[11px] font-mono text-muted-foreground truncate select-text min-w-0 flex-1"
+                      title={
+                        peakExpenseItem.tx.note ||
+                        allCategories?.find(c => c.id === peakExpenseItem.tx.category)?.name ||
+                        t('common.unknown', '未分類')
+                      }
+                    >
+                      {peakExpenseItem.tx.note ||
+                        allCategories?.find(c => c.id === peakExpenseItem.tx.category)?.name ||
+                        t('common.unknown', '未分類')}
+                    </p>
+                    <ChevronRight className="size-3.5 opacity-40 group-hover:opacity-100 transition-opacity shrink-0 ml-1" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-mono tracking-tight font-medium text-muted-foreground leading-none">
+                    --
+                  </p>
+                  <p className="text-[11px] font-mono text-muted-foreground mt-0.5">--</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Indicator 3: Total Income & Savings Rate */}
+          <div className="bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between h-5 min-w-0">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none shrink-0">
+                <TrendingUp className="size-3.5 text-emerald-500 shrink-0" />
                 <span>{t('reports.totalIncome', '總收入')}</span>
               </span>
               <MagnitudeBadge amount={totalIncome} memoryKey="reports-total-income" />
             </div>
-            <div>
-              <p className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none">
-                {currencySymbol}
-                <SpringNumber value={totalIncome} memoryKey="reports-total-income" />
-              </p>
-              <p className="text-[11px] font-mono mt-0.5">
+            <div className="min-w-0">
+              <div className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none min-w-0">
+                <AutoMarquee align="left">
+                  <span className="whitespace-nowrap inline-flex items-center select-text">
+                    {currencySymbol}
+                    <SpringNumber value={totalIncome} memoryKey="reports-total-income" />
+                  </span>
+                </AutoMarquee>
+              </div>
+              <p
+                className="text-[11px] font-mono mt-0.5 truncate select-text"
+                title={savingsRate !== null ? `${t('reports.savingsRate', '結餘率')}: ${savingsRate >= 0 ? '+' : ''}${savingsRate.toFixed(1)}%` : undefined}
+              >
                 {savingsRate !== null ? (
                   <span
                     className={cn(
@@ -588,30 +719,58 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Indicator 3: Peak Single Expense */}
-          <div className="p-4 flex flex-col justify-between gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5">
-                <Flame className="size-3.5 text-amber-500" />
-                <span>{t('reports.peakExpense', '單筆最高')}</span>
+          {/* Indicator 4: Peak Single Income */}
+          <div
+            onClick={() => {
+              if (peakIncomeItem) {
+                setSelectedTransactionId(peakIncomeItem.tx.id);
+              }
+            }}
+            className={cn(
+              "bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden transition-colors",
+              peakIncomeItem && "cursor-pointer hover:bg-muted/30 group"
+            )}
+          >
+            <div className="flex items-center justify-between h-5 min-w-0">
+              <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none shrink-0">
+                <Flame className="size-3.5 text-emerald-500 shrink-0" />
+                <span>{t('reports.peakIncome')}</span>
               </span>
+              <MagnitudeBadge
+                amount={peakIncomeItem ? peakIncomeItem.netAmount : 0}
+                memoryKey="reports-peak-income"
+              />
             </div>
-            <div>
-              {peakExpenseTx ? (
+            <div className="min-w-0">
+              {peakIncomeItem ? (
                 <>
-                  <p className="text-2xl font-mono tracking-tight font-medium text-foreground truncate select-text">
-                    {currencySymbol}
-                    {formatAmountNumber(peakExpenseTx.amount)}
-                  </p>
-                  <p className="text-[11px] font-mono text-muted-foreground truncate mt-0.5 select-text">
-                    {peakExpenseTx.note ||
-                      allCategories?.find(c => c.id === peakExpenseTx.category)?.name ||
-                      t('common.unknown', '未分類')}
-                  </p>
+                  <div className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none min-w-0">
+                    <AutoMarquee align="left">
+                      <span className="whitespace-nowrap inline-flex items-center select-text">
+                        {currencySymbol}
+                        {formatAmountNumber(peakIncomeItem.netAmount)}
+                      </span>
+                    </AutoMarquee>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5 min-w-0">
+                    <p
+                      className="text-[11px] font-mono text-muted-foreground truncate select-text min-w-0 flex-1"
+                      title={
+                        peakIncomeItem.tx.note ||
+                        allCategories?.find(c => c.id === peakIncomeItem.tx.category)?.name ||
+                        t('common.unknown', '未分類')
+                      }
+                    >
+                      {peakIncomeItem.tx.note ||
+                        allCategories?.find(c => c.id === peakIncomeItem.tx.category)?.name ||
+                        t('common.unknown', '未分類')}
+                    </p>
+                    <ChevronRight className="size-3.5 opacity-40 group-hover:opacity-100 transition-opacity shrink-0 ml-1" />
+                  </div>
                 </>
               ) : (
                 <>
-                  <p className="text-xl font-mono tracking-tight font-medium text-muted-foreground">
+                  <p className="text-2xl font-mono tracking-tight font-medium text-muted-foreground leading-none">
                     --
                   </p>
                   <p className="text-[11px] font-mono text-muted-foreground mt-0.5">--</p>

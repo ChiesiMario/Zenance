@@ -661,6 +661,7 @@
       "dailyAverage": "日均支出",
       "savingsRate": "結餘率",
       "peakExpense": "單筆最高",
+      "peakIncome": "單筆最高",
       "expense": "支出",
       "income": "收入",
       "trendTitle": "收支走勢",

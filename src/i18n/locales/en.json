@@ -119,6 +119,7 @@
       "loanInAmount": "Collection Amount",
       "category": "Category",
       "addCategory": "Add",
+      "createCategory": "Add Category",
       "addExpenseCategory": "Add Expense Category",
       "addIncomeCategory": "Add Income Category",
       "expenseCategories": "Expense Categories",

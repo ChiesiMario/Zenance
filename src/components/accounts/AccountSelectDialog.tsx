@@ -27,6 +27,8 @@ export interface AccountSelectDialogProps {
   disabledReason?: string;
   title?: string;
   filterType?: 'wallet' | 'contact' | 'all';
+  className?: string;
+  overlayClassName?: string;
 }
 
 const GROUP_ORDER = ['debit', 'cash', 'credit', 'credit_pay', 'investment', 'personal', 'organization', 'other'];
@@ -50,6 +52,8 @@ export function AccountSelectDialog({
   disabledReason,
   title,
   filterType = 'wallet',
+  className,
+  overlayClassName,
 }: AccountSelectDialogProps) {
   const { t } = useTranslation();
   const { wallets, contacts } = useAccounts();
@@ -138,7 +142,8 @@ export function AccountSelectDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
-        className="sm:max-w-[380px] max-h-[85vh] p-0 flex flex-col gap-0 overflow-hidden bg-card border border-border text-card-foreground shadow-none select-none"
+        overlayClassName={cn("z-[70]", overlayClassName)}
+        className={cn("z-[70] sm:max-w-[380px] max-h-[85vh] p-0 flex flex-col gap-0 overflow-hidden bg-card border border-border text-card-foreground shadow-none select-none", className)}
       >
         {/* Header */}
         <div className="px-4 py-3 shrink-0 flex items-center justify-between border-b border-border">

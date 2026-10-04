@@ -920,7 +920,8 @@ export function AddTransactionModal({
   };
 
   return (
-    <Dialog 
+    <>
+      <Dialog 
       open={isOpen} 
       onOpenChange={(open, details) => {
         if (!open) {
@@ -1592,8 +1593,24 @@ export function AddTransactionModal({
                   </button>
                 </>
               ) : (
-                <div className="w-full flex items-center justify-center py-1 text-xs text-muted-foreground select-none">
-                  <span>{t('add.noCategoriesAvailable')}</span>
+                <div className="w-full flex items-center justify-center py-0.5 select-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setIsCatDialogOpen(true);
+                      setIsCategoryWarning(false);
+                    }}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium border border-dashed transition-colors duration-500 cursor-pointer flex items-center gap-1.5",
+                      isCategoryWarning
+                        ? "border-destructive/80 text-foreground hover:border-foreground/50"
+                        : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
+                    )}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{t('add.createCategory')}</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1668,10 +1685,15 @@ export function AddTransactionModal({
         </div>
       </div>
     </div>
+  </DialogContent>
+</Dialog>
 
         {/* Full Category Picker Dialog */}
         <Dialog open={isCatPickerOpen} onOpenChange={setIsCatPickerOpen}>
-          <DialogContent className="sm:max-w-[380px] bg-card border border-border text-card-foreground p-4">
+          <DialogContent
+            overlayClassName="z-[70]"
+            className="z-[70] sm:max-w-[380px] bg-card border border-border text-card-foreground p-4"
+          >
             <DialogHeader>
               <DialogTitle className="text-card-foreground text-base font-semibold">
                 {type === 'expense' ? t('add.expenseCategories', '支出分類') : t('add.incomeCategories', '收入分類')}
@@ -1727,7 +1749,10 @@ export function AddTransactionModal({
 
         {/* Add Custom Category Dialog */}
         <Dialog open={isCatDialogOpen} onOpenChange={setIsCatDialogOpen}>
-          <DialogContent className="sm:max-w-[320px] bg-card border border-border text-card-foreground p-4">
+          <DialogContent
+            overlayClassName="z-[70]"
+            className="z-[70] sm:max-w-[320px] bg-card border border-border text-card-foreground p-4"
+          >
             <DialogHeader>
               <DialogTitle className="text-card-foreground text-base">
                 {type === 'expense' ? t('add.addExpenseCategory') : t('add.addIncomeCategory')}
@@ -1776,7 +1801,6 @@ export function AddTransactionModal({
             accountSelectConfig.onSelect(acc);
           }}
         />
-      </DialogContent>
-    </Dialog>
-  );
-}
+      </>
+    );
+  }

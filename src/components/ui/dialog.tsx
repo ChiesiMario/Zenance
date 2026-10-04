@@ -44,6 +44,7 @@ function DialogOverlay({
 function DialogContent({
   className,
   overlayClassName,
+  wrapperClassName,
   children,
   showCloseButton = true,
   container,
@@ -54,14 +55,20 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
   overlayClassName?: string
+  wrapperClassName?: string
   container?: HTMLElement | null
   fullscreen?: boolean
   commandDeck?: boolean
 }) {
   const contentRef = React.useRef<HTMLDivElement>(null)
 
+  const extractZIndex = (str?: unknown) =>
+    typeof str === 'string' ? str.match(/(?:^|\s)(z-(?:\[\d+\]|\d+))(?:\s|$)/)?.[1] : undefined
+
+  const extractedZIndex = extractZIndex(className) || extractZIndex(overlayClassName)
+
   return (
-    <DialogPortal container={container}>
+    <DialogPortal container={container ?? (typeof document !== 'undefined' ? document.body : undefined)}>
       <DialogOverlay className={cn(commandDeck && "bg-overlay", overlayClassName)} />
       {fullscreen ? (
         <DialogPrimitive.Popup
@@ -90,7 +97,11 @@ function DialogContent({
           {children}
         </DialogPrimitive.Popup>
       ) : (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none touch-none">
+        <div className={cn(
+          "fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none touch-none",
+          extractedZIndex,
+          wrapperClassName
+        )}>
           <DialogPrimitive.Popup
             ref={contentRef}
             initialFocus={initialFocus ?? false}

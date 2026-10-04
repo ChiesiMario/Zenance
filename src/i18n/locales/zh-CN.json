@@ -119,6 +119,7 @@
       "loanInAmount": "收款金额",
       "category": "分类",
       "addCategory": "添加",
+      "createCategory": "添加分类",
       "addExpenseCategory": "添加支出分类",
       "addIncomeCategory": "添加收入分类",
       "expenseCategories": "支出分类",

@@ -31,6 +31,12 @@ trigger: always_on
 - **彈窗與居中規範**：
   - 嚴禁在彈窗本體上使用 `inset-0 m-auto` 或 `transform: translate(-50%, -50%)` 做幾何定位。
   - 所有浮層與 Modal 必須使用外層「全螢幕 Flex 容器居中（`fixed inset-0 flex items-center justify-center p-4 pointer-events-none`）」架構，彈窗本體為普通 block（`pointer-events-auto`），高度嚴格由內容自然撐開。
+  - **禁止彈窗巢狀聲明 (No Nested Dialogs in DialogContent / Flat Sibling Portals)**：
+    - 所有 Dialog / Modal 元件在 JSX 結構中必須以平級兄弟節點（Sibling Node，使用 `<> ... </>` Fragment 平鋪）聲明，**絕對禁止**將次級 `<Dialog>` 寫在另一個 `<DialogContent>` 的 DOM 樹或 JSX 內部。
+    - 巢狀聲明會觸發底層 Portal 上下文（如 Base UI / Floating UI）將子 Portal 自動吸附至父級 Portal 容器，導致次級彈窗的毛玻璃遮罩 (`Backdrop`) 被父層實色卡片壓制、吞噬或失效，造成子彈窗彈出時背景失去暗化遮罩。
+    - 底層 `DialogContent` 必須將 Portal container 預設指定為 `document.body`，實現全域獨立渲染防護。
+  - **多層彈窗遮罩棧規範 (Multi-layer Dialog Stacking)**：
+    - 當主彈窗層級為 `z-[60]` 時，於其上疊加呼出的次級彈窗（Secondary Dialog，如新增分類、選擇帳戶、代付分帳、二次確認等）其遮罩層與彈窗本體必須指定更高層級（如 `overlayClassName="z-[70]"` 與 `className="z-[70] ..."`），確保第二層彈窗能清晰、高對比地遮蓋在第一層彈窗之上，形成清晰聚焦的層次感。
   - **焦點管理與禁止自動聚焦 (Dialog Focus & No Auto-Focus)**：
     - 彈窗掛載時禁止第 0 幀同步強奪焦點（`initialFocus={false}`），避免觸發整頁同步強制重排（Forced Synchronous Reflow）。
     - **嚴禁自動聚焦輸入框**：所有 Dialog 彈窗掛載出現時，**絕對禁止**在任何輸入框（如 `Input`、`AmountInput` 等）上設置 `autoFocus` 屬性，亦禁止透過 JS 強行調用 `.focus()`。自動聚焦會導致輸入鍵盤（桌面端懸浮數字鍵盤或行動端原生軟鍵盤）直接出現從而遮擋彈窗內容，破壞用戶看清彈窗完整資訊（如標題、說明、帳戶、金額上限等）的體驗。鍵盤必須交由用戶主動點擊目標欄位時呼出。

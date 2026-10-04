@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { clearNumberMemory } from '@/lib/numberMemory';
 
 interface AppState {
   isSyncing: boolean;
@@ -53,7 +54,13 @@ export const useAppStore = create<AppState>()(
       addModalInitialNote: null,
       setSyncing: (isSyncing) => set({ isSyncing }),
       setLastSyncTime: (time) => set({ lastSyncTime: time }),
-      setActiveLedgerId: (id) => set({ activeLedgerId: id }),
+      setActiveLedgerId: (id) =>
+        set((state) => {
+          if (state.activeLedgerId !== id) {
+            clearNumberMemory();
+          }
+          return { activeLedgerId: id };
+        }),
       setEditingTransactionId: (id) => set({ editingTransactionId: id }),
       setViewingTransactionId: (id) => set({ viewingTransactionId: id }),
       openAddModal: (type = 'expense', loanType = 'borrow', contactId, initialToAccountId, initialAmount, initialAccountId, initialCategoryId, initialNote) => 

@@ -1,20 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn, formatAmountNumber } from '@/lib/utils';
+import { useAppStore } from '@/store/useAppStore';
+import {
+  getRememberedNumber,
+  setRememberedNumber,
+  clearNumberMemory,
+} from '@/lib/numberMemory';
 
-// Global in-memory cache for remembered numbers across component mount/unmount cycles
-const numberMemoryStore = new Map<string, number>();
-
-export function getRememberedNumber(key: string): number | undefined {
-  return numberMemoryStore.get(key);
-}
-
-export function setRememberedNumber(key: string, val: number): void {
-  numberMemoryStore.set(key, val);
-}
-
-export function clearNumberMemory(): void {
-  numberMemoryStore.clear();
-}
+// Re-export for backward compatibility
+export { getRememberedNumber, setRememberedNumber, clearNumberMemory };
 
 export interface SpringNumberProps {
   value: number;
@@ -54,6 +48,9 @@ export function SpringNumber({
   damping = 24,
   format,
 }: SpringNumberProps) {
+  const { activeLedgerId } = useAppStore();
+  const scopedMemoryKey = memoryKey ? `${activeLedgerId || 'global'}:${memoryKey}` : undefined;
+
   // If decimals is not explicitly specified, automatically omit .00 if target value is integer
   const isTargetInteger = Math.round(Math.abs(value) * 100) % 100 === 0;
   const effectiveDecimals = decimals !== undefined ? decimals : (isTargetInteger ? 0 : 2);
@@ -63,7 +60,7 @@ export function SpringNumber({
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Retrieve cached previous value if memoryKey is supplied
-  const rememberedValue = memoryKey ? getRememberedNumber(memoryKey) : undefined;
+  const rememberedValue = scopedMemoryKey ? getRememberedNumber(scopedMemoryKey) : undefined;
   
   // 核心：若有快取且當前剛掛載處於 0 態，初始值直接採用快取值；否則直接採用真實 value
   const initialValue = isReducedMotion
@@ -96,8 +93,8 @@ export function SpringNumber({
       return;
     }
 
-    if (memoryKey && value !== 0) {
-      setRememberedNumber(memoryKey, value);
+    if (scopedMemoryKey && value !== 0) {
+      setRememberedNumber(scopedMemoryKey, value);
     }
 
     // 若為初次渲染或開啟減少動畫模式，或數值未實質改變，保持靜態
@@ -176,7 +173,7 @@ export function SpringNumber({
         rafIdRef.current = null;
       }
     };
-  }, [value, stiffness, damping, effectiveDecimals, isReducedMotion, memoryKey, rememberedValue]);
+  }, [value, stiffness, damping, effectiveDecimals, isReducedMotion, scopedMemoryKey, rememberedValue]);
 
   // 格式化輸出：若已靜止，且無自訂 format，採用全站標準 formatAmountNumber 確保完全一致
   const isSettled = Math.abs(currentPosRef.current - targetRef.current) < 0.001;

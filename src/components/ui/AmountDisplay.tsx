@@ -1,5 +1,7 @@
 import { getCurrencySymbol, cn, formatAmountNumber, formatCompactNumber } from '@/lib/utils';
-import { SpringNumber, getRememberedNumber, setRememberedNumber } from '@/components/ui/SpringNumber';
+import { SpringNumber } from '@/components/ui/SpringNumber';
+import { getRememberedNumber, setRememberedNumber } from '@/lib/numberMemory';
+import { useAppStore } from '@/store/useAppStore';
 
 export interface AmountDisplayProps {
   amount: number;
@@ -35,7 +37,9 @@ export function AmountDisplay({
   memoryKey,
   compact = false,
 }: AmountDisplayProps) {
-  const effectiveMemoryKey = memoryKey || (animated ? `amt-${type}-${baseCurrency}-${className || 'd'}` : undefined);
+  const { activeLedgerId } = useAppStore();
+  const rawKey = memoryKey || (animated ? `amt-${type}-${baseCurrency}-${className || 'd'}` : undefined);
+  const effectiveMemoryKey = rawKey ? `${activeLedgerId || 'global'}:${rawKey}` : undefined;
   
   // 核心：若有記憶快取且當前數值恰好為 0（非同步資料庫載入中），優先沿用快取數值，避免 0 態閃爍與佈局抖動
   const remembered = effectiveMemoryKey ? getRememberedNumber(effectiveMemoryKey) : undefined;

@@ -1,75 +1,109 @@
-# Root Cause 診斷報告：交易詳情大金額懸停非正中間位置高速頻閃
+# Root Cause 診斷報告：切換帳本後多個頁面金額統計資訊未正確更新
 
 ## 1. 故障現象描述
-在交易詳情卡片中，面對 1 萬以上的大金額，當使用者將滑鼠懸停在金額的「非正中間位置」（如偏左側或偏右側）時，金額與跑馬燈組件會發生極高頻率（每秒約 60 次）的閃爍（Hover Strobe / Jitter），只有當滑鼠精確停留在水平正中間時才不會頻閃。
+使用者在切換帳本（例如在首頁 Dashboard 下拉選單或設定頁面切換當前帳本）後，多個頁面（包含 Dashboard、Accounts、Reports、Contacts 等）的金額統計卡片與指標未及時更新為新帳本的數值，而是持續顯示舊帳本的金額統計資訊與金融縮寫膠囊。
 
 ---
 
 ## 2. 核心代碼定位
 
-1. **懸停事件掛載節點與自適應寬度（Inline-Flex）**：
-   - 檔案：`src/components/transactions/TransactionDetailsDialog.tsx`
-   - 代碼位置（`VoucherHeroAmount` 組件）：
+1. **全域數字記憶體與靜態無作用域 Key（Global Memory Store without Ledger Scope）**：
+   - 檔案：`src/components/ui/SpringNumber.tsx`（第 4～17 行）
      ```tsx
-     <div
-       onClick={handleClick}
-       onMouseEnter={handleMouseEnter}
-       onMouseLeave={handleMouseLeave}
-       className={cn(
-         "inline-flex items-center justify-center transition-opacity duration-150 select-text",
-         isLargeAmount && "cursor-pointer hover:opacity-90 active:scale-[0.99]"
-       )}
-     >
-       <AmountDisplay ... compact={showCompact} />
-     </div>
+     const numberMemoryStore = new Map<string, number>();
      ```
-2. **跑馬燈外層容器與居中佈局排版**：
-   - 檔案：`src/components/ui/AutoMarquee.tsx`
-   - 代碼位置（第 106～124 行）：
+   - 檔案：`src/pages/Dashboard.tsx`（第 401、410、420、429、437、447 行）
      ```tsx
-     <div
-       ref={containerRef}
-       className={cn(
-         'overflow-hidden max-w-full w-full [backface-visibility:hidden]',
-         isOverflowing
-           ? ...
-           : align === 'center'
-             ? 'flex justify-center text-center'
-             : ...
-       )}
-     >
+     memoryKey="dashboard-net-balance"
+     memoryKey="dashboard-income"
+     memoryKey="dashboard-expense"
+     ```
+   - 檔案：`src/pages/Accounts.tsx`（第 353、362、370、379、387、396 行）
+     ```tsx
+     memoryKey="accounts-net-worth"
+     memoryKey="accounts-total-wallets"
+     memoryKey="accounts-net-loans"
+     ```
+   - 檔案：`src/pages/Reports.tsx`（第 513、529、542、547、566、571 行）
+     ```tsx
+     memoryKey="reports-net-balance"
+     memoryKey="reports-total-expense"
+     memoryKey="reports-total-income"
+     ```
+   - 檔案：`src/pages/Contacts.tsx`（第 219、228、236、245、253、262 行）
+     ```tsx
+     memoryKey="contacts-net-balance"
+     memoryKey="contacts-total-receivable"
+     memoryKey="contacts-total-payable"
+     ```
+
+2. **零態防閃爍邏輯對 0 元的硬性攔截（Zero-State Interception in Display Components）**：
+   - 檔案：`src/components/ui/AmountDisplay.tsx`（第 36～39 行）
+     ```tsx
+     const remembered = effectiveMemoryKey ? getRememberedNumber(effectiveMemoryKey) : undefined;
+     const isPendingZero = amount === 0 && remembered !== undefined && remembered !== 0;
+     const displayAmount = isPendingZero ? remembered : amount;
+     ```
+   - 檔案：`src/components/ui/MagnitudeBadge.tsx`（第 30～32 行）
+     ```tsx
+     const remembered = memoryKey ? getRememberedNumber(memoryKey) : undefined;
+     const isPendingZero = (amount === 0 || amount === undefined) && remembered !== undefined && remembered !== 0;
+     const displayAmount = isPendingZero ? remembered : amount;
+     ```
+   - 檔案：`src/components/ui/SpringNumber.tsx`（第 94～97 行）
+     ```tsx
+     // 若是切換頁面或初始掛載階段，且剛好是 0 態（資料庫尚未返回），不朝 0 俯衝
+     if (value === 0 && rememberedValue !== undefined && rememberedValue !== 0) {
+       return;
+     }
+     ```
+
+3. **Keep-Alive 分頁生命週期與 `display: none` 下的 RAF 凍結**：
+   - 檔案：`src/components/layout/AppLayout.tsx`（第 208～229 行）
+     ```tsx
+     {mountedTabs.has('/accounts') && (
+       <div style={{ display: location.pathname === '/accounts' ? 'block' : 'none' }}>
+         <Accounts />
+       </div>
+     )}
+     ```
+   - 檔案：`src/store/useAppStore.ts`（第 56 行）
+     ```tsx
+     setActiveLedgerId: (id) => set({ activeLedgerId: id }),
      ```
 
 ---
 
 ## 3. 底層根本原因剖析 (Why & Root Cause)
 
-### 根因：DOM 碰撞偵測（Hit-Testing）邊界突變引發的「懸停正反饋震盪循環（Hover Flip-Flop Strobe）」
+### 根因一：`memoryKey` 全域快取跨帳本污染，導致新帳本零態（0 元）被強制劫持為舊帳本金額
 
-1. **初始狀態（完整長金額狀態，DOM 寬度大）**：
-   - 當金額為完整數字時（如 `¥123,456,789.00`），文字長度極長，`VoucherHeroAmount` 的幾何寬度佔據了容器大部分甚至全部寬度（例如寬度為 280px）。
-   - 此時使用者將滑鼠移動至偏左側或偏右側（例如距離卡片左側 40px 的位置），滑鼠落入該 280px 的 DOM 碰撞矩形內。
+1. **靜態 Key 缺乏帳本隔離（Ledger Isolation Defect）**：
+   - 各頁面的統計卡片傳入的 `memoryKey` 皆為純靜態字串（如 `"dashboard-net-balance"`, `"accounts-net-worth"` 等），未與 `activeLedgerId` 綁定。
+   - `numberMemoryStore` 是一個常駐於記憶體的全域 `Map<string, number>`，各帳本共用同一個 Key。
 
-2. **觸發 `mouseenter` 進入縮寫狀態**：
-   - 瀏覽器 Hit-Testing 判定游標進入 `VoucherHeroAmount`，觸發 `handleMouseEnter`，`isHovering` 變為 `true`。
-   - 組件將 `compact` 切換為 `true`，金額瞬間縮短為金融縮寫（如 `¥123.5M`）。
+2. **零態保護機制引發的永久陳舊（Zero-State Lockup）**：
+   - 當使用者從帳本 A 切換至帳本 B 時：
+     - 若帳本 B 為空帳本、新建立帳本，或某項指標真實數值為 0（例如當月無支出、無借貸等），該組件計算出的真實 `amount` 為 `0`。
+     - 但此時 `getRememberedNumber(memoryKey)` 抓取到的是帳本 A 的巨大金額（例如 100,000）。
+     - 判定式 `amount === 0 && remembered !== 0` 恆為 `true`。
+     - `AmountDisplay` 與 `MagnitudeBadge` 將 `displayAmount` 判定為 `remembered`（帳本 A 的舊值）；
+     - `SpringNumber` 執行至 `if (value === 0 && rememberedValue !== undefined && rememberedValue !== 0) return;` 直接終止回調，不執行動畫且不更新 `displayValue`。
+   - 由於真實值 `amount === 0`，永遠無法滿足 `if (memoryKey && amount !== 0) setRememberedNumber(...)`，導致全域快取永遠不會被覆寫，畫面永久鎖定在舊帳本 A 的金額上。
 
-3. **幾何邊界驟縮與父容器居中對齊（Bounding Rect Collapse & Centering）**：
-   - 金融縮寫文字極短（寬度由 280px 驟降至約 60px）。
-   - 由於寬度遠小於卡片容器，`AutoMarquee` 判定為未溢出，外層生效 `justify-center text-center`。
-   - 這使得 `VoucherHeroAmount` 的整個 DOM 節點瞬間向卡片正中央收縮，其有效點擊/碰撞區域僅剩正中間寬度 60px 的範圍（約卡片水平 130px～190px 之間）。
+---
 
-4. **游標被動脫離 DOM 節點，引發 `mouseleave`**：
-   - 使用者的滑鼠實體位置依然停留在偏左側（40px 處），但下方的 DOM 元素已在第 1 幀之內瞬間收縮至中央（130px 以外）。
-   - 游標下方瞬間變為外層父容器的空白間距，不再命中 `VoucherHeroAmount` 節點。
-   - 瀏覽器在下一幀的 Hit-Testing 中偵測到游標已不在該節點邊界內，**立刻觸發 `mouseleave` 事件**。
+### 根因二：Keep-Alive 機制下非活動分頁處於 `display: none`，導致瀏覽器凍結 `requestAnimationFrame`
 
-5. **觸發 `mouseleave` 恢復完整長金額**：
-   - `handleMouseLeave` 執行，`isHovering` 變為 `false`，`compact` 變回 `false`。
-   - 金額瞬間切換回 280px 的完整數字。
-   - `VoucherHeroAmount` 的幾何寬度瞬間再次擴展至 280px，重新覆蓋了游標所在的偏左側（40px）位置。
+1. **分頁元件未重新掛載（No Remount Trigger）**：
+   - 在 `AppLayout.tsx` 中，`Dashboard`、`Accounts`、`Budgets`、`Contacts` 等分頁採用持久化保活棧（`display: none / block`），切換帳本時並不會觸發組件卸載與重新掛載。
+2. **動畫被瀏覽器休眠**：
+   - 當使用者在當前分頁（如 `Dashboard`）切換帳本時，背景處於 `display: none` 的其他分頁（如 `Accounts`、`Contacts`）接收到新資料時觸發了數值變更，發起 `requestAnimationFrame`。
+   - 現代瀏覽器對於 `display: none` 的元素會徹底凍結或丟棄 RAF 幀更新。
+   - 當使用者切換至該分頁時，動畫狀態未曾完整執行收斂，停留在舊狀態或快取狀態。
 
-6. **重新被游標覆蓋，再次觸發 `mouseenter`，形成每秒 60 幀的無限震盪**：
-   - 游標再次進入擴展後的節點 ➔ 觸發 `mouseenter` ➔ 節點縮小至中央 ➔ 游標脫離 ➔ 觸發 `mouseleave` ➔ 節點放大覆蓋游標 ➔ 觸發 `mouseenter`...
-   - 整個循環在瀏覽器渲染幀（每秒 60 次）中持續震盪，產生劇烈的高頻頻閃。
-   - 只有當滑鼠恰好停留在正中間 60px 的交集範圍內時，DOM 節點縮小後仍能包覆住游標，才不會發生游標脫離現象。
+---
+
+### 根因三：切換帳本動作未清理全域數值快取，缺乏原子重置
+
+- 在 `useAppStore` 中執行 `setActiveLedgerId` 時，僅單純更新 `activeLedgerId` 字串，從未調用 `clearNumberMemory()`，亦未通知既有已掛載的組件重設其動畫參考值（Refs），導致舊帳本的數值記憶體在整個 SPA 運行期間持續殘留。

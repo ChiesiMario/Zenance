@@ -205,24 +205,24 @@ export function AppLayout() {
         onScroll={handleScroll}
         className="flex-1 w-full max-w-xl mx-auto overflow-y-auto px-5 pt-[calc(0.5rem+env(safe-area-inset-top,0px)+var(--ios-status-blur-offset,0px))] sm:pt-[calc(1rem+env(safe-area-inset-top,0px)+var(--ios-status-blur-offset,0px))] pb-6 [scrollbar-gutter:stable]"
       >
-        {/* Keep-Alive Tab Views */}
+        {/* Keep-Alive Tab Views with Ledger-Scoped Lifecycle Key */}
         {mountedTabs.has('/') && (
-          <div style={{ display: location.pathname === '/' ? 'block' : 'none' }}>
+          <div key={`dash-${activeLedgerId || 'default'}`} style={{ display: location.pathname === '/' ? 'block' : 'none' }}>
             <Dashboard />
           </div>
         )}
         {mountedTabs.has('/budgets') && (
-          <div style={{ display: location.pathname === '/budgets' ? 'block' : 'none' }}>
+          <div key={`budgets-${activeLedgerId || 'default'}`} style={{ display: location.pathname === '/budgets' ? 'block' : 'none' }}>
             <Budgets />
           </div>
         )}
         {mountedTabs.has('/accounts') && (
-          <div style={{ display: location.pathname === '/accounts' ? 'block' : 'none' }}>
+          <div key={`accounts-${activeLedgerId || 'default'}`} style={{ display: location.pathname === '/accounts' ? 'block' : 'none' }}>
             <Accounts />
           </div>
         )}
         {mountedTabs.has('/contacts') && (
-          <div style={{ display: location.pathname === '/contacts' ? 'block' : 'none' }}>
+          <div key={`contacts-${activeLedgerId || 'default'}`} style={{ display: location.pathname === '/contacts' ? 'block' : 'none' }}>
             <Contacts />
           </div>
         )}

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn, formatCompactNumber } from '@/lib/utils';
-import { getRememberedNumber, setRememberedNumber } from '@/components/ui/SpringNumber';
+import { getRememberedNumber, setRememberedNumber } from '@/lib/numberMemory';
+import { useAppStore } from '@/store/useAppStore';
 
 export const BADGE_PILL_CLASS =
   'inline-flex items-center justify-center h-4.5 text-[10px] font-mono font-medium px-1.5 rounded-full border border-border/80 text-muted-foreground bg-muted/40 select-none tracking-normal shrink-0 leading-none transition-opacity';
@@ -26,12 +27,14 @@ export const MagnitudeBadge: React.FC<MagnitudeBadgeProps> = ({
   showPositiveSign = false,
   memoryKey,
 }) => {
+  const { activeLedgerId } = useAppStore();
+  const scopedMemoryKey = memoryKey ? `${activeLedgerId || 'global'}:${memoryKey}` : undefined;
   const isInvalid = amount === undefined || amount === null || isNaN(amount) || amount === 0;
-  const remembered = memoryKey ? getRememberedNumber(memoryKey) : undefined;
+  const remembered = scopedMemoryKey ? getRememberedNumber(scopedMemoryKey) : undefined;
   const effectiveAmount = isInvalid && remembered !== undefined ? remembered : amount;
 
-  if (memoryKey && amount !== undefined && amount !== null && !isNaN(amount) && amount !== 0) {
-    setRememberedNumber(memoryKey, amount);
+  if (scopedMemoryKey && amount !== undefined && amount !== null && !isNaN(amount) && amount !== 0) {
+    setRememberedNumber(scopedMemoryKey, amount);
   }
 
   if (effectiveAmount === undefined || effectiveAmount === null || isNaN(effectiveAmount)) {

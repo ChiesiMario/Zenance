@@ -1585,7 +1585,6 @@ export default function Settings() {
               onChange={(e) => setClearConfirmationInput(e.target.value)}
               placeholder={requiredClearPhrase}
               className="font-mono"
-              autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && clearConfirmationInput.trim() === requiredClearPhrase) {
                   handleExecuteClear();

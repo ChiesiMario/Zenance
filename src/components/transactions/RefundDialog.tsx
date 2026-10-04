@@ -11,9 +11,11 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from '@/components/ui/toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { getCurrencySymbol, cn, formatAmountNumber, sanitizeAmountInput, getLocalDateString } from '@/lib/utils';
+import { getCurrencySymbol, cn, formatAmountNumber, getLocalDateString } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
-import { Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, Calendar, FileText } from 'lucide-react';
+import { Wallet as WalletIcon, ArrowDownLeft, ArrowUpRight, FileText } from 'lucide-react';
+import { DatePicker } from '@/components/ui/date-picker';
+import { AmountInput } from '@/components/ui/AmountInput';
 
 interface RefundDialogProps {
   open: boolean;
@@ -43,7 +45,6 @@ export function RefundDialog({
   const [note, setNote] = useState<string>('');
   const [isAccountSelectOpen, setIsAccountSelectOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const activeLedger = ledgers?.find((l) => l.id === activeLedgerId);
   const currency = transaction?.originalCurrency || activeLedger?.baseCurrency || 'CNY';
@@ -66,7 +67,6 @@ export function RefundDialog({
             target: transaction.note || `#${transaction.displayId || transaction.id.slice(0, 6)}`,
           });
       setNote(defaultNote);
-      setErrorMsg(null);
     }
   }, [open, transaction, maxRefundable, isExpenseRefund, t]);
 
@@ -75,39 +75,20 @@ export function RefundDialog({
     return list.find((w) => w.id === accountId);
   }, [allWallets, wallets, accounts, accountId]);
 
+  const numAmount = parseFloat(amountStr);
+  const isAmountValid = !isNaN(numAmount) && numAmount > 0;
+  const isAmountExceeded = !isNaN(numAmount) && numAmount > maxRefundable + 0.0001;
+
   const handleFullRefund = () => {
     setAmountStr(String(maxRefundable));
-    setErrorMsg(null);
     triggerHaptic('light');
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!transaction || isSubmitting) return;
-
-    const numAmount = parseFloat(amountStr);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      setErrorMsg(t('refund.amountRequired', '請輸入大於 0 的有效金額'));
-      return;
-    }
-
-    if (numAmount > maxRefundable + 0.0001) {
-      setErrorMsg(
-        t('refund.amountExceeded', {
-          max: `${currencySymbol}${maxRefundable}`,
-          defaultValue: `退款金額不得超過剩餘上限 ${currencySymbol}${maxRefundable}`,
-        })
-      );
-      return;
-    }
-
-    if (!accountId) {
-      setErrorMsg(t('add.selectAccount', '請選擇帳戶'));
-      return;
-    }
+    if (!transaction || isSubmitting || !isAmountValid || isAmountExceeded || !accountId) return;
 
     setIsSubmitting(true);
-    setErrorMsg(null);
 
     try {
       // 支出退款以收入形式記帳；收入退款以支出形式記帳
@@ -144,7 +125,7 @@ export function RefundDialog({
       onSuccess?.();
     } catch (err) {
       console.error('Failed to issue refund:', err);
-      setErrorMsg(String(err));
+      toast(String(err));
       triggerHaptic('error');
     } finally {
       setIsSubmitting(false);
@@ -157,10 +138,10 @@ export function RefundDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="max-w-[360px] p-5 sm:rounded-2xl border-border bg-background shadow-none"
+          className="w-full max-w-[350px] sm:max-w-[350px] p-5 sm:rounded-2xl border-border bg-background shadow-none"
           showCloseButton={true}
         >
-          <DialogHeader className="space-y-1 text-left">
+          <DialogHeader className="space-y-1 text-left pr-8">
             <div className="flex items-center gap-2">
               <span
                 className={cn(
@@ -205,27 +186,41 @@ export function RefundDialog({
               </div>
 
               <div className="flex items-baseline gap-2">
-                <span className="text-xl font-mono font-medium text-muted-foreground">
+                <span
+                  className={cn(
+                    'text-xl font-mono font-medium transition-colors shrink-0',
+                    isAmountExceeded ? 'text-destructive' : 'text-muted-foreground'
+                  )}
+                >
                   {currencySymbol}
                 </span>
-                <Input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
+                <AmountInput
                   value={amountStr}
-                  onChange={(e) => {
-                    const clean = sanitizeAmountInput(e.target.value);
-                    setAmountStr(clean);
-                    setErrorMsg(null);
+                  onValueChange={(val) => {
+                    setAmountStr(val);
                   }}
-                  className="border-none bg-transparent p-0 text-2xl font-bold font-mono tracking-tight text-foreground shadow-none focus-visible:ring-0 h-auto"
-                  autoFocus
+                  currencySymbol={currencySymbol}
+                  placeholder="0.00"
+                  className={cn(
+                    'flex-1 border-none bg-transparent p-0 text-2xl font-bold font-mono tracking-tight shadow-none focus-visible:ring-0 h-auto transition-colors',
+                    isAmountExceeded ? 'text-destructive' : 'text-foreground'
+                  )}
                 />
               </div>
 
-              <div className="text-[11px] font-mono text-muted-foreground/80 flex items-center justify-between pt-1 border-t border-border/50">
+              <div
+                className={cn(
+                  'text-[11px] font-mono flex items-center justify-between pt-1 border-t border-border/50 transition-colors',
+                  isAmountExceeded ? 'text-destructive font-medium' : 'text-muted-foreground/80'
+                )}
+              >
                 <span>{t('refund.maxRefundable', '剩餘可退上限')}</span>
-                <span className="font-semibold text-foreground">
+                <span
+                  className={cn(
+                    'font-semibold',
+                    isAmountExceeded ? 'text-destructive' : 'text-foreground'
+                  )}
+                >
                   {currencySymbol} {formatAmountNumber(maxRefundable)}
                 </span>
               </div>
@@ -260,15 +255,10 @@ export function RefundDialog({
               <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
                 {t('refund.date', '退款日期')}
               </label>
-              <div className="relative">
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="font-mono text-sm h-10 border-border bg-background shadow-none pr-8"
-                />
-                <Calendar className="w-4 h-4 text-muted-foreground absolute right-3 top-3 pointer-events-none" />
-              </div>
+              <DatePicker
+                value={date}
+                onChange={(newDate) => setDate(newDate)}
+              />
             </div>
 
             {/* 備註 */}
@@ -288,27 +278,20 @@ export function RefundDialog({
               </div>
             </div>
 
-            {/* 錯誤訊息 */}
-            {errorMsg && (
-              <p className="text-xs text-destructive font-medium px-1 animate-in fade-in">
-                {errorMsg}
-              </p>
-            )}
-
             {/* 操作按鈕 */}
             <DialogFooter className="pt-2 gap-2 sm:gap-2 flex-row">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="flex-1 border-border shadow-none h-9 text-xs"
+                className="flex-1 border-border shadow-none h-9 text-xs px-2 truncate"
               >
                 {t('refund.cancel', '取消')}
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting}
-                className="flex-1 bg-foreground text-background hover:bg-foreground/90 font-medium shadow-none h-9 text-xs"
+                disabled={isSubmitting || !isAmountValid || isAmountExceeded || !accountId}
+                className="flex-1 bg-foreground text-background hover:bg-foreground/90 font-medium shadow-none h-9 text-xs disabled:opacity-50 disabled:cursor-not-allowed px-2 truncate"
               >
                 {isSubmitting ? '...' : t('refund.confirm', '確認退款')}
               </Button>

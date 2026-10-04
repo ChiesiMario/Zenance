@@ -1153,7 +1153,8 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   if (!transactionId || !currentTransaction) return null;
 
   return (
-    <Dialog open={!!transactionId} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Dialog open={!!transactionId} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
         fullscreen={true}
@@ -1338,14 +1339,16 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           </div>
         </div>
 
-        {/* 退款 Dialog */}
-        <RefundDialog
-          open={isRefundDialogOpen}
-          onOpenChange={setIsRefundDialogOpen}
-          transaction={activeRootTx || currentTransaction}
-          maxRefundable={maxRefundable}
-        />
       </DialogContent>
     </Dialog>
+
+    {/* 退款 Dialog（解耦為頂層兄弟節點，確保 Base UI Backdrop 正常渲染遮罩） */}
+    <RefundDialog
+      open={isRefundDialogOpen}
+      onOpenChange={setIsRefundDialogOpen}
+      transaction={activeRootTx || currentTransaction}
+      maxRefundable={maxRefundable}
+    />
+  </>
   );
 }

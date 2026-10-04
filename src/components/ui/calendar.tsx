@@ -228,18 +228,6 @@ export function Calendar({ selected, onSelect, onClose, className }: CalendarPro
           >
             {t("calendar.yesterday", "昨天")}
           </button>
-          <button
-            type="button"
-            onClick={() => handlePresetClick(2)}
-            className={cn(
-              "px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer",
-              isPresetActive(2)
-                ? "bg-foreground text-background"
-                : "border border-border hover:bg-muted text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("calendar.dayBeforeYesterday", "前天")}
-          </button>
         </div>
         <span className="text-xs font-mono text-muted-foreground select-none">
           {format(tempSelected, "yyyy-MM-dd")}

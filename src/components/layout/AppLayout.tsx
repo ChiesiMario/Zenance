@@ -5,7 +5,7 @@ import Dashboard from '@/pages/Dashboard';
 import Budgets from '@/pages/Budgets';
 import Accounts from '@/pages/Accounts';
 import Contacts from '@/pages/Contacts';
-import { cn, getCurrencySymbol } from '@/lib/utils';
+import { cn, getCurrencySymbol, formatCompactAmount, formatAmountNumber } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDropboxSync } from '@/hooks/useDropboxSync';
@@ -18,6 +18,7 @@ import { toast, Toaster } from '@/components/ui/toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
+import { MarqueeText } from '@/components/ui/MarqueeText';
 
 export function AppLayout() {
   const location = useLocation();
@@ -87,16 +88,12 @@ export function AppLayout() {
       }
     });
     
-    const format = (val: number) => {
-      return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Math.max(0, val));
-    };
-    
     return {
-      expense: format(expense),
-      income: format(income),
-      transfer: format(transfer),
-      lend: format(lend),
-      borrow: format(borrow),
+      expense: Math.max(0, expense),
+      income: Math.max(0, income),
+      transfer: Math.max(0, transfer),
+      lend: Math.max(0, lend),
+      borrow: Math.max(0, borrow),
     };
   }, [transactions, contacts, archivedContacts, allCategories]);
   
@@ -268,13 +265,23 @@ export function AppLayout() {
                       <DropdownMenuItem onClick={() => handleOpenAddModal('expense')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
                         <ArrowUpRight className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
                         <span className="text-[11px] font-medium">{t('add.expense')}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.expense}</span>
+                        <MarqueeText 
+                          className="text-[10px] font-mono text-muted-foreground w-full"
+                          title={`${currencySymbol}${formatAmountNumber(stats.expense)}`}
+                        >
+                          {formatCompactAmount(stats.expense, currencySymbol)}
+                        </MarqueeText>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem onClick={() => handleOpenAddModal('income')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
                         <ArrowDownLeft className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
                         <span className="text-[11px] font-medium">{t('add.income')}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.income}</span>
+                        <MarqueeText 
+                          className="text-[10px] font-mono text-muted-foreground w-full"
+                          title={`${currencySymbol}${formatAmountNumber(stats.income)}`}
+                        >
+                          {formatCompactAmount(stats.income, currencySymbol)}
+                        </MarqueeText>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem 
@@ -292,19 +299,34 @@ export function AppLayout() {
                       >
                         <ArrowRightLeft className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
                         <span className="text-[11px] font-medium">{t('add.transfer')}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.transfer}</span>
+                        <MarqueeText 
+                          className="text-[10px] font-mono text-muted-foreground w-full"
+                          title={`${currencySymbol}${formatAmountNumber(stats.transfer)}`}
+                        >
+                          {formatCompactAmount(stats.transfer, currencySymbol)}
+                        </MarqueeText>
                       </DropdownMenuItem>
                       
                       <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'lend')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
                         <HandCoins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
                         <span className="text-[11px] font-medium">{t('add.lend')}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.lend}</span>
+                        <MarqueeText 
+                          className="text-[10px] font-mono text-muted-foreground w-full"
+                          title={`${currencySymbol}${formatAmountNumber(stats.lend)}`}
+                        >
+                          {formatCompactAmount(stats.lend, currencySymbol)}
+                        </MarqueeText>
                       </DropdownMenuItem>
 
                       <DropdownMenuItem onClick={() => handleOpenAddModal('loan', 'borrow')} className="flex flex-col items-center justify-center p-2 w-16 gap-1 cursor-pointer rounded-md">
                         <Coins className="w-5 h-5 text-foreground mb-0.5" strokeWidth={2} />
                         <span className="text-[11px] font-medium">{t('add.borrow')}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground">{currencySymbol}{stats.borrow}</span>
+                        <MarqueeText 
+                          className="text-[10px] font-mono text-muted-foreground w-full"
+                          title={`${currencySymbol}${formatAmountNumber(stats.borrow)}`}
+                        >
+                          {formatCompactAmount(stats.borrow, currencySymbol)}
+                        </MarqueeText>
                       </DropdownMenuItem>
                     </div>
                   </DropdownMenuContent>

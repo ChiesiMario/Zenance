@@ -34,6 +34,64 @@ export function formatAmountNumber(val: number): string {
   });
 }
 
+/**
+ * 將數值格式化為緊湊型縮寫字串（方案 A：千位小寫 k，百萬及以上大寫 M / B / T）：
+ * - < 1,000：原樣呈現整數或標準小數
+ * - >= 1,000 (k)、>= 1,000,000 (M)、>= 1,000,000,000 (B)、>= 1,000,000,000,000 (T)
+ * - 緊湊數值最多保留 1 位小數，若為整數則省略小數點（例如 10k, 10.5k, 1.2M, 55B, 2.1T）
+ * - 處理邊界進位（例如 999.96k 自動晉級為 1M 而非 1000k）
+ * - 支援負數（例如 -10k）
+ */
+export function formatCompactNumber(val: number): string {
+  if (!Number.isFinite(val)) return '0';
+  const sign = val < 0 ? '-' : '';
+  const abs = Math.abs(val);
+
+  if (abs < 1000) {
+    return sign + formatAmountNumber(abs);
+  }
+
+  const tiers = [
+    { threshold: 1e12, divisor: 1e12, symbol: 'T' },
+    { threshold: 1e9, divisor: 1e9, symbol: 'B' },
+    { threshold: 1e6, divisor: 1e6, symbol: 'M' },
+    { threshold: 1e3, divisor: 1e3, symbol: 'k' },
+  ];
+
+  for (let i = 0; i < tiers.length; i++) {
+    const tier = tiers[i];
+    if (abs >= tier.threshold) {
+      let scaled = abs / tier.divisor;
+      let rounded = Math.round(scaled * 10) / 10;
+
+      // 若四捨五入後達到 1000 且存在更高階單位，則升級到上一階
+      if (rounded >= 1000 && i > 0) {
+        const higherTier = tiers[i - 1];
+        scaled = abs / higherTier.divisor;
+        rounded = Math.round(scaled * 10) / 10;
+        const formatted = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+        return `${sign}${formatted}${higherTier.symbol}`;
+      }
+
+      const formatted = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+      return `${sign}${formatted}${tier.symbol}`;
+    }
+  }
+
+  return sign + formatAmountNumber(abs);
+}
+
+/**
+ * 將數值格式化為帶貨幣符號的緊湊型縮寫字串（例如 NT$10k, $1.5M, -NT$20k）
+ */
+export function formatCompactAmount(val: number, currencySymbol: string = ''): string {
+  if (!Number.isFinite(val)) return `${currencySymbol}0`;
+  const isNegative = val < 0;
+  const compactStr = formatCompactNumber(Math.abs(val));
+  return `${isNegative ? '-' : ''}${currencySymbol}${compactStr}`;
+}
+
+
 export function formatDisplayAmount(amountStr: string): string {
   if (!amountStr) return '0';
 

@@ -62,6 +62,15 @@
   animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+@keyframes marquee-ping-pong {
+  0%, 25% {
+    transform: translateX(0);
+  }
+  75%, 100% {
+    transform: translateX(var(--marquee-distance, 0px));
+  }
+}
+
 @layer base {
   :root {
     --background: #ffffff;

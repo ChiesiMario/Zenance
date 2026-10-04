@@ -505,11 +505,13 @@ export default function Reports() {
       <div className="border border-border rounded-xl overflow-hidden bg-card text-card-foreground shadow-none">
         {/* Net Balance Centerpiece */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
-          <div className="flex items-center justify-center gap-2 h-5 mb-1.5">
+          <div className="relative flex items-center justify-center h-5 mb-1.5 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono leading-none">
               {t('reports.netBalance')}
             </p>
-            <MagnitudeBadge amount={netBalance} memoryKey="reports-net-balance" />
+            <div className="absolute right-0 flex items-center">
+              <MagnitudeBadge amount={netBalance} memoryKey="reports-net-balance" />
+            </div>
           </div>
           <AutoMarquee
             align="center"

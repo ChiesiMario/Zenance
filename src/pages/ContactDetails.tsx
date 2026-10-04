@@ -157,11 +157,13 @@ export default function ContactDetails() {
       {/* Net Balance & Metrics Card */}
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground shadow-none">
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
-          <div className="flex items-center justify-center gap-2 h-5 mb-2">
+          <div className="relative flex items-center justify-center h-5 mb-2 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
               {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
             </p>
-            <MagnitudeBadge amount={Math.abs(netBalance)} memoryKey={`contact-net-balance-${id}`} />
+            <div className="absolute right-0 flex items-center">
+              <MagnitudeBadge amount={Math.abs(netBalance)} memoryKey={`contact-net-balance-${id}`} />
+            </div>
           </div>
           <AutoMarquee
             align="center"

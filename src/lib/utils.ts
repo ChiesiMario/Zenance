@@ -38,7 +38,8 @@ export function formatAmountNumber(val: number): string {
  * 將數值格式化為緊湊型縮寫字串（方案 A：千位小寫 k，百萬及以上大寫 M / B / T）：
  * - < 1,000：原樣呈現整數或標準小數
  * - >= 1,000 (k)、>= 1,000,000 (M)、>= 1,000,000,000 (B)、>= 1,000,000,000,000 (T)
- * - 緊湊數值最多保留 1 位小數，若為整數則省略小數點（例如 10k, 10.5k, 1.2M, 55B, 2.1T）
+ * - 緊湊數值最多保留 1 位小數，若為整數則省略小數點（例如 10k, 10.5k, 1.2M, 55B, 10,000T）
+ * - 依循正統財務與金融標準，縮寫數值的整數部分一律保留千分位分隔符（如 10,000T、1,000,000T）
  * - 處理邊界進位（例如 999.96k 自動晉級為 1M 而非 1000k）
  * - 支援負數（例如 -10k）
  */
@@ -50,6 +51,14 @@ export function formatCompactNumber(val: number): string {
   if (abs < 1000) {
     return sign + formatAmountNumber(abs);
   }
+
+  const formatWithCommas = (num: number): string => {
+    const isInteger = Math.abs(num % 1) < 0.00001;
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: isInteger ? 0 : 1,
+      maximumFractionDigits: isInteger ? 0 : 1,
+    });
+  };
 
   const tiers = [
     { threshold: 1e12, divisor: 1e12, symbol: 'T' },
@@ -69,11 +78,11 @@ export function formatCompactNumber(val: number): string {
         const higherTier = tiers[i - 1];
         scaled = abs / higherTier.divisor;
         rounded = Math.round(scaled * 10) / 10;
-        const formatted = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+        const formatted = formatWithCommas(rounded);
         return `${sign}${formatted}${higherTier.symbol}`;
       }
 
-      const formatted = rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1);
+      const formatted = formatWithCommas(rounded);
       return `${sign}${formatted}${tier.symbol}`;
     }
   }

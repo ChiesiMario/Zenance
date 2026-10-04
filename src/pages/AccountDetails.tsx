@@ -215,9 +215,11 @@ export default function AccountDetails() {
 
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
-          <div className="flex items-center justify-center gap-2 h-5 mb-2">
+          <div className="relative flex items-center justify-center h-5 mb-2 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('accounts.balance')}</p>
-            <MagnitudeBadge amount={balance} memoryKey={`account-balance-${id}`} />
+            <div className="absolute right-0 flex items-center">
+              <MagnitudeBadge amount={balance} memoryKey={`account-balance-${id}`} />
+            </div>
           </div>
           <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4 leading-none">
             <AmountDisplay 

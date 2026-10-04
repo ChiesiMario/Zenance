@@ -395,9 +395,11 @@ export default function Dashboard() {
 
         {/* Top Summary row */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
-          <div className="flex items-center justify-center gap-2 h-5 mb-2">
+          <div className="relative flex items-center justify-center h-5 mb-2 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.netBalance')}</p>
-            <MagnitudeBadge amount={balance} memoryKey="dashboard-net-balance" />
+            <div className="absolute right-0 flex items-center">
+              <MagnitudeBadge amount={balance} memoryKey="dashboard-net-balance" />
+            </div>
           </div>
           <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2 leading-none">
             <AmountDisplay 

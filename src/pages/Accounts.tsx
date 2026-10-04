@@ -21,7 +21,7 @@ import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
 import { cn, getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
-import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
+import { MagnitudeBadge, EstimatedRateBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { calculateAccountBalances, convertAmount } from '@/lib/currency';
 import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
@@ -343,15 +343,15 @@ export default function Accounts() {
       <div className="space-y-4">
         {currentView === 'active' && (
         <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground">
-          <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center relative">
-            {hasForeignCurrency && (
-              <span className="absolute top-4 right-4 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/20 select-none">
-                ≈ {t('accounts.rateEstimated')}
-              </span>
-            )}
-            <div className="flex items-center justify-center gap-2 h-5 mb-2">
+          <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center">
+            <div className="relative flex items-center justify-center h-5 mb-2 w-full">
+              {hasForeignCurrency && (
+                <EstimatedRateBadge className="absolute left-0" />
+              )}
               <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('accounts.netWorth')}</p>
-              <MagnitudeBadge amount={netWorth} memoryKey="accounts-net-worth" />
+              <div className="absolute right-0 flex items-center">
+                <MagnitudeBadge amount={netWorth} memoryKey="accounts-net-worth" />
+              </div>
             </div>
             <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2 leading-none">
               <AmountDisplay 

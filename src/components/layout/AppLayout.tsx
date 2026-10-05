@@ -18,6 +18,7 @@ import { toast, Toaster } from '@/components/ui/toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
+import { E2EEUnlockDialog } from '@/components/security/E2EEUnlockDialog';
 import { MarqueeText } from '@/components/ui/MarqueeText';
 
 export function AppLayout() {
@@ -25,7 +26,11 @@ export function AppLayout() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   useExchangeRates(); // Trigger background sync
-  useDropboxSync(); // Trigger background sync & auto network reconnection pull
+  const {
+    isUnlockModalOpen,
+    setIsUnlockModalOpen,
+    handleUnlockSuccess,
+  } = useDropboxSync(); // Trigger background sync & auto network reconnection pull
   
   const { transactions } = useTransactions();
   const { ledgers } = useLedgers();
@@ -372,6 +377,12 @@ export function AppLayout() {
       <TransactionDetailsDialog 
         transactionId={viewingTransactionId} 
         onClose={() => setViewingTransactionId(null)} 
+      />
+
+      <E2EEUnlockDialog
+        open={isUnlockModalOpen}
+        onOpenChange={setIsUnlockModalOpen}
+        onSuccess={handleUnlockSuccess}
       />
 
       <Toaster />

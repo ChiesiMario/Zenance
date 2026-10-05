@@ -19,7 +19,10 @@ import {
   getE2EEConfig,
   isE2EEEnabled,
   isE2EEUnlocked,
+  getE2EEUpdatedAt,
   importRemoteE2EEConfig,
+  disableE2EE,
+  initE2EEKey,
 } from '../crypto/e2eeManager';
 import type { CryptoEnvelope } from '../crypto/webCrypto';
 import { recordObservedTimestamp } from '@/lib/clock';
@@ -34,6 +37,26 @@ export interface SyncResult {
   error?: string;
   actionTaken: 'uploaded_initial' | 'merged' | 'downloaded_remote' | 'uploaded_local' | 'up_to_date';
   needsUnlock?: boolean;
+}
+
+export type SyncUnlockListener = (mode: 'auto' | 'overwrite_local' | 'overwrite_remote') => void;
+const unlockListeners = new Set<SyncUnlockListener>();
+
+export function onSyncUnlockNeeded(listener: SyncUnlockListener): () => void {
+  unlockListeners.add(listener);
+  return () => {
+    unlockListeners.delete(listener);
+  };
+}
+
+export function triggerSyncUnlockNeeded(mode: 'auto' | 'overwrite_local' | 'overwrite_remote' = 'auto'): void {
+  unlockListeners.forEach((fn) => {
+    try {
+      fn(mode);
+    } catch (e) {
+      console.error('Error in sync unlock listener:', e);
+    }
+  });
 }
 
 export interface SyncManifestLedgerStats {
@@ -53,17 +76,20 @@ export interface SyncManifestLedgerItem {
   stats: SyncManifestLedgerStats;
 }
 
+export interface SyncManifestE2EE {
+  enabled: boolean;
+  updatedAt: string;
+  salt?: string;
+  verification?: CryptoEnvelope;
+}
+
 export interface SyncManifest {
   appName: string;
   schemaVersion: number;
   exportedAt: string;
   totalLedgers: number;
   ledgers: SyncManifestLedgerItem[];
-  e2ee?: {
-    enabled: boolean;
-    salt: string;
-    verification?: CryptoEnvelope;
-  };
+  e2ee?: SyncManifestE2EE;
 }
 
 let isSyncInProgress = false;
@@ -237,21 +263,30 @@ async function uploadManifestFile(cachedRevs: Record<string, string>): Promise<v
   }));
 
   const e2eeConfig = getE2EEConfig();
+  const now = new Date().toISOString();
+
+  let e2eeManifest: SyncManifestE2EE | undefined;
+  if (e2eeConfig && e2eeConfig.enabled && e2eeConfig.salt) {
+    e2eeManifest = {
+      enabled: true,
+      updatedAt: e2eeConfig.updatedAt || e2eeConfig.createdAt || now,
+      salt: e2eeConfig.salt,
+      verification: e2eeConfig.verificationEnvelope,
+    };
+  } else {
+    e2eeManifest = {
+      enabled: false,
+      updatedAt: e2eeConfig?.updatedAt || now,
+    };
+  }
 
   const manifest: SyncManifest = {
     appName: 'Zenance',
     schemaVersion: 2,
-    exportedAt: new Date().toISOString(),
+    exportedAt: now,
     totalLedgers: ledgers.length,
     ledgers: manifestLedgers,
-    e2ee:
-      e2eeConfig?.enabled && e2eeConfig.salt
-        ? {
-            enabled: true,
-            salt: e2eeConfig.salt,
-            verification: e2eeConfig.verificationEnvelope,
-          }
-        : undefined,
+    e2ee: e2eeManifest,
   };
 
   const rev = await uploadJsonFile('/manifest.json', manifest);
@@ -282,15 +317,49 @@ export async function executeSync(
     };
   }
 
-  // 1. 本地前置檢查：若已啟用 E2EE 但當前會話金鑰處於鎖定狀態，快速阻斷並請求解鎖
+  // 優先嘗試從本地安全金庫靜默恢復金鑰，避免重整後自動同步被誤判為已鎖定
   if (isE2EEEnabled() && !isE2EEUnlocked()) {
-    return {
-      success: false,
-      timestamp: new Date().toISOString(),
-      error: 'E2EE_LOCKED',
-      needsUnlock: true,
-      actionTaken: 'up_to_date',
-    };
+    await initE2EEKey();
+  }
+
+  // 1. 純覆蓋雲端模式 (Overwrite Remote，例如停用 E2EE 覆寫明文或全量推送)
+  if (mode === 'overwrite_remote') {
+    if (isE2EEEnabled() && !isE2EEUnlocked()) {
+      triggerSyncUnlockNeeded(mode);
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        error: 'E2EE_LOCKED',
+        needsUnlock: true,
+        actionTaken: 'up_to_date',
+      };
+    }
+
+    isSyncInProgress = true;
+    try {
+      const now = new Date().toISOString();
+      const cachedRevs = getCachedRevs();
+      const pushedTimes = getPushedTimes();
+
+      await uploadAllLocalLedgers(now, cachedRevs, pushedTimes);
+      await uploadManifestFile(cachedRevs);
+
+      setCachedRevs(cachedRevs);
+      setPushedTimes(pushedTimes);
+      setLastSyncTime(now);
+
+      return { success: true, timestamp: now, actionTaken: 'uploaded_local' };
+    } catch (error: any) {
+      console.error('Overwrite remote error:', error);
+      return {
+        success: false,
+        timestamp: new Date().toISOString(),
+        error: error?.message || 'Overwrite remote error',
+        actionTaken: 'up_to_date',
+      };
+    } finally {
+      isSyncInProgress = false;
+    }
   }
 
   isSyncInProgress = true;
@@ -304,13 +373,57 @@ export async function executeSync(
     const remoteFiles = await listRemoteFolder();
     const ledgerFiles = remoteFiles.filter((f) => f.path_lower.startsWith('/ledgers/'));
 
-    // 2. 遠端握手：檢查遠端 manifest.json 是否啟用了 E2EE
+    // 2. 遠端完全沒有資料夾記錄（初次上傳）
+    if (ledgerFiles.length === 0) {
+      await uploadAllLocalLedgers(now, cachedRevs, pushedTimes);
+      await uploadManifestFile(cachedRevs);
+      setCachedRevs(cachedRevs);
+      setPushedTimes(pushedTimes);
+      setLastSyncTime(now);
+
+      return { success: true, timestamp: now, actionTaken: 'uploaded_initial' };
+    }
+
+    // 3. 雙向 E2EE 狀態機握手 (Bi-directional E2EE State Reconciliation)
     const manifestMeta = remoteFiles.find((f) => f.path_lower === '/manifest.json');
     if (manifestMeta) {
       const remoteManifest = await downloadJsonFile<SyncManifest>('/manifest.json');
-      if (remoteManifest?.e2ee?.enabled && remoteManifest.e2ee.salt) {
-        importRemoteE2EEConfig(remoteManifest.e2ee.salt, remoteManifest.e2ee.verification);
-        if (!isE2EEUnlocked()) {
+      const remoteE2EE = remoteManifest?.e2ee;
+      const localModified = getE2EEUpdatedAt();
+
+      if (remoteE2EE) {
+        if (!remoteE2EE.enabled) {
+          // 情況 A：遠端已停用 E2EE。若遠端關閉時間較新或本地還開著 E2EE，自動同步關閉本地 E2EE
+          if (!localModified || remoteE2EE.updatedAt >= localModified || isE2EEEnabled()) {
+            disableE2EE(remoteE2EE.updatedAt);
+          }
+        } else if (remoteE2EE.enabled && remoteE2EE.salt) {
+          // 情況 B：遠端已啟用 E2EE。若本地未啟用或遠端時間戳較新，匯入遠端配置
+          if (!localModified || remoteE2EE.updatedAt >= localModified || !isE2EEEnabled()) {
+            importRemoteE2EEConfig(
+              remoteE2EE.salt,
+              remoteE2EE.verification,
+              remoteE2EE.updatedAt
+            );
+          }
+          if (!isE2EEUnlocked()) {
+            await initE2EEKey();
+          }
+          if (!isE2EEUnlocked()) {
+            triggerSyncUnlockNeeded(mode);
+            return {
+              success: false,
+              timestamp: now,
+              error: 'E2EE_LOCKED',
+              needsUnlock: true,
+              actionTaken: 'up_to_date',
+            };
+          }
+        }
+      } else {
+        // 舊版或無 E2EE 宣告的明文備份
+        if (isE2EEEnabled() && !isE2EEUnlocked()) {
+          triggerSyncUnlockNeeded(mode);
           return {
             success: false,
             timestamp: now,
@@ -320,26 +433,18 @@ export async function executeSync(
           };
         }
       }
-    }
-
-    // 3. 純覆蓋雲端模式 (Overwrite Remote)
-    if (mode === 'overwrite_remote') {
-      await uploadAllLocalLedgers(now, cachedRevs, pushedTimes);
-      setCachedRevs(cachedRevs);
-      setPushedTimes(pushedTimes);
-      setLastSyncTime(now);
-
-      return { success: true, timestamp: now, actionTaken: 'uploaded_local' };
-    }
-
-    // 2. 遠端完全沒有資料夾記錄（初次上傳）
-    if (ledgerFiles.length === 0) {
-      await uploadAllLocalLedgers(now, cachedRevs, pushedTimes);
-      setCachedRevs(cachedRevs);
-      setPushedTimes(pushedTimes);
-      setLastSyncTime(now);
-
-      return { success: true, timestamp: now, actionTaken: 'uploaded_initial' };
+    } else {
+      // 遠端無 manifest，若本地已啟用且未解鎖則阻斷
+      if (isE2EEEnabled() && !isE2EEUnlocked()) {
+        triggerSyncUnlockNeeded(mode);
+        return {
+          success: false,
+          timestamp: now,
+          error: 'E2EE_LOCKED',
+          needsUnlock: true,
+          actionTaken: 'up_to_date',
+        };
+      }
     }
 
     // 3. 純覆蓋本機模式 (Overwrite Local)
@@ -661,6 +766,9 @@ export async function executeSync(
     console.error('Folder sync execution error:', error);
     const isLocked =
       error?.message === 'E2EE_LOCKED' || error?.message === 'E2EE_DECRYPT_FAILED';
+    if (isLocked) {
+      triggerSyncUnlockNeeded(mode);
+    }
     return {
       success: false,
       timestamp: new Date().toISOString(),
@@ -684,8 +792,14 @@ export function scheduleAutoSync(delayMs = 3000): void {
   }
 
   autoSyncTimeout = setTimeout(() => {
-    executeSync('auto').catch((err) => {
-      console.warn('Auto folder sync error:', err);
-    });
+    executeSync('auto')
+      .then((res) => {
+        if (res.needsUnlock) {
+          triggerSyncUnlockNeeded('auto');
+        }
+      })
+      .catch((err) => {
+        console.warn('Auto folder sync error:', err);
+      });
   }, delayMs);
 }

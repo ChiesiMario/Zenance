@@ -10,6 +10,7 @@ import {
   executeSync,
   getLastSyncTime,
   scheduleAutoSync,
+  onSyncUnlockNeeded,
   type SyncResult,
   type SyncManifest,
 } from '@/services/sync/syncEngine';
@@ -33,6 +34,43 @@ export function useDropboxSync() {
   const pendingSyncModeRef = useRef<'auto' | 'overwrite_local' | 'overwrite_remote'>('auto');
 
   const hasHandledAuthRef = useRef(false);
+
+  // 全域訂閱 E2EE 鎖定事件：背景定時同步或任何靜默同步遇到鎖定時，主動呼出彈窗
+  useEffect(() => {
+    return onSyncUnlockNeeded((mode) => {
+      pendingSyncModeRef.current = mode;
+      setIsUnlockModalOpen(true);
+    });
+  }, []);
+
+  // 應用啟動與切回視窗時主動檢查遠端是否有更新 (感應用戶在其他設備的變更)
+  useEffect(() => {
+    if (isDropboxConnected() && navigator.onLine) {
+      scheduleAutoSync(1500);
+    }
+
+    let lastCheckTime = Date.now();
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastCheckTime > 8000 && isDropboxConnected() && navigator.onLine) {
+        lastCheckTime = now;
+        scheduleAutoSync(1000);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleFocus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   // 監聽連網/離線狀態
   useEffect(() => {

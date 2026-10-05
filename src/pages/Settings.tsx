@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
@@ -17,6 +17,9 @@ import {
   Copy,
   Check,
   History,
+  ArrowLeft,
+  Plus,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,8 +42,8 @@ import { useAppLockStore } from '@/store/useAppLockStore';
 import { useStorageStatus } from '@/hooks/useStorageStatus';
 import { useDatabaseHealth } from '@/hooks/useDatabaseHealth';
 import { DatabaseHealthModal } from '@/components/fsck/DatabaseHealthModal';
-import { isE2EEEnabled, isE2EEUnlocked, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
-import { E2EEUnlockDialog } from '@/components/security/E2EEUnlockDialog';
+import { isE2EEEnabled, isE2EEUnlocked, setupE2EE, disableE2EE, initE2EEKey } from '@/services/crypto/e2eeManager';
+import { triggerSyncUnlockNeeded } from '@/services/sync/syncEngine';
 import { isCryptoSupported } from '@/services/crypto/webCrypto';
 import { isSecureEnvironment } from '@/services/storage/storageManager';
 import { useRollingBackups } from '@/hooks/useRollingBackups';
@@ -104,9 +107,6 @@ export default function Settings() {
     setFirstConnectModalOpen,
     localRecordCount,
     remoteRecordCount,
-    isUnlockModalOpen,
-    setIsUnlockModalOpen,
-    handleUnlockSuccess,
     connectDropbox,
     disconnectDropbox,
     syncNow,
@@ -148,12 +148,12 @@ export default function Settings() {
 
   // Modals for minimalist sub-views
   const [isDropboxModalOpen, setIsDropboxModalOpen] = useState(false);
+  const [dropboxModalView, setDropboxModalView] = useState<'overview' | 'enable_e2ee' | 'recovery_key'>('overview');
   const [isTimeMachineModalOpen, setIsTimeMachineModalOpen] = useState(false);
 
   // E2EE modal states
   const [e2eeActive, setE2eeActive] = useState<boolean>(isE2EEEnabled());
   const [e2eeUnlocked, setE2eeUnlocked] = useState<boolean>(isE2EEUnlocked());
-  const [isE2eeModalOpen, setIsE2eeModalOpen] = useState(false);
   const [e2eePassphrase, setE2eePassphrase] = useState('');
   const [e2eeConfirmPassphrase, setE2eeConfirmPassphrase] = useState('');
   const [generatedRecoveryKey, setGeneratedRecoveryKey] = useState('');
@@ -180,6 +180,7 @@ export default function Settings() {
       setGeneratedRecoveryKey(recoveryKey);
       setE2eeActive(true);
       setE2eeUnlocked(true);
+      setDropboxModalView('recovery_key');
       toast.show(t('settings.e2eeEnabledSuccess'));
 
       // 啟用加密後立即以端到端加密重新推送 Dropbox 雲端上的所有備份
@@ -191,7 +192,42 @@ export default function Settings() {
     }
   };
 
+  // 組件掛載時嘗試靜默從本地金庫恢復 E2EE 金鑰，消除刷新後的假鎖定狀態
+  useEffect(() => {
+    let mounted = true;
+    initE2EEKey().then(() => {
+      if (mounted) {
+        setE2eeActive(isE2EEEnabled());
+        setE2eeUnlocked(isE2EEUnlocked());
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // 隨時確保本地 E2EE 狀態與 e2eeManager 保持同步 (響應多設備遠端狀態傳播)
+  useEffect(() => {
+    const currentEnabled = isE2EEEnabled();
+    const currentUnlocked = isE2EEUnlocked();
+    if (currentEnabled !== e2eeActive) {
+      setE2eeActive(currentEnabled);
+    }
+    if (currentUnlocked !== e2eeUnlocked) {
+      setE2eeUnlocked(currentUnlocked);
+    }
+  }, [lastSyncTime]);
+
   const handleDisableE2EE = async () => {
+    if (e2eeActive && !e2eeUnlocked) {
+      const restored = await initE2EEKey();
+      if (!restored) {
+        triggerSyncUnlockNeeded('overwrite_remote');
+        return;
+      }
+      setE2eeUnlocked(true);
+    }
+
     const isConfirmed = await confirm({
       title: t('settings.disableE2eeConfirmTitle', '確定要停用端到端加密嗎？'),
       description: t('settings.disableE2eeConfirmDesc', '停用後，未來雲端同步將不再使用金鑰加密，且現有雲端資料將覆蓋為標準明文格式。'),
@@ -206,9 +242,9 @@ export default function Settings() {
     setE2eeUnlocked(true);
     toast.show(t('settings.e2eeDisabledSuccess'));
 
-    // 停用加密後立即將雲端備份覆蓋還原為標準明文格式
+    // 停用加密後立即將雲端備份覆蓋還原為標準明文格式並刷新雲端 manifest
     if (isAuthenticated && isOnline) {
-      syncNow('overwrite_remote');
+      await syncNow('overwrite_remote');
     }
   };
 
@@ -781,7 +817,10 @@ export default function Settings() {
         <div className="border border-border rounded-lg overflow-hidden bg-card divide-y divide-border">
           {/* Dropbox 同步 */}
           <div
-            onClick={() => setIsDropboxModalOpen(true)}
+            onClick={() => {
+              setDropboxModalView('overview');
+              setIsDropboxModalOpen(true);
+            }}
             className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors cursor-pointer group"
           >
             <span className="text-sm font-normal text-foreground">{t('settings.dropboxSync')}</span>
@@ -793,7 +832,24 @@ export default function Settings() {
               ) : !isOnline ? (
                 <span className="text-amber-500">{t('common.offline')}</span>
               ) : (
-                <span className="text-emerald-500">{t('settings.connected')}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-500">{t('settings.connected')}</span>
+                  {e2eeActive && (
+                    <>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span
+                        className={cn(
+                          "text-[10px] font-sans px-1.5 py-0.5 rounded border leading-none",
+                          e2eeUnlocked
+                            ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/5"
+                            : "border-amber-500/30 text-amber-500 bg-amber-500/5"
+                        )}
+                      >
+                        {e2eeUnlocked ? 'E2EE' : t('settings.e2eeLocked', '已鎖定')}
+                      </span>
+                    </>
+                  )}
+                </div>
               )}
               {lastSyncTime && (
                 <>
@@ -804,54 +860,6 @@ export default function Settings() {
                 </>
               )}
               <ChevronRight className="size-3.5 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
-            </div>
-          </div>
-
-          {/* 端到端加密 E2EE */}
-          <div
-            onClick={() => {
-              if (!hasCryptoSupport) {
-                toast.show(t('settings.requiresHttpsToast'));
-                return;
-              }
-              if (!isAuthenticated) {
-                toast.show(t('settings.e2eeRequiresDropbox', '請先連線 Dropbox 雲端同步以使用端到端加密'));
-                return;
-              }
-              if (!e2eeActive) {
-                setE2eePassphrase('');
-                setE2eeConfirmPassphrase('');
-                setGeneratedRecoveryKey('');
-                setIsE2eeModalOpen(true);
-              } else if (!e2eeUnlocked) {
-                setIsUnlockModalOpen(true);
-              } else {
-                handleDisableE2EE();
-              }
-            }}
-            className={cn(
-              "h-12 px-4 flex items-center justify-between transition-colors",
-              !hasCryptoSupport || !isAuthenticated
-                ? "opacity-50 cursor-not-allowed select-none"
-                : "hover:bg-muted/40 cursor-pointer group"
-            )}
-          >
-            <span className="text-sm font-normal text-foreground">{t('settings.e2ee')}</span>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
-              {!hasCryptoSupport ? (
-                <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
-              ) : !isAuthenticated ? (
-                <span>{t('settings.requiresCloudSync', '需連線雲端')}</span>
-              ) : !e2eeActive ? (
-                <span>{t('settings.notEnabled')}</span>
-              ) : !e2eeUnlocked ? (
-                <span className="text-amber-500 font-medium">{t('settings.e2eeLocked', '已鎖定')}</span>
-              ) : (
-                <span className="text-emerald-500">AES-256</span>
-              )}
-              {hasCryptoSupport && isAuthenticated && (
-                <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
-              )}
             </div>
           </div>
 
@@ -1042,74 +1050,262 @@ export default function Settings() {
         Zenance v1.0.0
       </div>
 
-      {/* Dropbox 快速管理彈窗 */}
-      <Dialog open={isDropboxModalOpen} onOpenChange={setIsDropboxModalOpen}>
-        <DialogContent className="sm:max-w-[340px] max-w-[340px] p-5 gap-4">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
-              <Cloud className="size-5 text-primary" />
-              <span>{t('settings.dropboxSyncModalTitle')}</span>
-            </DialogTitle>
-          </DialogHeader>
+      {/* Dropbox 快速管理彈窗（雲端同步與安全中心） */}
+      <Dialog
+        open={isDropboxModalOpen}
+        onOpenChange={(open) => {
+          setIsDropboxModalOpen(open);
+          if (!open) {
+            setDropboxModalView('overview');
+            setE2eePassphrase('');
+            setE2eeConfirmPassphrase('');
+            setGeneratedRecoveryKey('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[360px] max-w-[360px] p-5 gap-4">
+          {dropboxModalView === 'overview' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+                  <Cloud className="size-5 text-primary" />
+                  <span>{t('settings.dropboxSyncModalTitle')}</span>
+                </DialogTitle>
+              </DialogHeader>
 
-          <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
-            <div className="p-3 flex justify-between">
-              <span className="text-muted-foreground font-sans">{t('settings.status')}</span>
-              <span className={isAuthenticated ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
-                {isAuthenticated ? t('settings.connected') : t('settings.disconnected')}
-              </span>
-            </div>
-            {isAuthenticated && (
-              <div className="p-3 flex justify-between">
-                <span className="text-muted-foreground font-sans">{t('settings.lastSync')}</span>
-                <span className="text-foreground">
-                  {lastSyncTime
-                    ? format24Time(lastSyncTime, true)
-                    : t('settings.never')}
-                </span>
+              <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
+                {/* 連線狀態 */}
+                <div className="p-3 flex justify-between items-center">
+                  <span className="text-muted-foreground font-sans">{t('settings.status')}</span>
+                  <span className={isAuthenticated ? "text-emerald-500 font-medium" : "text-muted-foreground"}>
+                    {isAuthenticated ? t('settings.connected') : t('settings.disconnected')}
+                  </span>
+                </div>
+
+                {/* 上次同步 */}
+                {isAuthenticated && (
+                  <div className="p-3 flex justify-between items-center">
+                    <span className="text-muted-foreground font-sans">{t('settings.lastSync')}</span>
+                    <span className="text-foreground">
+                      {lastSyncTime
+                        ? format24Time(lastSyncTime, true)
+                        : t('settings.never')}
+                    </span>
+                  </div>
+                )}
+
+                {/* 端到端加密 E2EE */}
+                <div className="p-3 flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground font-sans">{t('settings.e2ee')}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!hasCryptoSupport ? (
+                      <span className="text-amber-500/80 font-sans">{t('security.requiresHttps')}</span>
+                    ) : !isAuthenticated ? (
+                      <span className="text-muted-foreground/60 font-sans">{t('settings.requiresCloudSync', '需連線雲端')}</span>
+                    ) : !e2eeActive ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setE2eePassphrase('');
+                          setE2eeConfirmPassphrase('');
+                          setGeneratedRecoveryKey('');
+                          setDropboxModalView('enable_e2ee');
+                        }}
+                        className="h-6 px-2.5 inline-flex items-center gap-1 text-[11px] font-sans rounded-full border border-border bg-muted/40 hover:bg-muted text-foreground transition-all cursor-pointer group/pill"
+                      >
+                        <Plus className="size-3 text-muted-foreground group-hover/pill:text-foreground transition-colors" />
+                        <span>{t('settings.enableAction', '啟用')}</span>
+                      </button>
+                    ) : !e2eeUnlocked ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const restored = await initE2EEKey();
+                          if (!restored) {
+                            triggerSyncUnlockNeeded('auto');
+                          } else {
+                            setE2eeUnlocked(true);
+                          }
+                        }}
+                        className="h-6 px-2.5 inline-flex items-center gap-1 text-[11px] font-sans rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                      >
+                        <Lock className="size-3" />
+                        <span>{t('settings.unlockAction', '解鎖')}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleDisableE2EE}
+                        className="h-6 px-2.5 inline-flex items-center gap-1.5 text-[11px] font-sans rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer group/pill"
+                        title={t('settings.clickToDisableE2ee', '點擊停用端到端加密')}
+                      >
+                        <span className="size-1.5 rounded-full bg-emerald-500 group-hover/pill:bg-destructive transition-colors shrink-0" />
+                        <span className="font-mono">AES-256</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="flex gap-2 pt-1">
-            {!isAuthenticated ? (
-              <Button
-                className="w-full h-9 text-xs cursor-pointer"
-                disabled={isSyncing}
-                onClick={() => {
-                  setIsDropboxModalOpen(false);
-                  connectDropbox();
-                }}
-              >
-                {t('settings.connectDropbox')}
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  className="flex-1 h-9 text-xs cursor-pointer"
-                  disabled={isSyncing || !isOnline}
-                  onClick={async () => {
-                    await syncNow();
-                  }}
-                >
-                  <RefreshCw className={cn("size-3.5 mr-1.5", isSyncing && "animate-spin")} />
-                  <span>{isSyncing ? t('settings.syncing') : t('settings.syncNow')}</span>
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="flex-1 h-9 text-xs cursor-pointer"
-                  disabled={isSyncing}
-                  onClick={() => {
-                    setIsDropboxModalOpen(false);
-                    disconnectDropbox();
-                  }}
-                >
-                  {t('settings.disconnect')}
-                </Button>
-              </>
-            )}
-          </div>
+              <div className="flex gap-2 pt-1">
+                {!isAuthenticated ? (
+                  <Button
+                    className="w-full h-9 text-xs cursor-pointer"
+                    disabled={isSyncing}
+                    onClick={() => {
+                      setIsDropboxModalOpen(false);
+                      connectDropbox();
+                    }}
+                  >
+                    {t('settings.connectDropbox')}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1 h-9 text-xs cursor-pointer"
+                      disabled={isSyncing || !isOnline}
+                      onClick={async () => {
+                        await syncNow();
+                      }}
+                    >
+                      <RefreshCw className={cn("size-3.5 mr-1.5", isSyncing && "animate-spin")} />
+                      <span>{isSyncing ? t('settings.syncing') : t('settings.syncNow')}</span>
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1 h-9 text-xs cursor-pointer"
+                      disabled={isSyncing}
+                      onClick={() => {
+                        setIsDropboxModalOpen(false);
+                        disconnectDropbox();
+                      }}
+                    >
+                      {t('settings.disconnect')}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {dropboxModalView === 'enable_e2ee' && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDropboxModalView('overview')}
+                    className="size-7 -ml-1 rounded-md flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    aria-label="Back"
+                  >
+                    <ArrowLeft className="size-4" />
+                  </button>
+                  <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+                    <KeyRound className="size-5 text-primary" />
+                    <span>{t('settings.enableE2eeTitle')}</span>
+                  </DialogTitle>
+                </div>
+                <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
+                  {t('settings.enableE2eeDesc')}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">
+                    {t('settings.e2eePassphraseLabel')}
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder={t('settings.e2eePassphrasePlaceholder')}
+                    value={e2eePassphrase}
+                    onChange={(e) => setE2eePassphrase(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">
+                    {t('settings.confirmE2eePassphraseLabel')}
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder={t('settings.confirmE2eePassphrasePlaceholder')}
+                    value={e2eeConfirmPassphrase}
+                    onChange={(e) => setE2eeConfirmPassphrase(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-9 text-xs cursor-pointer"
+                    onClick={() => setDropboxModalView('overview')}
+                  >
+                    {t('common.cancel')}
+                  </Button>
+                  <Button
+                    className="flex-1 h-9 text-xs cursor-pointer"
+                    onClick={handleEnableE2EE}
+                  >
+                    {t('settings.enableNow')}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {dropboxModalView === 'recovery_key' && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+                  <KeyRound className="size-5 text-primary" />
+                  <span>{t('settings.recoveryKeyTitle')}</span>
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
+                  {t('settings.recoveryKeyDesc')}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 pt-1">
+                <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col gap-1.5">
+                  <span className="text-[11px] font-medium text-primary uppercase tracking-wider">
+                    {t('settings.recoveryKeyTitle')}
+                  </span>
+                  <p className="text-xs font-mono font-bold text-foreground select-all break-all py-1">
+                    {generatedRecoveryKey}
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 h-9 text-xs cursor-pointer gap-1.5"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedRecoveryKey);
+                      setIsRecoveryCopied(true);
+                      setTimeout(() => setIsRecoveryCopied(false), 2000);
+                    }}
+                  >
+                    {isRecoveryCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                    <span>{isRecoveryCopied ? t('settings.copied') : t('settings.copyRecoveryKey')}</span>
+                  </Button>
+                  <Button
+                    className="flex-1 h-9 text-xs cursor-pointer"
+                    onClick={() => {
+                      setDropboxModalView('overview');
+                    }}
+                  >
+                    {t('settings.done')}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -1275,103 +1471,7 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
-      {/* 端到端加密設定彈窗 */}
-      <Dialog open={isE2eeModalOpen} onOpenChange={setIsE2eeModalOpen}>
-        <DialogContent className="sm:max-w-[360px] max-w-[360px] p-5 gap-4">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
-              <KeyRound className="size-5 text-primary" />
-              <span>{t('settings.enableE2eeTitle')}</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              {t('settings.enableE2eeDesc')}
-            </DialogDescription>
-          </DialogHeader>
 
-          {!generatedRecoveryKey ? (
-            <div className="space-y-3 pt-1">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">
-                  {t('settings.e2eePassphraseLabel')}
-                </label>
-                <Input
-                  type="password"
-                  placeholder={t('settings.e2eePassphrasePlaceholder')}
-                  value={e2eePassphrase}
-                  onChange={(e) => setE2eePassphrase(e.target.value)}
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">
-                  {t('settings.confirmE2eePassphraseLabel')}
-                </label>
-                <Input
-                  type="password"
-                  placeholder={t('settings.confirmE2eePassphrasePlaceholder')}
-                  value={e2eeConfirmPassphrase}
-                  onChange={(e) => setE2eeConfirmPassphrase(e.target.value)}
-                  className="h-9 text-xs"
-                />
-              </div>
-
-              <Button
-                className="w-full h-9 text-xs mt-2 cursor-pointer"
-                onClick={handleEnableE2EE}
-              >
-                {t('settings.enableNow')}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3 pt-1">
-              <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 flex flex-col gap-1.5">
-                <span className="text-[11px] font-medium text-primary uppercase tracking-wider">
-                  {t('settings.recoveryKeyTitle')}
-                </span>
-                <p className="text-xs font-mono font-bold text-foreground select-all break-all py-1">
-                  {generatedRecoveryKey}
-                </p>
-                <span className="text-[10px] text-muted-foreground leading-normal">
-                  {t('settings.recoveryKeyDesc')}
-                </span>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 h-9 text-xs cursor-pointer gap-1.5"
-                  onClick={() => {
-                    navigator.clipboard.writeText(generatedRecoveryKey);
-                    setIsRecoveryCopied(true);
-                    setTimeout(() => setIsRecoveryCopied(false), 2000);
-                  }}
-                >
-                  {isRecoveryCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                  <span>{isRecoveryCopied ? t('settings.copied') : t('settings.copyRecoveryKey')}</span>
-                </Button>
-                <Button
-                  className="flex-1 h-9 text-xs cursor-pointer"
-                  onClick={() => setIsE2eeModalOpen(false)}
-                >
-                  {t('settings.done')}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 端到端加密 E2EE 解鎖彈窗 */}
-      <E2EEUnlockDialog
-        open={isUnlockModalOpen}
-        onOpenChange={setIsUnlockModalOpen}
-        onSuccess={() => {
-          setE2eeActive(isE2EEEnabled());
-          setE2eeUnlocked(true);
-          handleUnlockSuccess();
-        }}
-      />
 
       {/* 應用程式安全鎖 PIN 碼設定彈窗 */}
       <Dialog open={isLockSetupModalOpen} onOpenChange={setIsLockSetupModalOpen}>

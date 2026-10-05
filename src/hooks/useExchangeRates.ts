@@ -33,13 +33,19 @@ export function useExchangeRates() {
       }
     };
 
+    let timer: any;
     if (navigator.onLine) {
-      syncRates();
+      timer = setTimeout(syncRates, 2000);
     }
 
-    const handleOnline = () => syncRates();
+    const handleOnline = () => {
+      timer = setTimeout(syncRates, 1000);
+    };
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('online', handleOnline);
+    };
   }, []);
 
   const getRate = useCallback((fromCurrency: string, toCurrency: string): number => {

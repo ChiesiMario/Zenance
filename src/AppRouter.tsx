@@ -1,22 +1,41 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
-import BudgetHistory from './pages/BudgetHistory';
-import BudgetDetails from './pages/BudgetDetails';
-import Settings from './pages/Settings';
-import Categories from './pages/Categories';
-import ArchivedCategories from './pages/ArchivedCategories';
-import CategoryDetails from './pages/CategoryDetails';
-import Setup from './pages/Setup';
-import AccountDetails from './pages/AccountDetails';
-import ContactDetails from './pages/ContactDetails';
-import Reports from './pages/Reports';
 import { SetupGuard } from './components/layout/SetupGuard';
 import { LockGuard } from './components/security/LockGuard';
+
+// 路由級動態代碼分割 (Code Splitting)，徹底卸載非首屏巨型依賴 (如 JSZip、報表等)
+const Setup = lazy(() => import('./pages/Setup'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Categories = lazy(() => import('./pages/Categories'));
+const ArchivedCategories = lazy(() => import('./pages/ArchivedCategories'));
+const CategoryDetails = lazy(() => import('./pages/CategoryDetails'));
+const BudgetHistory = lazy(() => import('./pages/BudgetHistory'));
+const BudgetDetails = lazy(() => import('./pages/BudgetDetails'));
+const AccountDetails = lazy(() => import('./pages/AccountDetails'));
+const ContactDetails = lazy(() => import('./pages/ContactDetails'));
+
+function LazyRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full w-full items-center justify-center bg-background text-muted-foreground" />
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 const router = createBrowserRouter([
   {
     path: '/setup',
-    element: <Setup />,
+    element: (
+      <LazyRoute>
+        <Setup />
+      </LazyRoute>
+    ),
   },
   {
     path: '/',
@@ -38,7 +57,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'accounts/:id',
-        element: <AccountDetails />,
+        element: (
+          <LazyRoute>
+            <AccountDetails />
+          </LazyRoute>
+        ),
       },
       {
         path: 'contacts',
@@ -46,7 +69,11 @@ const router = createBrowserRouter([
       },
       {
         path: 'contacts/:id',
-        element: <ContactDetails />,
+        element: (
+          <LazyRoute>
+            <ContactDetails />
+          </LazyRoute>
+        ),
       },
       {
         path: 'budgets',
@@ -54,31 +81,59 @@ const router = createBrowserRouter([
       },
       {
         path: 'budgets/history',
-        element: <BudgetHistory />,
+        element: (
+          <LazyRoute>
+            <BudgetHistory />
+          </LazyRoute>
+        ),
       },
       {
         path: 'budgets/:id',
-        element: <BudgetDetails />,
+        element: (
+          <LazyRoute>
+            <BudgetDetails />
+          </LazyRoute>
+        ),
       },
       {
         path: 'reports',
-        element: <Reports />,
+        element: (
+          <LazyRoute>
+            <Reports />
+          </LazyRoute>
+        ),
       },
       {
         path: 'settings',
-        element: <Settings />,
+        element: (
+          <LazyRoute>
+            <Settings />
+          </LazyRoute>
+        ),
       },
       {
         path: 'settings/categories',
-        element: <Categories />,
+        element: (
+          <LazyRoute>
+            <Categories />
+          </LazyRoute>
+        ),
       },
       {
         path: 'settings/categories/archived',
-        element: <ArchivedCategories />,
+        element: (
+          <LazyRoute>
+            <ArchivedCategories />
+          </LazyRoute>
+        ),
       },
       {
         path: 'settings/categories/:id',
-        element: <CategoryDetails />,
+        element: (
+          <LazyRoute>
+            <CategoryDetails />
+          </LazyRoute>
+        ),
       },
     ],
   },

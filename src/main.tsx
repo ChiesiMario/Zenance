@@ -21,7 +21,9 @@ registerSW({
 });
 
 // 主動向瀏覽器申請持久化儲存授權，防止 Safari / Chrome 閒置清理 IndexedDB
-requestStoragePersistence().catch(() => {});
+setTimeout(() => {
+  requestStoragePersistence().catch(() => {});
+}, 1500);
 
 // 背景閒置時定期執行低優先級數據自檢與自癒 (每 7 天至多一次)
 if (typeof window !== 'undefined') {

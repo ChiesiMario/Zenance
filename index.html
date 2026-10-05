@@ -27,9 +27,55 @@
         }
       })();
     </script>
+    <style>
+      :root {
+        --app-bg: #000000;
+        --app-fg: #ffffff;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --app-bg: #ffffff;
+          --app-fg: #000000;
+        }
+      }
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: var(--app-bg);
+        color: var(--app-fg);
+        overflow: hidden;
+      }
+      #app-shell-fallback {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--app-bg);
+      }
+      .app-shell-icon {
+        width: 52px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.9;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="app-shell-fallback">
+        <div class="app-shell-icon">
+          <svg width="44" height="44" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="14" fill="currentColor" fill-opacity="0.08"/>
+            <path d="M15 16H33L15 32H33" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

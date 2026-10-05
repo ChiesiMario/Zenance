@@ -31,10 +31,6 @@ export default defineConfig({
           }
         ]
       },
-      devOptions: {
-        enabled: true,
-        type: 'module',
-      },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2,webmanifest}'],
         cleanupOutdatedCaches: true,

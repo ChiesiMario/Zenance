@@ -12,13 +12,24 @@ import { requestStoragePersistence } from '@/services/storage/storageManager'
 import { runSilentHealthCheck } from '@/services/fsck'
 import { scheduleRollingBackup } from '@/services/storage/opfsBackupService'
 
-// 自動註冊 PWA Service Worker 實現 100% 離線可用
-registerSW({
-  immediate: true,
-  onOfflineReady() {
-    console.log('Zenance is 100% ready to work offline.');
-  },
-});
+// 在生產環境自動註冊 PWA Service Worker 實現 100% 離線可用；
+// 在本機開發環境 (npm run dev) 主動清理並註銷殘留的 Service Worker，避免 HMR/ESM 請求被攔截導致死鎖
+if (import.meta.env.DEV) {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
+} else {
+  registerSW({
+    immediate: true,
+    onOfflineReady() {
+      console.log('Zenance is 100% ready to work offline.');
+    },
+  });
+}
 
 // 主動向瀏覽器申請持久化儲存授權，防止 Safari / Chrome 閒置清理 IndexedDB
 setTimeout(() => {

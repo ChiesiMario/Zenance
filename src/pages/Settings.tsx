@@ -118,6 +118,7 @@ export default function Settings() {
     isLockConfigured,
     config: appLockConfig,
     hasBiometricHardware,
+    initLock,
     enableLock,
     updateLockSettings,
     disableLock,
@@ -192,9 +193,10 @@ export default function Settings() {
     }
   };
 
-  // 組件掛載時嘗試靜默從本地金庫恢復 E2EE 金鑰，消除刷新後的假鎖定狀態
+  // 組件掛載時嘗試靜默從本地金庫恢復 E2EE 金鑰，消除刷新後的假鎖定狀態；並即時自檢系統生物特徵
   useEffect(() => {
     let mounted = true;
+    initLock();
     initE2EEKey().then(() => {
       if (mounted) {
         setE2eeActive(isE2EEEnabled());
@@ -204,7 +206,7 @@ export default function Settings() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [initLock]);
 
   // 隨時確保本地 E2EE 狀態與 e2eeManager 保持同步 (響應多設備遠端狀態傳播)
   useEffect(() => {
@@ -870,6 +872,7 @@ export default function Settings() {
                 toast.show(t('security.requiresHttpsToast'));
                 return;
               }
+              initLock();
               if (!isLockConfigured) {
                 setLockPinInput('');
                 setLockPinConfirm('');

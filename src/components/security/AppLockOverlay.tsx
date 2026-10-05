@@ -15,6 +15,7 @@ export function AppLockOverlay() {
   const config = useAppLockStore((s) => s.config);
   const hasBiometricHardware = useAppLockStore((s) => s.hasBiometricHardware);
   const lockoutRemainingSec = useAppLockStore((s) => s.lockoutRemainingSec);
+  const initLock = useAppLockStore((s) => s.initLock);
   const unlockWithPin = useAppLockStore((s) => s.unlockWithPin);
   const unlockWithBiometric = useAppLockStore((s) => s.unlockWithBiometric);
   const disableLock = useAppLockStore((s) => s.disableLock);
@@ -67,9 +68,10 @@ export function AppLockOverlay() {
     }
   }, [unlockWithBiometric, lockoutRemainingSec, isBioVerifying, bioFailCount, t]);
 
-  // 每次 App 被鎖定且啟用了生物辨識時，重設失敗計數並設為首選視圖
+  // 每次 App 被鎖定時，自檢硬體狀態並重設失敗計數
   useEffect(() => {
     if (isLocked) {
+      initLock();
       if (isBiometricEligible) {
         setView('biometric');
         setBioFailCount(0);
@@ -79,7 +81,7 @@ export function AppLockOverlay() {
       setEnteredPin('');
       setErrorMsg('');
     }
-  }, [isLocked, isBiometricEligible]);
+  }, [isLocked, isBiometricEligible, initLock]);
 
   // 掛載且鎖定時，若在生物識別首選視圖，自動喚起 Face ID / Windows Hello / 指紋
   useEffect(() => {
@@ -200,10 +202,10 @@ export function AppLockOverlay() {
               <Lock className="size-4 text-primary" />
               <span>{t('security.appLocked')}</span>
             </h1>
-            <p className={cn("text-xs mt-1 leading-relaxed transition-colors", errorMsg ? "text-rose-500 font-medium" : "text-muted-foreground")}>
+            <p className={cn("text-xs mt-1 min-h-[1.25rem] leading-relaxed transition-colors", errorMsg ? "text-rose-500 font-medium" : "text-muted-foreground")}>
               {lockoutRemainingSec > 0
                 ? t('security.lockoutWait', { seconds: lockoutRemainingSec })
-                : errorMsg || t('security.biometricPrompt')}
+                : errorMsg}
             </p>
           </div>
 

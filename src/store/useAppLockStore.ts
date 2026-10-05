@@ -68,6 +68,16 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
     initLock: () => {
       isBiometricAvailable().then((available) => {
         set({ hasBiometricHardware: available });
+        // 若設備無生物識別 (未設定/無硬體/使用者在系統中關閉或移除了生物特徵)
+        const currentConfig = get().config;
+        if (currentConfig?.biometricEnabled && !available) {
+          const updated: AppLockConfig = {
+            ...currentConfig,
+            biometricEnabled: false,
+          };
+          localStorage.setItem(APP_LOCK_CONFIG_KEY, JSON.stringify(updated));
+          set({ config: updated });
+        }
       });
     },
 
@@ -125,6 +135,16 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
       if (!config?.biometricEnabled) return false;
       if (lockoutRemainingSec > 0) return false;
 
+      // 即時確認設備是否具備系統生物特徵
+      const isAvailable = await isBiometricAvailable();
+      if (!isAvailable) {
+        set({ hasBiometricHardware: false });
+        const updated = { ...config, biometricEnabled: false, biometricCredentialId: undefined };
+        localStorage.setItem(APP_LOCK_CONFIG_KEY, JSON.stringify(updated));
+        set({ config: updated });
+        return false;
+      }
+
       const success = await verifyBiometricCredential(config.biometricCredentialId);
       if (success) {
         get().setLocked(false);
@@ -160,8 +180,8 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
         pinHash,
         pinSalt: bufferToBase64(salt),
         pinLength: pin.length,
-        biometricEnabled: Boolean(biometricCredentialId),
-        biometricCredentialId,
+        biometricEnabled: Boolean(isAvailable && biometricCredentialId),
+        biometricCredentialId: isAvailable ? biometricCredentialId : undefined,
         timeoutMinutes,
       };
 
@@ -186,22 +206,29 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
       const isAvailable = await isBiometricAvailable();
       set({ hasBiometricHardware: isAvailable });
 
-      if (updates.biometricEnabled && !biometricCredentialId && isAvailable) {
+      // 若使用者關閉了生物識別，或設備生物識別在系統中被移除，立即清空憑證
+      if (updates.biometricEnabled === false || !isAvailable) {
+        biometricCredentialId = undefined;
+      } else if (updates.biometricEnabled && !biometricCredentialId && isAvailable) {
         const credId = await registerBiometricCredential();
         if (credId) {
           biometricCredentialId = credId;
         }
       }
 
+      const nextBioEnabled = Boolean(
+        isAvailable &&
+          (updates.biometricEnabled !== undefined
+            ? updates.biometricEnabled && Boolean(biometricCredentialId)
+            : cfg.biometricEnabled && Boolean(biometricCredentialId))
+      );
+
       const newConfig: AppLockConfig = {
         ...cfg,
         timeoutMinutes:
           updates.timeoutMinutes !== undefined ? updates.timeoutMinutes : cfg.timeoutMinutes,
-        biometricEnabled:
-          updates.biometricEnabled !== undefined
-            ? updates.biometricEnabled && Boolean(biometricCredentialId)
-            : cfg.biometricEnabled,
-        biometricCredentialId,
+        biometricEnabled: nextBioEnabled,
+        biometricCredentialId: nextBioEnabled ? biometricCredentialId : undefined,
       };
 
       localStorage.setItem(APP_LOCK_CONFIG_KEY, JSON.stringify(newConfig));

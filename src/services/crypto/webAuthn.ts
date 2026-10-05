@@ -36,7 +36,9 @@ export async function registerBiometricCredential(
   const userId = new Uint8Array(16);
   window.crypto.getRandomValues(userId);
 
-  const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
+  const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions & {
+    hints?: string[];
+  } = {
     challenge,
     rp: {
       name: 'Zenance',
@@ -52,10 +54,11 @@ export async function registerBiometricCredential(
       { alg: -257, type: 'public-key' }, // RS256
     ],
     authenticatorSelection: {
-      authenticatorAttachment: 'platform', // 限制為本機硬體生物辨識模組
-      userVerification: 'required',
-      residentKey: 'preferred',
+      authenticatorAttachment: 'platform', // 強制鎖定為本機內部平台硬體認證器 (Windows Hello / Touch ID / Android 生物辨識)
+      userVerification: 'required',        // 強制本機生物特徵 (或 Windows Hello PIN) 驗證
+      residentKey: 'discouraged',          // 阻止第三方密碼管理器 (1Password/Bitwarden) 當作可發現 Passkey 搶佔截獲
     },
+    hints: ['client-device'],              // WebAuthn L3: 明確指示瀏覽器優先調用本機實體設備
     timeout: 60000,
     attestation: 'none',
   };
@@ -81,7 +84,7 @@ export async function registerBiometricCredential(
 }
 
 /**
- * 呼叫本機生物辨識驗證解鎖 (Touch ID / FaceID 驗證)
+ * 呼叫本機生物辨識驗證解鎖 (Touch ID / FaceID / Windows Hello 驗證)
  */
 export async function verifyBiometricCredential(
   credentialIdBase64?: string
@@ -92,11 +95,14 @@ export async function verifyBiometricCredential(
   const challenge = new Uint8Array(32);
   window.crypto.getRandomValues(challenge);
 
-  const requestOptions: PublicKeyCredentialRequestOptions = {
+  const requestOptions: PublicKeyCredentialRequestOptions & {
+    hints?: string[];
+  } = {
     challenge,
     timeout: 60000,
     userVerification: 'required',
     rpId: window.location.hostname,
+    hints: ['client-device'], // 明確指示瀏覽器直接向系統安全性核心索取驗證斷言
   };
 
   if (credentialIdBase64) {

@@ -210,6 +210,7 @@ export async function getValidAccessToken(): Promise<string | null> {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: body.toString(),
+        signal: AbortSignal.timeout(10000),
       });
 
       if (response.ok) {
@@ -222,6 +223,16 @@ export async function getValidAccessToken(): Promise<string | null> {
         };
         setStoredTokens(updatedTokens);
         return updatedTokens.access_token;
+      }
+
+      // 若遠端回傳 400 invalid_grant 或 401，代表使用者已在 Dropbox 撤銷授權
+      if (response.status === 400 || response.status === 401) {
+        const errorData = await response.json().catch(() => null);
+        if (errorData?.error === 'invalid_grant' || response.status === 401) {
+          console.warn('Dropbox refresh token revoked or invalid. Clearing stored credentials.');
+          clearDropboxTokens();
+          return null;
+        }
       }
     } catch (err) {
       console.warn('Failed to refresh Dropbox access token silently:', err);

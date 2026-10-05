@@ -30,6 +30,7 @@ export function AppLayout() {
     isUnlockModalOpen,
     setIsUnlockModalOpen,
     handleUnlockSuccess,
+    disconnectDropbox,
   } = useDropboxSync(); // Trigger background sync & auto network reconnection pull
   
   const { transactions } = useTransactions();
@@ -383,6 +384,7 @@ export function AppLayout() {
         open={isUnlockModalOpen}
         onOpenChange={setIsUnlockModalOpen}
         onSuccess={handleUnlockSuccess}
+        onDisconnect={disconnectDropbox}
       />
 
       <Toaster />

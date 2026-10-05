@@ -644,6 +644,7 @@
       "unlockE2eePlaceholder": "Enter passphrase...",
       "unlockE2eeBtn": "Unlock & Sync",
       "unlockFailed": "Incorrect passphrase, unlock failed",
+      "disconnectDropbox": "Disconnect Dropbox",
       "requiresCloudSync": "Requires Cloud Sync",
       "e2eeRequiresDropbox": "Please connect to Dropbox cloud sync first to use End-to-End Encryption",
       "persistenceGranted": "Persistence storage permission granted!",

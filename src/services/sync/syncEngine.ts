@@ -26,6 +26,7 @@ import {
 } from '../crypto/e2eeManager';
 import type { CryptoEnvelope } from '../crypto/webCrypto';
 import { recordObservedTimestamp } from '@/lib/clock';
+import { generateDueMonthlySnapshots } from '@/services/balance/snapshotService';
 
 const LAST_SYNC_KEY = 'zenance_dropbox_last_sync';
 const CACHED_REVS_KEY = 'zenance_dropbox_cached_revs';
@@ -93,7 +94,32 @@ export interface SyncManifest {
 }
 
 let isSyncInProgress = false;
+let hasPendingSyncRequest = false;
+let pendingSyncMode: 'auto' | 'overwrite_local' | 'overwrite_remote' = 'auto';
 let autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 遠端交易合併後，背景無感補齊受影響帳本的歷史結算月份餘額快照
+ */
+async function reconcileMonthlySnapshotsForLedger(ledgerId: string): Promise<void> {
+  try {
+    const ledger = await db.ledgers.get(ledgerId);
+    if (!ledger) return;
+
+    const rates = await db.exchange_rates.toArray();
+    const getRate = (fromCurrency: string, toCurrency: string): number => {
+      if (fromCurrency === toCurrency) return 1;
+      if (!rates || rates.length === 0) return 1;
+      const fromRate = rates.find((r) => r.currency === fromCurrency)?.rate || 1;
+      const toRate = rates.find((r) => r.currency === toCurrency)?.rate || 1;
+      return toRate / fromRate;
+    };
+
+    await generateDueMonthlySnapshots(ledgerId, getRate, ledger.baseCurrency || 'CNY');
+  } catch (err) {
+    console.warn(`Failed to reconcile monthly snapshots for ledger ${ledgerId}:`, err);
+  }
+}
 
 export function getLastSyncTime(): string | null {
   return localStorage.getItem(LAST_SYNC_KEY);
@@ -253,12 +279,12 @@ async function uploadManifestFile(cachedRevs: Record<string, string>): Promise<v
     baseCurrency: l.baseCurrency,
     isDefault: l.isDefault,
     stats: {
-      accountsCount: allAccounts.filter((a) => a.ledgerId === l.id).length,
-      contactsCount: allContacts.filter((c) => c.ledgerId === l.id).length,
-      categoriesCount: allCategories.filter((c) => c.ledgerId === l.id).length,
-      budgetsCount: allBudgets.filter((b) => b.ledgerId === l.id).length,
-      budgetRulesCount: allBudgetRules.filter((r) => r.ledgerId === l.id).length,
-      transactionsCount: allTransactions.filter((t) => t.ledgerId === l.id).length,
+      accountsCount: allAccounts.filter((a) => a.ledgerId === l.id && !a.deleted).length,
+      contactsCount: allContacts.filter((c) => c.ledgerId === l.id && !c.deleted).length,
+      categoriesCount: allCategories.filter((c) => c.ledgerId === l.id && !c.deleted).length,
+      budgetsCount: allBudgets.filter((b) => b.ledgerId === l.id && !b.deleted).length,
+      budgetRulesCount: allBudgetRules.filter((r) => r.ledgerId === l.id && !r.deleted).length,
+      transactionsCount: allTransactions.filter((t) => t.ledgerId === l.id && !t.deleted).length,
     },
   }));
 
@@ -300,10 +326,14 @@ export async function executeSync(
   mode: 'auto' | 'overwrite_local' | 'overwrite_remote' = 'auto'
 ): Promise<SyncResult> {
   if (isSyncInProgress) {
+    hasPendingSyncRequest = true;
+    if (mode === 'overwrite_remote' || mode === 'overwrite_local') {
+      pendingSyncMode = mode;
+    }
     return {
       success: false,
       timestamp: new Date().toISOString(),
-      error: 'Sync already in progress',
+      error: 'Sync already in progress, queued next run',
       actionTaken: 'up_to_date',
     };
   }
@@ -359,6 +389,16 @@ export async function executeSync(
       };
     } finally {
       isSyncInProgress = false;
+      if (hasPendingSyncRequest) {
+        hasPendingSyncRequest = false;
+        const nextMode = pendingSyncMode;
+        pendingSyncMode = 'auto';
+        setTimeout(() => {
+          executeSync(nextMode).catch((err) => {
+            console.warn('Pending sync execution error:', err);
+          });
+        }, 300);
+      }
     }
   }
 
@@ -520,12 +560,18 @@ export async function executeSync(
       setCachedRevs(cachedRevs);
       setLastSyncTime(now);
 
+      // 全量拉取後，為所有帳本非同步校準月度資產快照
+      for (const l of allLedgers) {
+        reconcileMonthlySnapshotsForLedger(l.id);
+      }
+
       return { success: true, timestamp: now, actionTaken: 'downloaded_remote' };
     }
 
     // 4. 動態雙向解包文件夾同步模式 (Auto Granular Selective Pull & Push)
     let hasLocalModified = false;
     let hasRemoteModified = false;
+    const affectedLedgersForSnapshots = new Set<string>();
 
     // A. 遠端修訂號比對拉取 (Selective Pull via rev)
     const remoteFileMap = new Map<string, DropboxFileMetadata>(
@@ -542,27 +588,24 @@ export async function executeSync(
     }
 
     // 檢視各遠端檔案是否需要下載 (僅在 rev 不一致時下載)
+    // 優先依據拓撲依賴順序：先建立/更新 ledger 頂層帳本實體，再裝填子實體，徹底杜絕孤兒數據
     for (const ledgerId of remoteLedgerIds) {
       const prefix = `/ledgers/${ledgerId}`;
 
-      // 檢查 transactions.json
-      const txPath = `${prefix}/transactions.json`;
-      const txMeta = remoteFileMap.get(txPath);
-      if (txMeta && cachedRevs[txPath] !== txMeta.rev) {
-        const remoteTxs = (await downloadJsonFile<Transaction[]>(txPath)) || [];
-        const localTxs = await db.transactions.where('ledgerId').equals(ledgerId).toArray();
-        const m = mergeEntities(localTxs, remoteTxs);
-        if (m.hasLocalChanges) {
-          await db.transactions.bulkPut(m.merged);
+      // 1. 優先檢查並更新 ledger.json
+      const ledPath = `${prefix}/ledger.json`;
+      const ledMeta = remoteFileMap.get(ledPath);
+      if (ledMeta && cachedRevs[ledPath] !== ledMeta.rev) {
+        const remoteLed = await downloadJsonFile<Ledger>(ledPath);
+        const localLed = await db.ledgers.get(ledgerId);
+        if (remoteLed && (!localLed || (remoteLed.updatedAt || '') > (localLed.updatedAt || ''))) {
+          await db.ledgers.put(remoteLed);
           hasLocalModified = true;
         }
-        if (m.hasRemoteChanges) {
-          hasRemoteModified = true;
-        }
-        cachedRevs[txPath] = txMeta.rev;
+        cachedRevs[ledPath] = ledMeta.rev;
       }
 
-      // 檢查 accounts.json
+      // 2. 檢查 accounts.json
       const accPath = `${prefix}/accounts.json`;
       const accMeta = remoteFileMap.get(accPath);
       if (accMeta && cachedRevs[accPath] !== accMeta.rev) {
@@ -579,7 +622,7 @@ export async function executeSync(
         cachedRevs[accPath] = accMeta.rev;
       }
 
-      // 檢查 contacts.json
+      // 3. 檢查 contacts.json
       const contPath = `${prefix}/contacts.json`;
       const contMeta = remoteFileMap.get(contPath);
       if (contMeta && cachedRevs[contPath] !== contMeta.rev) {
@@ -596,7 +639,7 @@ export async function executeSync(
         cachedRevs[contPath] = contMeta.rev;
       }
 
-      // 檢查 categories.json
+      // 4. 檢查 categories.json
       const catPath = `${prefix}/categories.json`;
       const catMeta = remoteFileMap.get(catPath);
       if (catMeta && cachedRevs[catPath] !== catMeta.rev) {
@@ -613,7 +656,7 @@ export async function executeSync(
         cachedRevs[catPath] = catMeta.rev;
       }
 
-      // 檢查 budgets.json
+      // 5. 檢查 budgets.json
       const budPath = `${prefix}/budgets.json`;
       const budMeta = remoteFileMap.get(budPath);
       if (budMeta && cachedRevs[budPath] !== budMeta.rev) {
@@ -630,7 +673,7 @@ export async function executeSync(
         cachedRevs[budPath] = budMeta.rev;
       }
 
-      // 檢查 budget_rules.json
+      // 6. 檢查 budget_rules.json
       const rulePath = `${prefix}/budget_rules.json`;
       const ruleMeta = remoteFileMap.get(rulePath);
       if (ruleMeta && cachedRevs[rulePath] !== ruleMeta.rev) {
@@ -647,17 +690,29 @@ export async function executeSync(
         cachedRevs[rulePath] = ruleMeta.rev;
       }
 
-      // 檢查 ledger.json
-      const ledPath = `${prefix}/ledger.json`;
-      const ledMeta = remoteFileMap.get(ledPath);
-      if (ledMeta && cachedRevs[ledPath] !== ledMeta.rev) {
-        const remoteLed = await downloadJsonFile<Ledger>(ledPath);
-        const localLed = await db.ledgers.get(ledgerId);
-        if (remoteLed && (!localLed || (remoteLed.updatedAt || '') > (localLed.updatedAt || ''))) {
-          await db.ledgers.put(remoteLed);
+      // 7. 檢查 transactions.json
+      const txPath = `${prefix}/transactions.json`;
+      const txMeta = remoteFileMap.get(txPath);
+      if (txMeta && cachedRevs[txPath] !== txMeta.rev) {
+        const remoteTxs = (await downloadJsonFile<Transaction[]>(txPath)) || [];
+        const localTxs = await db.transactions.where('ledgerId').equals(ledgerId).toArray();
+        const m = mergeEntities(localTxs, remoteTxs);
+        if (m.hasLocalChanges) {
+          await db.transactions.bulkPut(m.merged);
           hasLocalModified = true;
+          affectedLedgersForSnapshots.add(ledgerId);
         }
-        cachedRevs[ledPath] = ledMeta.rev;
+        if (m.hasRemoteChanges) {
+          hasRemoteModified = true;
+        }
+        cachedRevs[txPath] = txMeta.rev;
+      }
+    }
+
+    // 若有遠端交易被拉取合併，背景觸發受影響帳本的歷史月末資產快照補齊
+    if (affectedLedgersForSnapshots.size > 0) {
+      for (const lid of affectedLedgersForSnapshots) {
+        reconcileMonthlySnapshotsForLedger(lid);
       }
     }
 
@@ -674,7 +729,7 @@ export async function executeSync(
 
       if (!lastTxPushed || maxTxUpdated > lastTxPushed || hasRemoteModified) {
         const txPath = `${prefix}/transactions.json`;
-        cachedRevs[txPath] = await uploadJsonFile(txPath, localTxs);
+        cachedRevs[txPath] = await uploadJsonFile(txPath, localTxs, cachedRevs[txPath]);
         pushedTimes[`${l.id}_transactions`] = now;
         hasRemoteModified = true;
       }
@@ -686,7 +741,7 @@ export async function executeSync(
 
       if (!lastAccPushed || maxAccUpdated > lastAccPushed) {
         const accPath = `${prefix}/accounts.json`;
-        cachedRevs[accPath] = await uploadJsonFile(accPath, localAccs);
+        cachedRevs[accPath] = await uploadJsonFile(accPath, localAccs, cachedRevs[accPath]);
         pushedTimes[`${l.id}_accounts`] = now;
         hasRemoteModified = true;
       }
@@ -698,7 +753,7 @@ export async function executeSync(
 
       if (!lastContPushed || maxContUpdated > lastContPushed) {
         const contPath = `${prefix}/contacts.json`;
-        cachedRevs[contPath] = await uploadJsonFile(contPath, localConts);
+        cachedRevs[contPath] = await uploadJsonFile(contPath, localConts, cachedRevs[contPath]);
         pushedTimes[`${l.id}_contacts`] = now;
         hasRemoteModified = true;
       }
@@ -710,7 +765,7 @@ export async function executeSync(
 
       if (!lastCatPushed || maxCatUpdated > lastCatPushed) {
         const catPath = `${prefix}/categories.json`;
-        cachedRevs[catPath] = await uploadJsonFile(catPath, localCats);
+        cachedRevs[catPath] = await uploadJsonFile(catPath, localCats, cachedRevs[catPath]);
         pushedTimes[`${l.id}_categories`] = now;
         hasRemoteModified = true;
       }
@@ -722,7 +777,7 @@ export async function executeSync(
 
       if (!lastBudPushed || maxBudUpdated > lastBudPushed) {
         const budPath = `${prefix}/budgets.json`;
-        cachedRevs[budPath] = await uploadJsonFile(budPath, localBuds);
+        cachedRevs[budPath] = await uploadJsonFile(budPath, localBuds, cachedRevs[budPath]);
         pushedTimes[`${l.id}_budgets`] = now;
         hasRemoteModified = true;
       }
@@ -733,7 +788,7 @@ export async function executeSync(
 
       if (!lastRulePushed || maxRuleUpdated > lastRulePushed) {
         const rulePath = `${prefix}/budget_rules.json`;
-        cachedRevs[rulePath] = await uploadJsonFile(rulePath, localRules);
+        cachedRevs[rulePath] = await uploadJsonFile(rulePath, localRules, cachedRevs[rulePath]);
         pushedTimes[`${l.id}_budget_rules`] = now;
         hasRemoteModified = true;
       }
@@ -742,7 +797,7 @@ export async function executeSync(
       const lastLedPushed = pushedTimes[`${l.id}_ledger`] || '';
       if (!lastLedPushed || (l.updatedAt || '') > lastLedPushed) {
         const ledPath = `${prefix}/ledger.json`;
-        cachedRevs[ledPath] = await uploadJsonFile(ledPath, l);
+        cachedRevs[ledPath] = await uploadJsonFile(ledPath, l, cachedRevs[ledPath]);
         pushedTimes[`${l.id}_ledger`] = now;
         hasRemoteModified = true;
       }
@@ -764,6 +819,11 @@ export async function executeSync(
     };
   } catch (error: any) {
     console.error('Folder sync execution error:', error);
+    if (error?.message?.includes('DROPBOX_CONFLICT')) {
+      console.warn('Dropbox concurrency conflict detected! Queuing automatic re-merge...');
+      hasPendingSyncRequest = true;
+      pendingSyncMode = 'auto';
+    }
     const isLocked =
       error?.message === 'E2EE_LOCKED' || error?.message === 'E2EE_DECRYPT_FAILED';
     if (isLocked) {
@@ -778,6 +838,18 @@ export async function executeSync(
     };
   } finally {
     isSyncInProgress = false;
+    if (hasPendingSyncRequest) {
+      hasPendingSyncRequest = false;
+      const nextMode = pendingSyncMode;
+      pendingSyncMode = 'auto';
+      // 加入 300ms ~ 600ms 的隨機抖動退避 (Jitter)，防止多設備並行衝突時陷入週期性互鎖
+      const jitterDelay = Math.floor(300 + Math.random() * 300);
+      setTimeout(() => {
+        executeSync(nextMode).catch((err) => {
+          console.warn('Pending sync execution error:', err);
+        });
+      }, jitterDelay);
+    }
   }
 }
 

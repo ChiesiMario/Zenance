@@ -17,6 +17,7 @@ import {
 import { downloadJsonFile } from '@/services/sync/dropboxClient';
 import { db } from '@/services/db/db';
 import { toast } from '@/components/ui/toast';
+import { useAppStore } from '@/store/useAppStore';
 
 export function useDropboxSync() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(isDropboxConnected());
@@ -32,6 +33,11 @@ export function useDropboxSync() {
   // E2EE 解鎖彈窗狀態與待恢復的同步模式
   const [isUnlockModalOpen, setIsUnlockModalOpen] = useState<boolean>(false);
   const pendingSyncModeRef = useRef<'auto' | 'overwrite_local' | 'overwrite_remote'>('auto');
+  const pendingUnlockRequestedRef = useRef<boolean>(false);
+
+  // 訂閱記帳視窗狀態，保護無邊界大輸入框體驗
+  const isAddModalOpen = useAppStore((state) => state.isAddModalOpen);
+  const editingTransactionId = useAppStore((state) => state.editingTransactionId);
 
   const hasHandledAuthRef = useRef(false);
 
@@ -39,9 +45,23 @@ export function useDropboxSync() {
   useEffect(() => {
     return onSyncUnlockNeeded((mode) => {
       pendingSyncModeRef.current = mode;
-      setIsUnlockModalOpen(true);
+      const { isAddModalOpen: isAdding, editingTransactionId: isEditing } = useAppStore.getState();
+      if (isAdding || !!isEditing) {
+        // 使用者正在記帳或編輯交易中，暫緩彈窗避免打斷輸入體驗
+        pendingUnlockRequestedRef.current = true;
+      } else {
+        setIsUnlockModalOpen(true);
+      }
     });
   }, []);
+
+  // 當使用者完成記帳並關閉彈窗時，若有待處理的解鎖請求，平滑補彈
+  useEffect(() => {
+    if (!isAddModalOpen && !editingTransactionId && pendingUnlockRequestedRef.current) {
+      pendingUnlockRequestedRef.current = false;
+      setIsUnlockModalOpen(true);
+    }
+  }, [isAddModalOpen, editingTransactionId]);
 
   // 應用啟動與切回視窗時主動檢查遠端是否有更新 (感應用戶在其他設備的變更)
   useEffect(() => {

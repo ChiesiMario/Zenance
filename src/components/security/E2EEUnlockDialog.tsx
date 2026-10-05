@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyRound, Lock, Loader2 } from 'lucide-react';
+import { KeyRound, Lock, Loader2, Unlink } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,12 +19,14 @@ interface E2EEUnlockDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  onDisconnect?: () => void;
 }
 
 export function E2EEUnlockDialog({
   open,
   onOpenChange,
   onSuccess,
+  onDisconnect,
 }: E2EEUnlockDialogProps) {
   const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
@@ -63,6 +65,14 @@ export function E2EEUnlockDialog({
     setPassphrase('');
     setIsError(false);
     onOpenChange(false);
+  };
+
+  const handleDisconnect = () => {
+    if (isUnlocking) return;
+    handleClose();
+    if (onDisconnect) {
+      onDisconnect();
+    }
   };
 
   return (
@@ -129,6 +139,18 @@ export function E2EEUnlockDialog({
             )}
           </Button>
         </DialogFooter>
+
+        <div className="flex justify-center -mt-1 w-full">
+          <button
+            type="button"
+            onClick={handleDisconnect}
+            disabled={isUnlocking}
+            className="text-[11px] font-mono tracking-tight text-muted-foreground/75 hover:text-destructive transition-colors outline-none cursor-pointer flex items-center gap-1.5 py-1 px-2 rounded hover:bg-destructive/10"
+          >
+            <Unlink className="size-3" />
+            <span>{t('settings.disconnectDropbox', '斷開 Dropbox 連接')}</span>
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
   );

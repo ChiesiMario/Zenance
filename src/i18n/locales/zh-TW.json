@@ -644,6 +644,7 @@
       "unlockE2eePlaceholder": "輸入加密主密碼...",
       "unlockE2eeBtn": "解鎖並同步",
       "unlockFailed": "密碼錯誤，無法解鎖",
+      "disconnectDropbox": "斷開 Dropbox 連接",
       "requiresCloudSync": "需連線雲端",
       "e2eeRequiresDropbox": "請先連線 Dropbox 雲端同步以使用端到端加密",
       "persistenceGranted": "已獲得瀏覽器持久化儲存授權！",

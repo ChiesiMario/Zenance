@@ -100,18 +100,22 @@ export async function verifyBiometricCredential(
   };
 
   if (credentialIdBase64) {
-    const binary = atob(credentialIdBase64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    try {
+      const binary = atob(credentialIdBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      // 不指定已廢棄的 transports，確保全平台 (Apple/Windows/Android) 現代 WebKit/Blink 核心原生相容
+      requestOptions.allowCredentials = [
+        {
+          id: bytes,
+          type: 'public-key',
+        },
+      ];
+    } catch (e) {
+      console.warn('Failed to parse biometric credential ID:', e);
     }
-    requestOptions.allowCredentials = [
-      {
-        id: bytes,
-        type: 'public-key',
-        transports: ['internal'],
-      },
-    ];
   }
 
   try {
@@ -119,8 +123,9 @@ export async function verifyBiometricCredential(
       publicKey: requestOptions,
     });
     return Boolean(assertion);
-  } catch (err) {
-    console.warn('Biometric verification cancelled or failed:', err);
+  } catch (err: any) {
+    // 使用者主動取消或生物特徵不匹配
+    console.warn('Biometric verification cancelled or failed:', err?.message || err);
     return false;
   }
 }

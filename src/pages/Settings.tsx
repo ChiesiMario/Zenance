@@ -261,7 +261,7 @@ export default function Settings() {
       toast.show(t('security.pinMismatch'));
       return;
     }
-    const success = await enableLock(lockPinInput, lockEnableBio, 0);
+    const success = await enableLock(lockPinInput, lockEnableBio && hasBiometricHardware, 0);
     if (success) {
       setIsLockSetupModalOpen(false);
       setLockPinInput('');
@@ -873,6 +873,7 @@ export default function Settings() {
               if (!isLockConfigured) {
                 setLockPinInput('');
                 setLockPinConfirm('');
+                setLockEnableBio(hasBiometricHardware);
                 setIsLockSetupModalOpen(true);
               } else {
                 setIsLockSettingsModalOpen(true);
@@ -1517,20 +1518,31 @@ export default function Settings() {
               />
             </div>
 
-            {hasBiometricHardware && (
-              <div className="p-2.5 rounded-lg border border-border bg-muted/20 flex items-center justify-between">
+            <div
+              className={cn(
+                "p-2.5 rounded-lg border border-border flex items-center justify-between transition-colors",
+                hasBiometricHardware ? "bg-muted/20" : "opacity-60 bg-muted/10 cursor-not-allowed"
+              )}
+            >
+              <div className="flex flex-col gap-0.5">
                 <span className="text-xs font-medium flex items-center gap-1.5">
                   <Fingerprint className="size-4 text-primary" />
                   <span>{t('security.biometricSupport')}</span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={lockEnableBio}
-                  onChange={(e) => setLockEnableBio(e.target.checked)}
-                  className="size-4 rounded accent-primary cursor-pointer"
-                />
+                {!hasBiometricHardware && (
+                  <span className="text-[10px] text-muted-foreground font-sans">
+                    {t('security.biometricNotConfigured')}
+                  </span>
+                )}
               </div>
-            )}
+              <input
+                type="checkbox"
+                disabled={!hasBiometricHardware}
+                checked={hasBiometricHardware ? lockEnableBio : false}
+                onChange={(e) => setLockEnableBio(e.target.checked)}
+                className="size-4 rounded accent-primary cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
 
             <Button
               className="w-full h-9 text-xs mt-2 cursor-pointer"
@@ -1585,22 +1597,33 @@ export default function Settings() {
               </Select>
             </div>
 
-            {hasBiometricHardware && (
-              <div className="p-3 flex items-center justify-between">
+            <div
+              className={cn(
+                "p-3 flex items-center justify-between transition-colors",
+                !hasBiometricHardware && "opacity-60 bg-muted/10 cursor-not-allowed"
+              )}
+            >
+              <div className="flex flex-col gap-0.5">
                 <span className="text-muted-foreground font-sans flex items-center gap-1.5">
                   <Fingerprint className="size-3.5 text-primary" />
                   <span>{t('security.biometricUnlock')}</span>
                 </span>
-                <input
-                  type="checkbox"
-                  checked={appLockConfig?.biometricEnabled ?? false}
-                  onChange={(e) => {
-                    updateLockSettings({ biometricEnabled: e.target.checked });
-                  }}
-                  className="size-4 rounded accent-primary cursor-pointer"
-                />
+                {!hasBiometricHardware && (
+                  <span className="text-[10px] text-muted-foreground font-sans">
+                    {t('security.biometricNotConfigured')}
+                  </span>
+                )}
               </div>
-            )}
+              <input
+                type="checkbox"
+                disabled={!hasBiometricHardware}
+                checked={hasBiometricHardware && (appLockConfig?.biometricEnabled ?? false)}
+                onChange={(e) => {
+                  updateLockSettings({ biometricEnabled: e.target.checked });
+                }}
+                className="size-4 rounded accent-primary cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
           </div>
 
           <div className="flex gap-2 pt-1">

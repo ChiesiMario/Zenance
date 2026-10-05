@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/ui/Logo';
 import { Delete, Fingerprint, Lock, KeyRound, AlertTriangle } from 'lucide-react';
@@ -19,7 +19,17 @@ export function AppLockOverlay() {
   const unlockWithBiometric = useAppLockStore((s) => s.unlockWithBiometric);
   const disableLock = useAppLockStore((s) => s.disableLock);
 
-  const [view, setView] = useState<'pin' | 'recover'>('pin');
+  const isBiometricEligible = useMemo(() => {
+    return Boolean(config?.biometricEnabled && hasBiometricHardware);
+  }, [config?.biometricEnabled, hasBiometricHardware]);
+
+  const [view, setView] = useState<'biometric' | 'pin' | 'recover'>(() => {
+    return isBiometricEligible ? 'biometric' : 'pin';
+  });
+
+  const [bioFailCount, setBioFailCount] = useState<number>(0);
+  const [isBioVerifying, setIsBioVerifying] = useState<boolean>(false);
+
   const [enteredPin, setEnteredPin] = useState<string>('');
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [isError, setIsError] = useState<boolean>(false);
@@ -31,24 +41,55 @@ export function AppLockOverlay() {
 
   const requiredLength = config?.pinLength || 4;
 
-  // 嘗試生物辨識解鎖
+  // 嘗試生物辨識解鎖 (全平台 Face ID / Touch ID / Windows Hello / Android 指紋)
   const handleBiometric = useCallback(async () => {
-    if (lockoutRemainingSec > 0) return;
-    const success = await unlockWithBiometric();
-    if (!success) {
-      setErrorMsg(t('security.biometricFailed'));
+    if (lockoutRemainingSec > 0 || isBioVerifying) return;
+    setIsBioVerifying(true);
+    setErrorMsg('');
+    try {
+      const success = await unlockWithBiometric();
+      if (success) {
+        setBioFailCount(0);
+        setErrorMsg('');
+      } else {
+        const nextFail = bioFailCount + 1;
+        setBioFailCount(nextFail);
+        if (nextFail >= 2) {
+          // 累積 2 次失敗，自動回退至 PIN 碼鍵盤
+          setView('pin');
+          setErrorMsg(t('security.biometricFallbackToPin', '生物識別多次未通過，請輸入 PIN 碼'));
+        } else {
+          setErrorMsg(t('security.biometricFailed', '生物辨識未通過，請點擊重試'));
+        }
+      }
+    } finally {
+      setIsBioVerifying(false);
     }
-  }, [unlockWithBiometric, lockoutRemainingSec, t]);
+  }, [unlockWithBiometric, lockoutRemainingSec, isBioVerifying, bioFailCount, t]);
 
-  // 掛載且鎖定時，若啟用了生物辨識，自動喚起 FaceID / 指紋
+  // 每次 App 被鎖定且啟用了生物辨識時，重設失敗計數並設為首選視圖
   useEffect(() => {
-    if (isLocked && view === 'pin' && config?.biometricEnabled && lockoutRemainingSec <= 0) {
+    if (isLocked) {
+      if (isBiometricEligible) {
+        setView('biometric');
+        setBioFailCount(0);
+      } else {
+        setView('pin');
+      }
+      setEnteredPin('');
+      setErrorMsg('');
+    }
+  }, [isLocked, isBiometricEligible]);
+
+  // 掛載且鎖定時，若在生物識別首選視圖，自動喚起 Face ID / Windows Hello / 指紋
+  useEffect(() => {
+    if (isLocked && view === 'biometric' && isBiometricEligible && lockoutRemainingSec <= 0) {
       const timer = setTimeout(() => {
         handleBiometric();
-      }, 300);
+      }, 350);
       return () => clearTimeout(timer);
     }
-  }, [isLocked, view, config?.biometricEnabled, lockoutRemainingSec, handleBiometric]);
+  }, [isLocked, view, isBiometricEligible, lockoutRemainingSec, handleBiometric]);
 
   // 鍵入單個數字，並在滿碼時立即自動進行錯誤檢測
   const handleDigit = useCallback(
@@ -147,11 +188,63 @@ export function AppLockOverlay() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background text-foreground select-none p-4 animate-in fade-in duration-200">
-      {view === 'pin' ? (
+      {view === 'biometric' ? (
+        /* 生物辨識首選視圖 (Biometric-First View) */
+        <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
+          {/* Top Logo & Status */}
+          <div className="mb-4 flex flex-col items-center">
+            <div className="size-14 rounded-2xl bg-card border border-border shadow-none flex items-center justify-center mb-3">
+              <Logo size={32} showBorder={false} />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
+              <Lock className="size-4 text-primary" />
+              <span>{t('security.appLocked')}</span>
+            </h1>
+            <p className={cn("text-xs mt-1 leading-relaxed transition-colors", errorMsg ? "text-rose-500 font-medium" : "text-muted-foreground")}>
+              {lockoutRemainingSec > 0
+                ? t('security.lockoutWait', { seconds: lockoutRemainingSec })
+                : errorMsg || t('security.biometricPrompt')}
+            </p>
+          </div>
+
+          {/* Central Biometric Scan Trigger Card */}
+          <button
+            type="button"
+            disabled={isBioVerifying || lockoutRemainingSec > 0}
+            onClick={handleBiometric}
+            className={cn(
+              "size-24 rounded-full bg-card border border-border flex flex-col items-center justify-center transition-all my-6 cursor-pointer group shadow-none outline-none active:scale-95",
+              isBioVerifying && "animate-pulse border-primary ring-2 ring-primary/20",
+              errorMsg && "border-destructive/60"
+            )}
+            title={t('security.biometricClickToRetry')}
+          >
+            <Fingerprint className={cn("size-10 text-primary transition-transform group-hover:scale-105", errorMsg && "text-destructive")} />
+          </button>
+
+          <p className="text-[11px] font-mono text-muted-foreground/70 mb-4">
+            {isBioVerifying ? t('security.biometricVerifying') : t('security.biometricClickToRetry')}
+          </p>
+
+          {/* Fallback to PIN Button */}
+          <div className="mt-2 pt-1 w-full">
+            <button
+              type="button"
+              onClick={() => {
+                setView('pin');
+                setErrorMsg('');
+              }}
+              className="w-full py-2 px-3 text-xs font-medium text-muted-foreground hover:text-foreground border border-border/80 rounded-md bg-card hover:bg-muted/40 transition-colors cursor-pointer outline-none"
+            >
+              {t('security.usePinInstead')}
+            </button>
+          </div>
+        </div>
+      ) : view === 'pin' ? (
         <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
           {/* Top Logo & Status */}
           <div className="mb-6 flex flex-col items-center">
-            <div className="size-14 rounded-2xl bg-card border border-border shadow-sm flex items-center justify-center mb-3">
+            <div className="size-14 rounded-2xl bg-card border border-border shadow-none flex items-center justify-center mb-3">
               <Logo size={32} showBorder={false} />
             </div>
             <h1 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
@@ -206,11 +299,14 @@ export function AppLockOverlay() {
 
             {/* Left Slot: Biometrics button */}
             <div className="flex items-center justify-center">
-              {config?.biometricEnabled && hasBiometricHardware && (
+              {isBiometricEligible && (
                 <button
                   type="button"
                   disabled={lockoutRemainingSec > 0}
-                  onClick={handleBiometric}
+                  onClick={() => {
+                    setView('biometric');
+                    setErrorMsg('');
+                  }}
                   className="size-16 rounded-full bg-card hover:bg-muted/60 active:scale-95 border border-border/80 flex items-center justify-center text-foreground transition-all cursor-pointer shadow-none disabled:opacity-30"
                   title={t('security.biometricButtonTitle')}
                 >
@@ -261,7 +357,7 @@ export function AppLockOverlay() {
         /* 救急/重設視圖 (原位切換，零彈窗衝突) */
         <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
           <div className="mb-6 flex flex-col items-center">
-            <div className="size-14 rounded-2xl bg-card border border-border shadow-sm flex items-center justify-center mb-3">
+            <div className="size-14 rounded-2xl bg-card border border-border shadow-none flex items-center justify-center mb-3">
               <KeyRound className="size-7 text-primary" strokeWidth={1.5} />
             </div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">
@@ -285,7 +381,7 @@ export function AppLockOverlay() {
                     setE2eePassphraseInput(e.target.value);
                     setForgotErrorMsg('');
                   }}
-                  className="h-10 text-xs text-center"
+                  className="h-10 text-xs text-center font-mono"
                 />
                 {forgotErrorMsg && (
                   <span className="text-[11px] text-rose-500 block mt-1.5">{forgotErrorMsg}</span>

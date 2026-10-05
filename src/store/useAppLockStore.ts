@@ -145,8 +145,10 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
       const pinHash = await hashPin(pin, salt);
 
       let biometricCredentialId: string | undefined = undefined;
-      const { hasBiometricHardware } = get();
-      if (enableBiometrics && hasBiometricHardware) {
+      const isAvailable = await isBiometricAvailable();
+      set({ hasBiometricHardware: isAvailable });
+
+      if (enableBiometrics && isAvailable) {
         const credId = await registerBiometricCredential();
         if (credId) {
           biometricCredentialId = credId;
@@ -181,8 +183,10 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
       if (!cfg || !cfg.enabled) return;
 
       let biometricCredentialId = cfg.biometricCredentialId;
-      const { hasBiometricHardware } = get();
-      if (updates.biometricEnabled && !biometricCredentialId && hasBiometricHardware) {
+      const isAvailable = await isBiometricAvailable();
+      set({ hasBiometricHardware: isAvailable });
+
+      if (updates.biometricEnabled && !biometricCredentialId && isAvailable) {
         const credId = await registerBiometricCredential();
         if (credId) {
           biometricCredentialId = credId;
@@ -215,3 +219,7 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
     },
   };
 });
+
+// 立即觸發本機生物辨識模組可用性檢測 (Face ID / Touch ID / Windows Hello / Android)
+useAppLockStore.getState().initLock();
+

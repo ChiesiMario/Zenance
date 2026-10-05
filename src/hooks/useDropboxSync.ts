@@ -28,6 +28,10 @@ export function useDropboxSync() {
   const [localRecordCount, setLocalRecordCount] = useState<number>(0);
   const [remoteRecordCount, setRemoteRecordCount] = useState<number>(0);
 
+  // E2EE 解鎖彈窗狀態與待恢復的同步模式
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState<boolean>(false);
+  const pendingSyncModeRef = useRef<'auto' | 'overwrite_local' | 'overwrite_remote'>('auto');
+
   const hasHandledAuthRef = useRef(false);
 
   // 監聽連網/離線狀態
@@ -86,6 +90,9 @@ export function useDropboxSync() {
             const res = await executeSync('auto');
             if (res.success) {
               setLastSyncTime(getLastSyncTime());
+            } else if (res.needsUnlock || res.error === 'E2EE_LOCKED' || res.error === 'E2EE_DECRYPT_FAILED') {
+              pendingSyncModeRef.current = 'auto';
+              setIsUnlockModalOpen(true);
             }
           }
         } catch (err: any) {
@@ -145,6 +152,9 @@ export function useDropboxSync() {
           } else {
             toast.show('同步完成');
           }
+        } else if (result.needsUnlock || result.error === 'E2EE_LOCKED' || result.error === 'E2EE_DECRYPT_FAILED') {
+          pendingSyncModeRef.current = mode;
+          setIsUnlockModalOpen(true);
         } else {
           toast.show('同步未完成：' + (result.error || '請重試'));
         }
@@ -156,6 +166,24 @@ export function useDropboxSync() {
     [isSyncing]
   );
 
+  // 解鎖成功後自動恢復被中斷的同步任務
+  const handleUnlockSuccess = useCallback(async () => {
+    setIsUnlockModalOpen(false);
+    setIsSyncing(true);
+    try {
+      const mode = pendingSyncModeRef.current;
+      const res = await executeSync(mode);
+      if (res.success) {
+        setLastSyncTime(getLastSyncTime());
+        toast.show('E2EE 已解鎖，同步完成');
+      } else {
+        toast.show('同步未完成：' + (res.error || '請重試'));
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
   // 處理首次連線衝突彈窗用戶決策
   const resolveFirstConnectConflict = useCallback(
     async (decision: 'merge' | 'overwrite_local' | 'overwrite_remote') => {
@@ -166,6 +194,9 @@ export function useDropboxSync() {
         if (res.success) {
           setLastSyncTime(getLastSyncTime());
           toast.show('初始同步已完成');
+        } else if (res.needsUnlock || res.error === 'E2EE_LOCKED' || res.error === 'E2EE_DECRYPT_FAILED') {
+          pendingSyncModeRef.current = decision === 'merge' ? 'auto' : decision;
+          setIsUnlockModalOpen(true);
         } else {
           toast.show('同步失敗：' + (res.error || '請重試'));
         }
@@ -185,6 +216,9 @@ export function useDropboxSync() {
     setFirstConnectModalOpen,
     localRecordCount,
     remoteRecordCount,
+    isUnlockModalOpen,
+    setIsUnlockModalOpen,
+    handleUnlockSuccess,
     connectDropbox,
     disconnectDropbox,
     syncNow,

@@ -39,7 +39,8 @@ import { useAppLockStore } from '@/store/useAppLockStore';
 import { useStorageStatus } from '@/hooks/useStorageStatus';
 import { useDatabaseHealth } from '@/hooks/useDatabaseHealth';
 import { DatabaseHealthModal } from '@/components/fsck/DatabaseHealthModal';
-import { isE2EEEnabled, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
+import { isE2EEEnabled, isE2EEUnlocked, setupE2EE, disableE2EE } from '@/services/crypto/e2eeManager';
+import { E2EEUnlockDialog } from '@/components/security/E2EEUnlockDialog';
 import { isCryptoSupported } from '@/services/crypto/webCrypto';
 import { isSecureEnvironment } from '@/services/storage/storageManager';
 import { useRollingBackups } from '@/hooks/useRollingBackups';
@@ -103,6 +104,9 @@ export default function Settings() {
     setFirstConnectModalOpen,
     localRecordCount,
     remoteRecordCount,
+    isUnlockModalOpen,
+    setIsUnlockModalOpen,
+    handleUnlockSuccess,
     connectDropbox,
     disconnectDropbox,
     syncNow,
@@ -148,6 +152,7 @@ export default function Settings() {
 
   // E2EE modal states
   const [e2eeActive, setE2eeActive] = useState<boolean>(isE2EEEnabled());
+  const [e2eeUnlocked, setE2eeUnlocked] = useState<boolean>(isE2EEUnlocked());
   const [isE2eeModalOpen, setIsE2eeModalOpen] = useState(false);
   const [e2eePassphrase, setE2eePassphrase] = useState('');
   const [e2eeConfirmPassphrase, setE2eeConfirmPassphrase] = useState('');
@@ -174,6 +179,7 @@ export default function Settings() {
       const { recoveryKey } = await setupE2EE(e2eePassphrase);
       setGeneratedRecoveryKey(recoveryKey);
       setE2eeActive(true);
+      setE2eeUnlocked(true);
       toast.show(t('settings.e2eeEnabledSuccess'));
 
       // 啟用加密後立即以端到端加密重新推送 Dropbox 雲端上的所有備份
@@ -197,6 +203,7 @@ export default function Settings() {
 
     disableE2EE();
     setE2eeActive(false);
+    setE2eeUnlocked(true);
     toast.show(t('settings.e2eeDisabledSuccess'));
 
     // 停用加密後立即將雲端備份覆蓋還原為標準明文格式
@@ -807,19 +814,25 @@ export default function Settings() {
                 toast.show(t('settings.requiresHttpsToast'));
                 return;
               }
+              if (!isAuthenticated) {
+                toast.show(t('settings.e2eeRequiresDropbox', '請先連線 Dropbox 雲端同步以使用端到端加密'));
+                return;
+              }
               if (!e2eeActive) {
                 setE2eePassphrase('');
                 setE2eeConfirmPassphrase('');
                 setGeneratedRecoveryKey('');
                 setIsE2eeModalOpen(true);
+              } else if (!e2eeUnlocked) {
+                setIsUnlockModalOpen(true);
               } else {
                 handleDisableE2EE();
               }
             }}
             className={cn(
               "h-12 px-4 flex items-center justify-between transition-colors",
-              !hasCryptoSupport
-                ? "opacity-60 cursor-not-allowed"
+              !hasCryptoSupport || !isAuthenticated
+                ? "opacity-50 cursor-not-allowed select-none"
                 : "hover:bg-muted/40 cursor-pointer group"
             )}
           >
@@ -827,12 +840,16 @@ export default function Settings() {
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
               {!hasCryptoSupport ? (
                 <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
-              ) : e2eeActive ? (
-                <span className="text-emerald-500">AES-256</span>
-              ) : (
+              ) : !isAuthenticated ? (
+                <span>{t('settings.requiresCloudSync', '需連線雲端')}</span>
+              ) : !e2eeActive ? (
                 <span>{t('settings.notEnabled')}</span>
+              ) : !e2eeUnlocked ? (
+                <span className="text-amber-500 font-medium">{t('settings.e2eeLocked', '已鎖定')}</span>
+              ) : (
+                <span className="text-emerald-500">AES-256</span>
               )}
-              {hasCryptoSupport && (
+              {hasCryptoSupport && isAuthenticated && (
                 <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
               )}
             </div>
@@ -1344,6 +1361,17 @@ export default function Settings() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 端到端加密 E2EE 解鎖彈窗 */}
+      <E2EEUnlockDialog
+        open={isUnlockModalOpen}
+        onOpenChange={setIsUnlockModalOpen}
+        onSuccess={() => {
+          setE2eeActive(isE2EEEnabled());
+          setE2eeUnlocked(true);
+          handleUnlockSuccess();
+        }}
+      />
 
       {/* 應用程式安全鎖 PIN 碼設定彈窗 */}
       <Dialog open={isLockSetupModalOpen} onOpenChange={setIsLockSetupModalOpen}>

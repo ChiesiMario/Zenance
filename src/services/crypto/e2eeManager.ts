@@ -5,13 +5,18 @@ import {
   base64ToBuffer,
   generateRecoveryKey,
   isCryptoSupported,
+  encryptPayload,
+  decryptPayload,
+  type CryptoEnvelope,
 } from './webCrypto';
 
 const E2EE_CONFIG_KEY = 'zenance_e2ee_config';
+export const E2EE_VERIFICATION_MAGIC = 'ZENANCE_E2EE_VERIFIED_V1';
 
 export interface E2EEConfig {
   enabled: boolean;
   salt: string; // Base64
+  verificationEnvelope?: CryptoEnvelope;
   recoveryKeyHash?: string;
   createdAt: string;
 }
@@ -48,7 +53,31 @@ export function getActiveSalt(): Uint8Array | null {
 }
 
 /**
- * 初次在當前設備啟用端到端加密 (生成 Salt、衍生 Key、生成救援金鑰)
+ * 跨設備同步：從遠端 manifest.json 匯入 E2EE 鹽值與校驗信封，標記本地需要解鎖
+ */
+export function importRemoteE2EEConfig(salt: string, verificationEnvelope?: CryptoEnvelope): void {
+  const current = getE2EEConfig();
+  if (current?.enabled && current?.salt === salt) {
+    if (!current.verificationEnvelope && verificationEnvelope) {
+      current.verificationEnvelope = verificationEnvelope;
+      localStorage.setItem(E2EE_CONFIG_KEY, JSON.stringify(current));
+    }
+    return;
+  }
+
+  const config: E2EEConfig = {
+    enabled: true,
+    salt,
+    verificationEnvelope,
+    createdAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(E2EE_CONFIG_KEY, JSON.stringify(config));
+  // 保持 memoryCryptoKey = null，讓系統感知需要解鎖
+}
+
+/**
+ * 初次在當前設備啟用端到端加密 (生成 Salt、衍生 Key、生成驗證信封與救援金鑰)
  */
 export async function setupE2EE(
   passphrase: string
@@ -61,9 +90,13 @@ export async function setupE2EE(
   const cryptoKey = await deriveKeyFromPassphrase(passphrase, salt);
   const recoveryKey = generateRecoveryKey();
 
+  // 生成本地校驗信封，供後續解鎖時即時檢驗密碼正確性
+  const verificationEnvelope = await encryptPayload(E2EE_VERIFICATION_MAGIC, cryptoKey, salt);
+
   const config: E2EEConfig = {
     enabled: true,
     salt: bufferToBase64(salt),
+    verificationEnvelope,
     recoveryKeyHash: recoveryKey, // 保留救援金鑰以供本地展示
     createdAt: new Date().toISOString(),
   };
@@ -76,7 +109,7 @@ export async function setupE2EE(
 }
 
 /**
- * 透過密碼解鎖當前會話的 E2EE 金鑰
+ * 透過密碼解鎖當前會話的 E2EE 金鑰 (具備校驗信封即時驗證能力)
  */
 export async function unlockE2EE(passphrase: string): Promise<boolean> {
   const config = getE2EEConfig();
@@ -85,6 +118,29 @@ export async function unlockE2EE(passphrase: string): Promise<boolean> {
   try {
     const salt = base64ToBuffer(config.salt);
     const cryptoKey = await deriveKeyFromPassphrase(passphrase, salt);
+
+    // 若存在校驗信封，立即校驗密碼正確性
+    if (config.verificationEnvelope) {
+      try {
+        const decrypted = await decryptPayload<string>(config.verificationEnvelope, cryptoKey);
+        if (decrypted !== E2EE_VERIFICATION_MAGIC) {
+          return false;
+        }
+      } catch {
+        // 解密失敗 (GCM tag mismatch)，確認密碼錯誤
+        return false;
+      }
+    } else {
+      // 舊版或尚未生成校驗信封，為其補齊 verificationEnvelope 以利後續快速檢驗
+      try {
+        const verificationEnvelope = await encryptPayload(E2EE_VERIFICATION_MAGIC, cryptoKey, salt);
+        config.verificationEnvelope = verificationEnvelope;
+        localStorage.setItem(E2EE_CONFIG_KEY, JSON.stringify(config));
+      } catch (e) {
+        console.warn('Failed to upgrade legacy E2EE config with verification envelope:', e);
+      }
+    }
+
     memoryCryptoKey = cryptoKey;
     memorySalt = salt;
     return true;
@@ -102,3 +158,4 @@ export function disableE2EE(): void {
   memoryCryptoKey = null;
   memorySalt = null;
 }
+

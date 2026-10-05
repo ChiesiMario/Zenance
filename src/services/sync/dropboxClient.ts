@@ -120,11 +120,16 @@ export async function downloadJsonFile<T>(filePath: string): Promise<T | null> {
       if (!key) {
         throw new Error('E2EE_LOCKED');
       }
-      return await decryptPayload<T>(raw, key);
+      try {
+        return await decryptPayload<T>(raw, key);
+      } catch (decryptErr) {
+        console.error(`Failed to decrypt payload for ${filePath}:`, decryptErr);
+        throw new Error('E2EE_DECRYPT_FAILED');
+      }
     }
     return raw as T;
   } catch (err: any) {
-    if (err?.message === 'E2EE_LOCKED') {
+    if (err?.message === 'E2EE_LOCKED' || err?.message === 'E2EE_DECRYPT_FAILED') {
       throw err;
     }
     return null;
@@ -147,9 +152,11 @@ export async function uploadJsonFile(filePath: string, data: any): Promise<strin
   if (normalizedPath !== '/manifest.json' && isE2EEEnabled()) {
     const key = getActiveCryptoKey();
     const salt = getActiveSalt();
-    if (key && salt) {
-      dataToUpload = await encryptPayload(data, key, salt);
+    if (!key || !salt) {
+      // 安全熔斷：嚴禁未解鎖時降級為明文上傳！
+      throw new Error('E2EE_LOCKED');
     }
+    dataToUpload = await encryptPayload(data, key, salt);
   }
 
   const bodyContent = JSON.stringify(dataToUpload, null, 2);

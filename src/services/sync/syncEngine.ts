@@ -15,7 +15,13 @@ import {
   type DropboxFileMetadata,
 } from './dropboxClient';
 import { isDropboxConnected } from './dropboxAuth';
-import { getE2EEConfig } from '../crypto/e2eeManager';
+import {
+  getE2EEConfig,
+  isE2EEEnabled,
+  isE2EEUnlocked,
+  importRemoteE2EEConfig,
+} from '../crypto/e2eeManager';
+import type { CryptoEnvelope } from '../crypto/webCrypto';
 import { recordObservedTimestamp } from '@/lib/clock';
 
 const LAST_SYNC_KEY = 'zenance_dropbox_last_sync';
@@ -27,6 +33,7 @@ export interface SyncResult {
   timestamp: string;
   error?: string;
   actionTaken: 'uploaded_initial' | 'merged' | 'downloaded_remote' | 'uploaded_local' | 'up_to_date';
+  needsUnlock?: boolean;
 }
 
 export interface SyncManifestLedgerStats {
@@ -55,6 +62,7 @@ export interface SyncManifest {
   e2ee?: {
     enabled: boolean;
     salt: string;
+    verification?: CryptoEnvelope;
   };
 }
 
@@ -236,7 +244,14 @@ async function uploadManifestFile(cachedRevs: Record<string, string>): Promise<v
     exportedAt: new Date().toISOString(),
     totalLedgers: ledgers.length,
     ledgers: manifestLedgers,
-    e2ee: e2eeConfig?.enabled && e2eeConfig.salt ? { enabled: true, salt: e2eeConfig.salt } : undefined,
+    e2ee:
+      e2eeConfig?.enabled && e2eeConfig.salt
+        ? {
+            enabled: true,
+            salt: e2eeConfig.salt,
+            verification: e2eeConfig.verificationEnvelope,
+          }
+        : undefined,
   };
 
   const rev = await uploadJsonFile('/manifest.json', manifest);
@@ -267,6 +282,17 @@ export async function executeSync(
     };
   }
 
+  // 1. 本地前置檢查：若已啟用 E2EE 但當前會話金鑰處於鎖定狀態，快速阻斷並請求解鎖
+  if (isE2EEEnabled() && !isE2EEUnlocked()) {
+    return {
+      success: false,
+      timestamp: new Date().toISOString(),
+      error: 'E2EE_LOCKED',
+      needsUnlock: true,
+      actionTaken: 'up_to_date',
+    };
+  }
+
   isSyncInProgress = true;
 
   try {
@@ -274,7 +300,29 @@ export async function executeSync(
     const cachedRevs = getCachedRevs();
     const pushedTimes = getPushedTimes();
 
-    // 1. 純覆蓋雲端模式 (Overwrite Remote)
+    // 呼叫一次 listRemoteFolder，單次請求掌握所有遠端檔案及其 rev
+    const remoteFiles = await listRemoteFolder();
+    const ledgerFiles = remoteFiles.filter((f) => f.path_lower.startsWith('/ledgers/'));
+
+    // 2. 遠端握手：檢查遠端 manifest.json 是否啟用了 E2EE
+    const manifestMeta = remoteFiles.find((f) => f.path_lower === '/manifest.json');
+    if (manifestMeta) {
+      const remoteManifest = await downloadJsonFile<SyncManifest>('/manifest.json');
+      if (remoteManifest?.e2ee?.enabled && remoteManifest.e2ee.salt) {
+        importRemoteE2EEConfig(remoteManifest.e2ee.salt, remoteManifest.e2ee.verification);
+        if (!isE2EEUnlocked()) {
+          return {
+            success: false,
+            timestamp: now,
+            error: 'E2EE_LOCKED',
+            needsUnlock: true,
+            actionTaken: 'up_to_date',
+          };
+        }
+      }
+    }
+
+    // 3. 純覆蓋雲端模式 (Overwrite Remote)
     if (mode === 'overwrite_remote') {
       await uploadAllLocalLedgers(now, cachedRevs, pushedTimes);
       setCachedRevs(cachedRevs);
@@ -283,10 +331,6 @@ export async function executeSync(
 
       return { success: true, timestamp: now, actionTaken: 'uploaded_local' };
     }
-
-    // 呼叫一次 listRemoteFolder，單次請求掌握所有遠端檔案及其 rev
-    const remoteFiles = await listRemoteFolder();
-    const ledgerFiles = remoteFiles.filter((f) => f.path_lower.startsWith('/ledgers/'));
 
     // 2. 遠端完全沒有資料夾記錄（初次上傳）
     if (ledgerFiles.length === 0) {
@@ -615,10 +659,13 @@ export async function executeSync(
     };
   } catch (error: any) {
     console.error('Folder sync execution error:', error);
+    const isLocked =
+      error?.message === 'E2EE_LOCKED' || error?.message === 'E2EE_DECRYPT_FAILED';
     return {
       success: false,
       timestamp: new Date().toISOString(),
       error: error?.message || 'Unknown sync error',
+      needsUnlock: isLocked,
       actionTaken: 'up_to_date',
     };
   } finally {

@@ -1,41 +1,24 @@
-import { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { SetupGuard } from './components/layout/SetupGuard';
 import { LockGuard } from './components/security/LockGuard';
 
-// 路由級動態代碼分割 (Code Splitting)，徹底卸載非首屏巨型依賴 (如 JSZip、報表等)
-const Setup = lazy(() => import('./pages/Setup'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Reports = lazy(() => import('./pages/Reports'));
-const Categories = lazy(() => import('./pages/Categories'));
-const ArchivedCategories = lazy(() => import('./pages/ArchivedCategories'));
-const CategoryDetails = lazy(() => import('./pages/CategoryDetails'));
-const BudgetHistory = lazy(() => import('./pages/BudgetHistory'));
-const BudgetDetails = lazy(() => import('./pages/BudgetDetails'));
-const AccountDetails = lazy(() => import('./pages/AccountDetails'));
-const ContactDetails = lazy(() => import('./pages/ContactDetails'));
-
-function LazyRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-full w-full items-center justify-center bg-background text-muted-foreground" />
-      }
-    >
-      {children}
-    </Suspense>
-  );
-}
+// 全頁面靜態直載 (Static Direct Import)，徹底消除次級頁面首次載入 1-2 秒白屏延遲，實現原生 App 級 0ms 秒開
+import Setup from './pages/Setup';
+import Settings from './pages/Settings';
+import Reports from './pages/Reports';
+import Categories from './pages/Categories';
+import ArchivedCategories from './pages/ArchivedCategories';
+import CategoryDetails from './pages/CategoryDetails';
+import BudgetHistory from './pages/BudgetHistory';
+import BudgetDetails from './pages/BudgetDetails';
+import AccountDetails from './pages/AccountDetails';
+import ContactDetails from './pages/ContactDetails';
 
 const router = createBrowserRouter([
   {
     path: '/setup',
-    element: (
-      <LazyRoute>
-        <Setup />
-      </LazyRoute>
-    ),
+    element: <Setup />,
   },
   {
     path: '/',
@@ -57,11 +40,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'accounts/:id',
-        element: (
-          <LazyRoute>
-            <AccountDetails />
-          </LazyRoute>
-        ),
+        element: <AccountDetails />,
       },
       {
         path: 'contacts',
@@ -69,11 +48,7 @@ const router = createBrowserRouter([
       },
       {
         path: 'contacts/:id',
-        element: (
-          <LazyRoute>
-            <ContactDetails />
-          </LazyRoute>
-        ),
+        element: <ContactDetails />,
       },
       {
         path: 'budgets',
@@ -81,59 +56,31 @@ const router = createBrowserRouter([
       },
       {
         path: 'budgets/history',
-        element: (
-          <LazyRoute>
-            <BudgetHistory />
-          </LazyRoute>
-        ),
+        element: <BudgetHistory />,
       },
       {
         path: 'budgets/:id',
-        element: (
-          <LazyRoute>
-            <BudgetDetails />
-          </LazyRoute>
-        ),
+        element: <BudgetDetails />,
       },
       {
         path: 'reports',
-        element: (
-          <LazyRoute>
-            <Reports />
-          </LazyRoute>
-        ),
+        element: <Reports />,
       },
       {
         path: 'settings',
-        element: (
-          <LazyRoute>
-            <Settings />
-          </LazyRoute>
-        ),
+        element: <Settings />,
       },
       {
         path: 'settings/categories',
-        element: (
-          <LazyRoute>
-            <Categories />
-          </LazyRoute>
-        ),
+        element: <Categories />,
       },
       {
         path: 'settings/categories/archived',
-        element: (
-          <LazyRoute>
-            <ArchivedCategories />
-          </LazyRoute>
-        ),
+        element: <ArchivedCategories />,
       },
       {
         path: 'settings/categories/:id',
-        element: (
-          <LazyRoute>
-            <CategoryDetails />
-          </LazyRoute>
-        ),
+        element: <CategoryDetails />,
       },
     ],
   },

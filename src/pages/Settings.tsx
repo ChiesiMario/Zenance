@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import JSZip from 'jszip';
 import {
   ChevronLeft,
   ChevronRight,
@@ -369,6 +368,7 @@ export default function Settings() {
           db.budget_rules.toArray(),
         ]);
 
+      const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       const manifestLedgers = [];
       const ledgersFolder = zip.folder('ledgers');
@@ -447,6 +447,7 @@ export default function Settings() {
       let parsed: ParsedBackup | null = null;
 
       if (isZip) {
+        const JSZip = (await import('jszip')).default;
         const zip = await JSZip.loadAsync(file);
         const manifestFile = zip.file('manifest.json');
         let manifest;

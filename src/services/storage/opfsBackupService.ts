@@ -1,4 +1,3 @@
-import JSZip from 'jszip';
 import { db, type Ledger, type Wallet, type Contact, type Category, type Budget, type BudgetRule, type Transaction } from '@/services/db/db';
 import { formatBytes, isSecureEnvironment } from './storageManager';
 
@@ -74,6 +73,7 @@ export async function generateBackupZipBlob(): Promise<Blob> {
       db.budget_rules.toArray(),
     ]);
 
+  const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
   const manifestLedgers = [];
   const ledgersFolder = zip.folder('ledgers');
@@ -134,6 +134,7 @@ export async function generateBackupZipBlob(): Promise<Blob> {
  */
 export async function parseBackupZipBlob(blob: Blob): Promise<ParsedZipBackup | null> {
   try {
+    const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(blob);
     const manifestFile = zip.file('manifest.json');
     const manifest = manifestFile ? JSON.parse(await manifestFile.async('text')) : null;

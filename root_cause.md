@@ -1,155 +1,86 @@
-# Root Cause 診斷報告：Dropbox 雲端同步遇加密備份時提示 E2EE 已鎖定 (E2EE_LOCKED)
+# Root Cause 診斷報告：次級頁面（設置、報表等）首次開啟出現 1-2 秒空白問題
 
 ## 1. 故障現象描述
 
-在以下兩種典型使用場景中，Dropbox 雲端同步會中斷並彈出錯誤提示 `E2EE_LOCKED`（或「同步未完成：E2EE_LOCKED」）：
-
-1. **跨設備首次連線場景（新設備 / 新瀏覽器）**：
-   - 設備 A 啟用了端到端加密（E2EE）並將加密帳本上傳至 Dropbox 雲端。
-   - 設備 B 登入同一個 Dropbox 帳號進行連線同步時，同步流程直接中斷，提示 `E2EE_LOCKED`，無法下載或同步任何資料，且介面完全沒有提供任何彈窗引導使用者輸入加密密碼進行解密。
-2. **同設備頁面重整 / 會話過期場景**：
-   - 設備 A 已啟用 E2EE，但在瀏覽器重新整理（F5）、關閉分頁重開或閒置過後。
-   - 觸發背景自動同步或點擊「立即同步」時，同樣失敗並提示 `E2EE_LOCKED`。
+在應用運行過程中，點擊導覽至次級頁面（特別是「報表 `/reports`」與「設置 `/settings`」）時，使用者會觀察到如下現象：
+1. **首次開啟顯著延遲**：在首次點擊進入設置或報表頁面時，主內容區域會呈現持續約 1～2 秒的完全空白畫面（深色模式下為純黑背景，淺色模式下為純白背景），隨後頁面內容才突然出現。
+2. **與主分頁體驗割裂**：底部導覽列的主分頁（總覽 `/`、預算 `/budgets`、帳戶 `/accounts`、聯絡人 `/contacts`）彼此切換時為瞬間呈現、毫無空白；但次級頁面卻有明顯的空白停頓，無法達到原生 App 的「秒開」質感。
 
 ---
 
 ## 2. 核心代碼定位
 
-### 關鍵檔案 1：`src/services/sync/dropboxClient.ts`（第 116～131 行、第 145～154 行）
+### 關鍵檔案 1：`src/AppRouter.tsx`（第 7～29 行）
 
 ```typescript
-// downloadJsonFile: 遇到密文信封但金鑰不存在時直接拋出未捕捉的異常
-try {
-  const raw = await response.json();
-  if (isCryptoEnvelope(raw)) {
-    const key = getActiveCryptoKey();
-    if (!key) {
-      throw new Error('E2EE_LOCKED'); // <--- 致命拋錯點
-    }
-    return await decryptPayload<T>(raw, key);
-  }
-  return raw as T;
-} catch (err: any) {
-  if (err?.message === 'E2EE_LOCKED') {
-    throw err; // 原樣拋給上層 syncEngine
-  }
-  return null;
-}
+// 路由級動態代碼分割 (Code Splitting)，徹底卸載非首屏巨型依賴 (如 JSZip、報表等)
+const Setup = lazy(() => import('./pages/Setup'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Reports = lazy(() => import('./pages/Reports'));
+const Categories = lazy(() => import('./pages/Categories'));
+const ArchivedCategories = lazy(() => import('./pages/ArchivedCategories'));
+const CategoryDetails = lazy(() => import('./pages/CategoryDetails'));
+const BudgetHistory = lazy(() => import('./pages/BudgetHistory'));
+const BudgetDetails = lazy(() => import('./pages/BudgetDetails'));
+const AccountDetails = lazy(() => import('./pages/AccountDetails'));
+const ContactDetails = lazy(() => import('./pages/ContactDetails'));
 
-// uploadJsonFile: 未解鎖時未阻止上傳，反而靜默降級為明文上傳
-let dataToUpload = data;
-if (normalizedPath !== '/manifest.json' && isE2EEEnabled()) {
-  const key = getActiveCryptoKey();
-  const salt = getActiveSalt();
-  if (key && salt) {
-    dataToUpload = await encryptPayload(data, key, salt);
-  }
+function LazyRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full w-full items-center justify-center bg-background text-muted-foreground" />
+      }
+    >
+      {children}
+    </Suspense>
+  );
 }
 ```
 
-### 關鍵檔案 2：`src/services/crypto/e2eeManager.ts`（第 19～48 行、第 81～95 行）
+### 關鍵檔案 2：`src/components/layout/AppLayout.tsx`（第 4～7 行、第 215～239 行）
 
 ```typescript
-// 運行時金鑰僅存在於 JS 模組記憶體中，刷新頁面即丟失
-let memoryCryptoKey: CryptoKey | null = null;
-let memorySalt: Uint8Array | null = null;
-
-export function isE2EEEnabled(): boolean {
-  const config = getE2EEConfig();
-  return Boolean(config?.enabled && config?.salt);
-}
-
-export function isE2EEUnlocked(): boolean {
-  if (!isE2EEEnabled()) return true;
-  return memoryCryptoKey !== null;
-}
-
-export function getActiveCryptoKey(): CryptoKey | null {
-  return memoryCryptoKey;
-}
-
-// 唯一的 unlockE2EE 函式僅在 AppLockOverlay（PIN 碼安全鎖）中被呼叫，
-// 在同步生命週期、設定頁與首頁完全沒有任何調用點！
-export async function unlockE2EE(passphrase: string): Promise<boolean> {
-  const config = getE2EEConfig();
-  if (!config || !config.salt) return false;
-  ...
-}
+import Dashboard from '@/pages/Dashboard';
+import Budgets from '@/pages/Budgets';
+import Accounts from '@/pages/Accounts';
+import Contacts from '@/pages/Contacts';
+...
+// 主 Tab 享有靜態同步載入與 Keep-Alive 視圖常駐：
+{mountedTabs.has('/') && (
+  <div key={`dash-${activeLedgerId || 'default'}`} style={{ display: location.pathname === '/' ? 'block' : 'none' }}>
+    <Dashboard />
+  </div>
+)}
+...
+{/* 次級頁面則透過未常駐的 Outlet 渲染，完全依賴 React.lazy 與動態生命週期 */}
+{!isCurrentTab && <Outlet />}
 ```
 
-### 關鍵檔案 3：`src/services/sync/syncEngine.ts`（第 249～342 行、第 616～624 行）
+### 關鍵檔案 3：`src/pages/Settings.tsx` 與 `src/pages/Reports.tsx` 的模組依賴鏈
 
-```typescript
-// executeSync: 進入同步流程前完全沒有前置檢查遠端 manifest.json 的 E2EE 狀態，
-// 亦無金鑰解鎖前置防護
-export async function executeSync(...): Promise<SyncResult> {
-  ...
-  try {
-    // 未檢查遠端 manifest 是否加密，直接下載檔案
-    const remoteFiles = await listRemoteFolder();
-    ...
-    // 下載時觸發 downloadJsonFile 拋出 E2EE_LOCKED
-    const l = await downloadJsonFile<Ledger>(`${prefix}/ledger.json`);
-    ...
-  } catch (error: any) {
-    // 捕獲異常並將字串 "E2EE_LOCKED" 傳遞給前端
-    return {
-      success: false,
-      timestamp: new Date().toISOString(),
-      error: error?.message || 'Unknown sync error',
-      actionTaken: 'up_to_date',
-    };
-  }
-}
-```
-
-### 關鍵檔案 4：`src/hooks/useDropboxSync.ts`（第 73～96 行、第 138～154 行）
-
-```typescript
-// useDropboxSync: 僅在首次連線衝突時提供資料合併/覆蓋彈窗，
-// 完全未針對 E2EE_LOCKED 提供解鎖攔截或密碼輸入對話框
-const result = await executeSync(mode);
-if (!result.success) {
-  toast.show('同步未完成：' + (result.error || '請重試')); // 裸露報錯
-}
-```
+- `Settings.tsx`（第 4 行）：同步引入重型壓縮庫 `import JSZip from 'jszip'`，並依賴資料庫健康檢查器 `DatabaseHealthModal`、`fsck`、滾動備份管理器、E2EE 加解密層等數十個模組。
+- `Reports.tsx`（第 11～29 行）：同步引入 `date-fns` 的 17 個時間計算子模組，以及多個複雜動畫與統計組件。
 
 ---
 
-## 3. 底層根本原因剖析 (Why & Root Cause)
+## 3. 根因剖析 (Root Cause Analysis)
 
-### 根因一：記憶體金鑰無持久化與會話生命週期解耦（Transient Memory Key Trap）
-1. 為了保障極致安全性，系統採用 Web Crypto API 派生 `CryptoKey`，並且刻意**不將金鑰持久化至磁碟或 localStorage**（`memoryCryptoKey` 僅為模組全域記憶體變數）。
-2. 這導致當使用者關閉頁面、重新整理頁面（F5）或重啟 PWA 應用程式時，記憶體變數被垃圾回收重置為 `null`。
-3. 此時本機的 `localStorage` 雖然記錄了 `enabled: true`，但系統處於「已啟用但已鎖定」的半癱瘓狀態；背景排程同步（`scheduleAutoSync`）或手動點擊「立即同步」呼叫 `downloadJsonFile` 時，因為 `getActiveCryptoKey() === null` 而必然命中 `throw new Error('E2EE_LOCKED')`。
+### 根本原因 A：路由級 `React.lazy` 動態代碼分割導致的「冷請求延遲 (Cold On-Demand Request)」
+- 在 `AppRouter.tsx` 中，為了縮小首屏初始 Bundle 體積，所有次級頁面（`Settings`、`Reports` 等）均被宣告為 `React.lazy(() => import(...))` 動態按需加載。
+- 在使用者點擊 Dashboard 上的設置或報表按鈕前，**系統沒有任何預加載（No Preload / No Prefetching）機制**（無論是基於空閒時間 `requestIdleCallback` 還是滑鼠懸停 `onMouseEnter`）。
+- **觸發瓶頸**：
+  - 在開發環境（Vite 開發伺服器運行時），Vite 採取未打包的 ESM 按需轉換機制。當使用者第一次點擊 `/settings` 或 `/reports` 時，瀏覽器會同時向 Vite 伺服器發起幾十個未打包的模組請求（包括龐大的 `jszip`、`date-fns`、各類 UI 元件及客製化 Hooks），伺服器需即時編譯、轉換並回傳，整個網路與解析耗時達 1 至 2 秒。
+  - 在生產環境中，即便打包為單一 Chunk，瀏覽器在點擊當下也必須等待 Chunk 下載並解析完畢後才能開始掛載組件。
 
----
+### 根本原因 B：`Suspense` 降級容器渲染純空白元素 (Blank Fallback)
+- 當 React 遇到未就緒的 `React.lazy` Promise 時，會觸發 `Suspense` 的 fallback 降級渲染。
+- `LazyRoute` 的 fallback 目前被指定為：
+  ```tsx
+  <div className="flex h-full w-full items-center justify-center bg-background text-muted-foreground" />
+  ```
+- 這是一個寬高 100% 但**毫無任何骨架屏 (Skeleton)、加載指示器或結構佔位**的空白 `div`。這使得在前一個視圖卸載後、新頁面代碼就緒前，用戶視野中的主要內容區域完全是一片死寂的純色空白，造成嚴重的「白屏/黑屏卡頓」感知。
 
-### 根因二：跨設備同步缺失遠端 E2EE 元數據握手與金鑰導入機制（Missing Handshake & Import Protocol）
-1. 設備 A 啟用 E2EE 後，遠端的 `manifest.json` 實際上已經記錄了公用元數據：
-   `manifest.e2ee = { enabled: true, salt: e2eeConfig.salt }`（`manifest.json` 刻意以明文存儲，具備可讀性）。
-2. 但設備 B 在點擊連線或同步時，`syncEngine.ts` **從未在下載任何實體資料前先檢視遠端 `manifest.e2ee`**。
-3. 設備 B 的本機 `localStorage` 根本沒有該鹽值（`salt`）與 E2EE 設定，當 `downloadJsonFile` 讀到密文信封時，本機既無配置亦無金鑰，只能被迫拋出 `E2EE_LOCKED` 中斷流程。
-4. 整個系統完全缺失了「偵測到遠端已加密 -> 讀取遠端 salt 導入本機配置 -> 彈出密碼輸入框要求使用者解鎖」的前置握手協議。
-
----
-
-### 根因三：同步引擎對 `E2EE_LOCKED` 缺乏攔截型 UI 互動架構（No Unlock Interceptor / Modal）
-1. 整個專案中，`unlockE2EE` 函式僅僅在 `AppLockOverlay.tsx`（PIN 碼安全鎖）的重設密碼流程中被偶然呼叫過一次。
-2. 在 `Settings.tsx`、`useDropboxSync.ts` 以及主導覽介面中，**完全不存在任何一個用於解鎖 E2EE 雲端金鑰的專屬彈窗或互動元件**。
-3. 當 `executeSync` 拋出 `E2EE_LOCKED` 時，外層邏輯直接將其當作普通網絡失敗或未知異常，以 Toast 形式冰冷地通知使用者「同步未完成：E2EE_LOCKED」，將使用者直接卡死在死胡同中，沒有任何輸入密碼以解鎖金鑰的途徑。
-
----
-
-### 根因四：未解鎖狀態下 `uploadJsonFile` 靜默明文洩漏缺陷（Silent Plaintext Fallback Bug）
-1. 在 `dropboxClient.ts` 的第 147～153 行中：
-   ```typescript
-   if (normalizedPath !== '/manifest.json' && isE2EEEnabled()) {
-     const key = getActiveCryptoKey();
-     const salt = getActiveSalt();
-     if (key && salt) {
-       dataToUpload = await encryptPayload(data, key, salt);
-     }
-   }
-   ```
-2. 當 `isE2EEEnabled()` 為 `true` 但處於鎖定狀態（`key === null`）時，條件判斷 `if (key && salt)` 不成立，程式不會拋錯中斷，反而**直接將未加密的本機明文資料直接覆蓋上傳至雲端**，導致原本加密的雲端備份被明文覆蓋，破壞端到端加密的完整性。
+### 根本原因 C：次級頁面缺乏視圖層快取（即開即銷毀）
+- 4 大主 Tab（總覽、預算、帳戶、聯絡人）在 `AppLayout.tsx` 中採用了靜態引入並結合 `display: none` 的 Keep-Alive 快取結構，生命週期常駐，因而切換時完全秒開。
+- 次級頁面則單純透過 `<Outlet />` 渲染，離開次級頁面時組件被立即銷毀（Unmount），返回時即便模組已被記憶體快取，React 仍需重新走完整個組件掛載與資料查詢的流程，未能達到原生應用的即時滑動與記憶體級瞬時響應。

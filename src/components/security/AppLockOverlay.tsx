@@ -18,6 +18,7 @@ export function AppLockOverlay() {
   const initLock = useAppLockStore((s) => s.initLock);
   const unlockWithPin = useAppLockStore((s) => s.unlockWithPin);
   const unlockWithBiometric = useAppLockStore((s) => s.unlockWithBiometric);
+  const verifySecurityAnswer = useAppLockStore((s) => s.verifySecurityAnswer);
   const disableLock = useAppLockStore((s) => s.disableLock);
 
   const isBiometricEligible = useMemo(() => {
@@ -37,8 +38,11 @@ export function AppLockOverlay() {
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   // 忘記密碼救急狀態
+  const [recoverMethod, setRecoverMethod] = useState<'e2ee' | 'question' | 'legacy'>('e2ee');
   const [e2eePassphraseInput, setE2eePassphraseInput] = useState<string>('');
+  const [securityAnswerInput, setSecurityAnswerInput] = useState<string>('');
   const [forgotErrorMsg, setForgotErrorMsg] = useState<string>('');
+  const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
   const requiredLength = config?.pinLength || 4;
 
@@ -167,21 +171,56 @@ export function AppLockOverlay() {
 
   // 忘記密碼救急解鎖
   const handleRecoverViaE2EE = async () => {
-    if (!e2eePassphraseInput.trim()) return;
-    const success = await unlockE2EE(e2eePassphraseInput.trim());
-    if (success) {
-      disableLock();
-      setView('pin');
-      setEnteredPin('');
-    } else {
-      setForgotErrorMsg(t('security.passphraseError'));
+    if (!e2eePassphraseInput.trim() || isRecovering || lockoutRemainingSec > 0) return;
+    setIsRecovering(true);
+    setForgotErrorMsg('');
+    try {
+      const success = await unlockE2EE(e2eePassphraseInput.trim());
+      if (success) {
+        disableLock();
+        setView('pin');
+        setEnteredPin('');
+        setE2eePassphraseInput('');
+        setForgotErrorMsg('');
+      } else {
+        setForgotErrorMsg(t('security.passphraseError'));
+      }
+    } finally {
+      setIsRecovering(false);
     }
   };
 
-  const handleResetLockWithoutE2EE = () => {
+  const handleRecoverViaSecurityQuestion = async () => {
+    if (!securityAnswerInput.trim() || isRecovering || lockoutRemainingSec > 0) return;
+    setIsRecovering(true);
+    setForgotErrorMsg('');
+    try {
+      const success = await verifySecurityAnswer(securityAnswerInput.trim());
+      if (success) {
+        disableLock();
+        setView('pin');
+        setEnteredPin('');
+        setSecurityAnswerInput('');
+        setForgotErrorMsg('');
+      } else {
+        const currentFailed = useAppLockStore.getState().failedAttempts;
+        const remaining = Math.max(0, 5 - currentFailed);
+        if (remaining > 0) {
+          setForgotErrorMsg(t('security.answerError', { remaining }));
+        } else {
+          setForgotErrorMsg(t('security.tooManyAttempts'));
+        }
+      }
+    } finally {
+      setIsRecovering(false);
+    }
+  };
+
+  const handleResetLockLegacy = () => {
     disableLock();
     setView('pin');
     setEnteredPin('');
+    setForgotErrorMsg('');
   };
 
   if (!isLockConfigured || !isLocked) {
@@ -352,6 +391,14 @@ export function AppLockOverlay() {
               onClick={() => {
                 setForgotErrorMsg('');
                 setE2eePassphraseInput('');
+                setSecurityAnswerInput('');
+                if (isE2EEEnabled()) {
+                  setRecoverMethod('e2ee');
+                } else if (config?.securityQuestion) {
+                  setRecoverMethod('question');
+                } else {
+                  setRecoverMethod('legacy');
+                }
                 setView('recover');
               }}
               className="text-xs text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer outline-none"
@@ -371,13 +418,15 @@ export function AppLockOverlay() {
               {t('security.forgotPinTitle')}
             </h1>
             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-              {isE2EEEnabled()
+              {recoverMethod === 'e2ee'
                 ? t('security.forgotPinDescE2ee')
-                : t('security.forgotPinDescNoE2ee')}
+                : recoverMethod === 'question'
+                  ? t('security.forgotPinDescQuestion')
+                  : t('security.forgotPinDescLegacy')}
             </p>
           </div>
 
-          {isE2EEEnabled() ? (
+          {recoverMethod === 'e2ee' ? (
             <div className="w-full space-y-3">
               <div>
                 <Input
@@ -388,19 +437,101 @@ export function AppLockOverlay() {
                     setE2eePassphraseInput(e.target.value);
                     setForgotErrorMsg('');
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRecoverViaE2EE();
+                  }}
                   className="h-10 text-xs text-center font-mono"
                 />
-                {forgotErrorMsg && (
-                  <span className="text-[11px] text-rose-500 block mt-1.5">{forgotErrorMsg}</span>
-                )}
+                <div className="min-h-[1.25rem] mt-1.5 flex items-center justify-center">
+                  {forgotErrorMsg && (
+                    <span className="text-[11px] text-rose-500 block leading-tight">{forgotErrorMsg}</span>
+                  )}
+                </div>
               </div>
 
               <Button
                 className="w-full h-10 text-xs cursor-pointer"
+                disabled={!e2eePassphraseInput.trim() || isRecovering || lockoutRemainingSec > 0}
                 onClick={handleRecoverViaE2EE}
               >
                 {t('security.verifyAndUnlock')}
               </Button>
+
+              {config?.securityQuestion && (
+                <Button
+                  variant="ghost"
+                  className="w-full h-8 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={() => {
+                    setRecoverMethod('question');
+                    setForgotErrorMsg('');
+                  }}
+                >
+                  {t('security.useSecurityQuestion')}
+                </Button>
+              )}
+
+              <Button
+                variant="ghost"
+                className="w-full h-9 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={() => setView('pin')}
+              >
+                {t('security.backToPin')}
+              </Button>
+            </div>
+          ) : recoverMethod === 'question' ? (
+            <div className="w-full space-y-3">
+              <div className="p-3 rounded-lg border border-border bg-muted/20 text-xs text-left w-full space-y-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground block">
+                  {t('security.securityQuestion')}
+                </span>
+                <span className="text-xs font-medium text-foreground block">
+                  {config?.securityQuestion?.questionId === 'custom'
+                    ? config.securityQuestion.customQuestion
+                    : t(`security.questions.${config?.securityQuestion?.questionId || 'q_pet'}`)}
+                </span>
+              </div>
+
+              <div>
+                <Input
+                  type="text"
+                  placeholder={t('security.securityAnswerPlaceholder')}
+                  value={securityAnswerInput}
+                  onChange={(e) => {
+                    setSecurityAnswerInput(e.target.value);
+                    setForgotErrorMsg('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRecoverViaSecurityQuestion();
+                  }}
+                  className="h-10 text-xs text-center font-mono"
+                />
+                <div className="min-h-[1.25rem] mt-1.5 flex items-center justify-center">
+                  {forgotErrorMsg && (
+                    <span className="text-[11px] text-rose-500 block leading-tight">{forgotErrorMsg}</span>
+                  )}
+                </div>
+              </div>
+
+              <Button
+                className="w-full h-10 text-xs cursor-pointer"
+                disabled={!securityAnswerInput.trim() || isRecovering || lockoutRemainingSec > 0}
+                onClick={handleRecoverViaSecurityQuestion}
+              >
+                {t('security.verifySecurityAnswer')}
+              </Button>
+
+              {isE2EEEnabled() && (
+                <Button
+                  variant="ghost"
+                  className="w-full h-8 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={() => {
+                    setRecoverMethod('e2ee');
+                    setForgotErrorMsg('');
+                  }}
+                >
+                  {t('security.useE2EEPassphrase')}
+                </Button>
+              )}
 
               <Button
                 variant="ghost"
@@ -420,9 +551,9 @@ export function AppLockOverlay() {
               <Button
                 variant="destructive"
                 className="w-full h-10 text-xs cursor-pointer"
-                onClick={handleResetLockWithoutE2EE}
+                onClick={handleResetLockLegacy}
               >
-                {t('security.confirmDisableLock')}
+                {t('security.legacyResetConfirm')}
               </Button>
 
               <Button

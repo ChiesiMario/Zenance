@@ -12,6 +12,19 @@ import {
   verifyBiometricCredential,
 } from '@/services/crypto/webAuthn';
 
+export interface SecurityQuestionConfig {
+  questionId: string; // e.g. 'q_pet' | 'q_school' | 'q_city' | 'q_movie' | 'q_friend' | 'custom'
+  customQuestion?: string;
+  answerHash: string;
+  answerSalt: string;
+}
+
+export interface SecurityQuestionInput {
+  questionId: string;
+  customQuestion?: string;
+  answer: string;
+}
+
 export interface AppLockConfig {
   enabled: boolean;
   pinHash: string;
@@ -20,6 +33,7 @@ export interface AppLockConfig {
   biometricEnabled: boolean;
   biometricCredentialId?: string;
   timeoutMinutes: number; // 0: 立即, 1: 1分鐘, 5: 5分鐘, 15: 15分鐘
+  securityQuestion?: SecurityQuestionConfig;
 }
 
 const APP_LOCK_CONFIG_KEY = 'zenance_app_lock_config';
@@ -44,7 +58,14 @@ interface AppLockState {
   initLock: () => void;
   unlockWithPin: (pin: string) => Promise<boolean>;
   unlockWithBiometric: () => Promise<boolean>;
-  enableLock: (pin: string, enableBiometrics?: boolean, timeoutMinutes?: number) => Promise<boolean>;
+  enableLock: (
+    pin: string,
+    enableBiometrics?: boolean,
+    timeoutMinutes?: number,
+    securityQuestion?: SecurityQuestionInput
+  ) => Promise<boolean>;
+  verifySecurityAnswer: (answer: string) => Promise<boolean>;
+  updateSecurityQuestion: (input: SecurityQuestionInput) => Promise<boolean>;
   updateLockSettings: (updates: { timeoutMinutes?: number; biometricEnabled?: boolean }) => Promise<void>;
   disableLock: () => void;
   setLocked: (locked: boolean) => void;
@@ -157,7 +178,8 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
     enableLock: async (
       pin: string,
       enableBiometrics = false,
-      timeoutMinutes = 0
+      timeoutMinutes = 1,
+      securityQuestion?: SecurityQuestionInput
     ): Promise<boolean> => {
       if (!isCryptoSupported()) return false;
 
@@ -175,6 +197,22 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
         }
       }
 
+      let secQConfig: SecurityQuestionConfig | undefined = undefined;
+      if (securityQuestion && securityQuestion.answer.trim()) {
+        const normalized = securityQuestion.answer.trim().toLowerCase();
+        const qSalt = generateRandomBytes(16);
+        const aHash = await hashPin(normalized, qSalt);
+        secQConfig = {
+          questionId: securityQuestion.questionId,
+          customQuestion:
+            securityQuestion.questionId === 'custom'
+              ? securityQuestion.customQuestion?.trim()
+              : undefined,
+          answerHash: aHash,
+          answerSalt: bufferToBase64(qSalt),
+        };
+      }
+
       const newConfig: AppLockConfig = {
         enabled: true,
         pinHash,
@@ -183,6 +221,7 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
         biometricEnabled: Boolean(isAvailable && biometricCredentialId),
         biometricCredentialId: isAvailable ? biometricCredentialId : undefined,
         timeoutMinutes,
+        securityQuestion: secQConfig,
       };
 
       localStorage.setItem(APP_LOCK_CONFIG_KEY, JSON.stringify(newConfig));
@@ -192,6 +231,63 @@ export const useAppLockStore = create<AppLockState>((set, get) => {
         isLocked: false,
       });
       sessionStorage.setItem(LOCK_STATE_KEY, 'unlocked');
+      return true;
+    },
+
+    verifySecurityAnswer: async (answer: string): Promise<boolean> => {
+      const { config, lockoutRemainingSec, failedAttempts } = get();
+      if (!config?.securityQuestion) return false;
+      if (lockoutRemainingSec > 0) return false;
+
+      const normalized = answer.trim().toLowerCase();
+      const saltBuffer = base64ToBuffer(config.securityQuestion.answerSalt);
+      const computedHash = await hashPin(normalized, saltBuffer);
+
+      if (computedHash === config.securityQuestion.answerHash) {
+        set({ failedAttempts: 0, lockoutRemainingSec: 0 });
+        return true;
+      }
+
+      const nextFailed = failedAttempts + 1;
+      let lockout = 0;
+      if (nextFailed >= 10) {
+        lockout = 300;
+      } else if (nextFailed >= 5) {
+        lockout = 30;
+      }
+
+      set({
+        failedAttempts: nextFailed,
+        lockoutRemainingSec: lockout,
+      });
+
+      return false;
+    },
+
+    updateSecurityQuestion: async (input: SecurityQuestionInput): Promise<boolean> => {
+      const cfg = getStoredConfig();
+      if (!cfg || !cfg.enabled) return false;
+      if (!isCryptoSupported()) return false;
+
+      const normalized = input.answer.trim().toLowerCase();
+      const salt = generateRandomBytes(16);
+      const answerHash = await hashPin(normalized, salt);
+
+      const securityQuestion: SecurityQuestionConfig = {
+        questionId: input.questionId,
+        customQuestion:
+          input.questionId === 'custom' ? input.customQuestion?.trim() : undefined,
+        answerHash,
+        answerSalt: bufferToBase64(salt),
+      };
+
+      const newConfig: AppLockConfig = {
+        ...cfg,
+        securityQuestion,
+      };
+
+      localStorage.setItem(APP_LOCK_CONFIG_KEY, JSON.stringify(newConfig));
+      set({ config: newConfig });
       return true;
     },
 

@@ -18,10 +18,12 @@ import {
   ArrowLeft,
   Plus,
   Lock,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -115,6 +117,7 @@ export default function Settings() {
     initLock,
     enableLock,
     updateLockSettings,
+    updateSecurityQuestion,
     disableLock,
   } = useAppLockStore();
 
@@ -160,6 +163,15 @@ export default function Settings() {
   const [lockPinInput, setLockPinInput] = useState('');
   const [lockPinConfirm, setLockPinConfirm] = useState('');
   const [lockEnableBio, setLockEnableBio] = useState(true);
+  const [lockSecurityQuestionId, setLockSecurityQuestionId] = useState('q_pet');
+  const [lockCustomQuestion, setLockCustomQuestion] = useState('');
+  const [lockSecurityAnswer, setLockSecurityAnswer] = useState('');
+
+  // 變更安全性問題次級彈窗狀態
+  const [isEditSecQuestionOpen, setIsEditSecQuestionOpen] = useState(false);
+  const [editSecQuestionId, setEditSecQuestionId] = useState('q_pet');
+  const [editCustomQuestion, setEditCustomQuestion] = useState('');
+  const [editSecAnswer, setEditSecAnswer] = useState('');
 
   const handleEnableE2EE = async () => {
     if (!e2eePassphrase.trim() || e2eePassphrase.length < 6) {
@@ -257,14 +269,69 @@ export default function Settings() {
       toast.show(t('security.pinMismatch'));
       return;
     }
-    const success = await enableLock(lockPinInput, lockEnableBio && hasBiometricHardware, 0);
+
+    const isE2EE = isE2EEEnabled();
+    // 未開啟 E2EE 時，強制要求設置安全性問題
+    if (!isE2EE) {
+      if (lockSecurityQuestionId === 'custom' && !lockCustomQuestion.trim()) {
+        toast.show(t('security.customQuestionRequired'));
+        return;
+      }
+      if (!lockSecurityAnswer.trim()) {
+        toast.show(t('security.answerRequired'));
+        return;
+      }
+    }
+
+    const secQParam = lockSecurityAnswer.trim()
+      ? {
+          questionId: lockSecurityQuestionId,
+          customQuestion:
+            lockSecurityQuestionId === 'custom' ? lockCustomQuestion.trim() : undefined,
+          answer: lockSecurityAnswer.trim(),
+        }
+      : undefined;
+
+    const success = await enableLock(
+      lockPinInput,
+      lockEnableBio && hasBiometricHardware,
+      1,
+      secQParam
+    );
     if (success) {
       setIsLockSetupModalOpen(false);
       setLockPinInput('');
       setLockPinConfirm('');
+      setLockSecurityAnswer('');
+      setLockCustomQuestion('');
       toast.show(t('security.lockEnabledSuccess'));
     } else {
       toast.show(t('security.enableLockFailed'));
+    }
+  };
+
+  const handleSaveEditSecurityQuestion = async () => {
+    if (editSecQuestionId === 'custom' && !editCustomQuestion.trim()) {
+      toast.show(t('security.customQuestionRequired'));
+      return;
+    }
+    if (!editSecAnswer.trim()) {
+      toast.show(t('security.answerRequired'));
+      return;
+    }
+
+    const success = await updateSecurityQuestion({
+      questionId: editSecQuestionId,
+      customQuestion:
+        editSecQuestionId === 'custom' ? editCustomQuestion.trim() : undefined,
+      answer: editSecAnswer.trim(),
+    });
+
+    if (success) {
+      setIsEditSecQuestionOpen(false);
+      setEditSecAnswer('');
+      setEditCustomQuestion('');
+      toast.show(t('security.securityQuestionUpdated'));
     }
   };
 
@@ -329,6 +396,11 @@ export default function Settings() {
       default:
         return full ? t('security.timeoutIdleMinutes', { minutes }) : t('security.timeoutMinutes', { minutes });
     }
+  };
+
+  const getSecurityQuestionLabel = (qId: string) => {
+    if (!qId) return '';
+    return t(`security.questions.${qId}`);
   };
 
   const format24Time = (timestamp: number | string | Date, includeSeconds = false) => {
@@ -860,7 +932,7 @@ export default function Settings() {
                 <span className="text-amber-500/80">{t('security.requiresHttps')}</span>
               ) : isLockConfigured ? (
                 <span className="text-emerald-500">
-                  PIN · {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0)}
+                  PIN · {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 1)}
                 </span>
               ) : (
                 <span>{t('security.statusDisabled')}</span>
@@ -1415,13 +1487,28 @@ export default function Settings() {
             </div>
 
             <div
+              role="button"
+              tabIndex={hasBiometricHardware ? 0 : -1}
+              onClick={() => {
+                if (hasBiometricHardware) {
+                  setLockEnableBio((prev) => !prev);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (hasBiometricHardware && (e.key === ' ' || e.key === 'Enter')) {
+                  e.preventDefault();
+                  setLockEnableBio((prev) => !prev);
+                }
+              }}
               className={cn(
-                "p-2.5 rounded-lg border border-border flex items-center justify-between transition-colors",
-                hasBiometricHardware ? "bg-muted/20" : "opacity-60 bg-muted/10 cursor-not-allowed"
+                "p-3 rounded-lg border border-border flex items-center justify-between transition-colors select-none",
+                hasBiometricHardware
+                  ? "bg-muted/20 hover:bg-muted/30 active:bg-muted/40 cursor-pointer"
+                  : "opacity-60 bg-muted/10 cursor-not-allowed"
               )}
             >
               <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-medium flex items-center gap-1.5">
+                <span className="text-xs font-medium flex items-center gap-1.5 text-foreground">
                   <Fingerprint className="size-4 text-primary" />
                   <span>{t('security.biometricSupport')}</span>
                 </span>
@@ -1431,13 +1518,80 @@ export default function Settings() {
                   </span>
                 )}
               </div>
-              <input
-                type="checkbox"
+              <Switch
                 disabled={!hasBiometricHardware}
                 checked={hasBiometricHardware ? lockEnableBio : false}
-                onChange={(e) => setLockEnableBio(e.target.checked)}
-                className="size-4 rounded accent-primary cursor-pointer disabled:cursor-not-allowed"
+                onCheckedChange={(checked) => {
+                  if (hasBiometricHardware) {
+                    setLockEnableBio(checked);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
               />
+            </div>
+
+            {/* 安全性問題設定區塊 */}
+            <div className="p-3 rounded-lg border border-border bg-muted/10 space-y-2.5">
+              <div className="flex flex-col gap-0.5">
+                <label className="text-xs font-medium text-foreground flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <HelpCircle className="size-3.5 text-primary" />
+                    <span>{t('security.securityQuestion')}</span>
+                  </span>
+                  {!isE2EEEnabled() && (
+                    <span className="text-[10px] text-primary font-mono font-normal">
+                      *{t('common.required', '必填')}
+                    </span>
+                  )}
+                </label>
+                <p className="text-[11px] text-muted-foreground leading-normal font-sans">
+                  {t('security.securityQuestionDesc')}
+                </p>
+              </div>
+
+              <div>
+                <Select
+                  value={lockSecurityQuestionId}
+                  onValueChange={(val) => val && setLockSecurityQuestionId(val)}
+                >
+                  <SelectTrigger className="w-full h-9 text-xs">
+                    <SelectValue
+                      className="truncate text-left flex-1"
+                      placeholder={t('security.selectSecurityQuestion')}
+                    >
+                      {getSecurityQuestionLabel(lockSecurityQuestionId)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value="q_pet">{t('security.questions.q_pet')}</SelectItem>
+                    <SelectItem value="q_school">{t('security.questions.q_school')}</SelectItem>
+                    <SelectItem value="q_city">{t('security.questions.q_city')}</SelectItem>
+                    <SelectItem value="q_movie">{t('security.questions.q_movie')}</SelectItem>
+                    <SelectItem value="q_friend">{t('security.questions.q_friend')}</SelectItem>
+                    <SelectItem value="custom">{t('security.questions.custom')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {lockSecurityQuestionId === 'custom' && (
+                <div>
+                  <Input
+                    placeholder={t('security.customQuestionPlaceholder')}
+                    value={lockCustomQuestion}
+                    onChange={(e) => setLockCustomQuestion(e.target.value)}
+                    className="h-9 text-xs"
+                  />
+                </div>
+              )}
+
+              <div>
+                <Input
+                  placeholder={t('security.securityAnswerPlaceholder')}
+                  value={lockSecurityAnswer}
+                  onChange={(e) => setLockSecurityAnswer(e.target.value)}
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
             </div>
 
             <Button
@@ -1461,15 +1615,15 @@ export default function Settings() {
           </DialogHeader>
 
           <div className="divide-y divide-border border border-border rounded-md text-xs font-mono">
-            <div className="p-3 flex items-center justify-between">
+            <div className="h-11 px-3 flex items-center justify-between">
               <span className="text-muted-foreground font-sans">{t('security.status')}</span>
               <span className="text-emerald-500 font-medium">{t('security.statusActive')}</span>
             </div>
 
-            <div className="p-3 flex items-center justify-between">
+            <div className="h-11 px-3 flex items-center justify-between">
               <span className="text-muted-foreground font-sans">{t('security.autoLock')}</span>
               <Select
-                value={String(appLockConfig?.timeoutMinutes ?? 0)}
+                value={String(appLockConfig?.timeoutMinutes ?? 1)}
                 onValueChange={(val) => {
                   if (val) {
                     updateLockSettings({ timeoutMinutes: parseInt(val, 10) });
@@ -1481,7 +1635,7 @@ export default function Settings() {
                   className="flex items-center gap-1 text-xs font-mono text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                 >
                   <SelectValue className="flex-none text-right">
-                    {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 0, true)}
+                    {getLockTimeoutLabel(appLockConfig?.timeoutMinutes ?? 1, true)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent align="end">
@@ -1494,9 +1648,26 @@ export default function Settings() {
             </div>
 
             <div
+              role="button"
+              tabIndex={hasBiometricHardware ? 0 : -1}
+              onClick={() => {
+                if (hasBiometricHardware) {
+                  const current = appLockConfig?.biometricEnabled ?? false;
+                  updateLockSettings({ biometricEnabled: !current });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (hasBiometricHardware && (e.key === ' ' || e.key === 'Enter')) {
+                  e.preventDefault();
+                  const current = appLockConfig?.biometricEnabled ?? false;
+                  updateLockSettings({ biometricEnabled: !current });
+                }
+              }}
               className={cn(
-                "p-3 flex items-center justify-between transition-colors",
-                !hasBiometricHardware && "opacity-60 bg-muted/10 cursor-not-allowed"
+                "h-11 px-3 flex items-center justify-between transition-colors select-none",
+                hasBiometricHardware
+                  ? "hover:bg-muted/30 active:bg-muted/40 cursor-pointer"
+                  : "opacity-60 bg-muted/10 cursor-not-allowed"
               )}
             >
               <div className="flex flex-col gap-0.5">
@@ -1510,15 +1681,36 @@ export default function Settings() {
                   </span>
                 )}
               </div>
-              <input
-                type="checkbox"
+              <Switch
                 disabled={!hasBiometricHardware}
                 checked={hasBiometricHardware && (appLockConfig?.biometricEnabled ?? false)}
-                onChange={(e) => {
-                  updateLockSettings({ biometricEnabled: e.target.checked });
+                onCheckedChange={(checked) => {
+                  if (hasBiometricHardware) {
+                    updateLockSettings({ biometricEnabled: checked });
+                  }
                 }}
-                className="size-4 rounded accent-primary cursor-pointer disabled:cursor-not-allowed"
+                onClick={(e) => e.stopPropagation()}
               />
+            </div>
+
+            <div className="h-11 px-3 flex items-center justify-between">
+              <span className="text-muted-foreground font-sans flex items-center gap-1.5">
+                <HelpCircle className="size-3.5 text-primary" />
+                <span>{t('security.securityQuestion')}</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs font-sans px-2 cursor-pointer text-primary hover:text-primary/80"
+                onClick={() => {
+                  setEditSecQuestionId(appLockConfig?.securityQuestion?.questionId || 'q_pet');
+                  setEditCustomQuestion(appLockConfig?.securityQuestion?.customQuestion || '');
+                  setEditSecAnswer('');
+                  setIsEditSecQuestionOpen(true);
+                }}
+              >
+                {t('security.editSecurityQuestion')}
+              </Button>
             </div>
           </div>
 
@@ -1533,6 +1725,86 @@ export default function Settings() {
               }}
             >
               {t('security.disableLock')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 變更安全性問題次級彈窗 (平級 Sibling Node) */}
+      <Dialog open={isEditSecQuestionOpen} onOpenChange={setIsEditSecQuestionOpen}>
+        <DialogContent
+          overlayClassName="z-[70]"
+          className="z-[70] sm:max-w-[340px] max-w-[340px] p-5 gap-4"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <HelpCircle className="size-5 text-primary" />
+              <span>{t('security.editSecurityQuestion')}</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
+              {t('security.securityQuestionDesc')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-1">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">
+                {t('security.selectSecurityQuestion')}
+              </label>
+              <Select
+                value={editSecQuestionId}
+                onValueChange={(val) => val && setEditSecQuestionId(val)}
+              >
+                <SelectTrigger className="w-full h-9 text-xs">
+                  <SelectValue
+                    className="truncate text-left flex-1"
+                    placeholder={t('security.selectSecurityQuestion')}
+                  >
+                    {getSecurityQuestionLabel(editSecQuestionId)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  <SelectItem value="q_pet">{t('security.questions.q_pet')}</SelectItem>
+                  <SelectItem value="q_school">{t('security.questions.q_school')}</SelectItem>
+                  <SelectItem value="q_city">{t('security.questions.q_city')}</SelectItem>
+                  <SelectItem value="q_movie">{t('security.questions.q_movie')}</SelectItem>
+                  <SelectItem value="q_friend">{t('security.questions.q_friend')}</SelectItem>
+                  <SelectItem value="custom">{t('security.questions.custom')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {editSecQuestionId === 'custom' && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">
+                  {t('security.customQuestionLabel')}
+                </label>
+                <Input
+                  placeholder={t('security.customQuestionPlaceholder')}
+                  value={editCustomQuestion}
+                  onChange={(e) => setEditCustomQuestion(e.target.value)}
+                  className="h-9 text-xs"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">
+                {t('security.securityAnswerLabel')}
+              </label>
+              <Input
+                placeholder={t('security.securityAnswerPlaceholder')}
+                value={editSecAnswer}
+                onChange={(e) => setEditSecAnswer(e.target.value)}
+                className="h-9 text-xs font-mono"
+              />
+            </div>
+
+            <Button
+              className="w-full h-9 text-xs mt-2 cursor-pointer"
+              onClick={handleSaveEditSecurityQuestion}
+            >
+              {t('common.confirm', '確認儲存')}
             </Button>
           </div>
         </DialogContent>

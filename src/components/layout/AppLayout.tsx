@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AddTransactionModal } from '@/components/transactions/AddTransactionModal';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { E2EEUnlockDialog } from '@/components/security/E2EEUnlockDialog';
+import { InitialSyncModal } from '@/components/sync/InitialSyncModal';
 import { MarqueeText } from '@/components/ui/MarqueeText';
 
 export function AppLayout() {
@@ -386,6 +387,8 @@ export function AppLayout() {
         onSuccess={handleUnlockSuccess}
         onDisconnect={disconnectDropbox}
       />
+
+      <InitialSyncModal />
 
       <Toaster />
     </div>

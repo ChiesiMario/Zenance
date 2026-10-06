@@ -8,7 +8,6 @@ import {
   Cloud,
   RefreshCw,
   Download,
-  Upload,
   GitMerge,
   AlertTriangle,
   ShieldCheck,
@@ -103,14 +102,9 @@ export default function Settings() {
     isSyncing,
     lastSyncTime,
     isOnline,
-    firstConnectModalOpen,
-    setFirstConnectModalOpen,
-    localRecordCount,
-    remoteRecordCount,
     connectDropbox,
     disconnectDropbox,
     syncNow,
-    resolveFirstConnectConflict,
   } = useDropboxSync();
 
   // App Lock security store
@@ -1401,79 +1395,7 @@ export default function Settings() {
         }}
       />
 
-      {/* 首次連線資料衝突選擇彈窗 (Q1 選項 B) */}
-      <Dialog open={firstConnectModalOpen} onOpenChange={setFirstConnectModalOpen}>
-        <DialogContent className="sm:max-w-[360px] max-w-[360px] p-5 gap-4">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
-              <Cloud className="size-5 text-primary" />
-              <span>{t('settings.remoteConflictTitle')}</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground leading-relaxed pt-1">
-              {t('settings.remoteConflictDesc', { remote: remoteRecordCount, local: localRecordCount })}
-            </DialogDescription>
-          </DialogHeader>
 
-          <div className="space-y-2 pt-1">
-            <button
-              type="button"
-              onClick={() => resolveFirstConnectConflict('merge')}
-              className="w-full p-3 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/40 transition-colors text-left flex items-start gap-3 cursor-pointer group"
-            >
-              <div className="size-8 rounded-md bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                <GitMerge className="size-4 text-foreground" strokeWidth={1.8} />
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-foreground flex items-center justify-between">
-                  <span>{t('settings.mergeStrategyTitle')}</span>
-                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    {t('settings.recommended')}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground leading-normal mt-0.5">
-                  {t('settings.mergeStrategyDesc')}
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => resolveFirstConnectConflict('overwrite_local')}
-              className="w-full p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left flex items-start gap-3 cursor-pointer group"
-            >
-              <div className="size-8 rounded-md bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                <Download className="size-4 text-foreground" strokeWidth={1.8} />
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-foreground">
-                  {t('settings.overwriteLocalTitle')}
-                </div>
-                <p className="text-xs text-muted-foreground leading-normal mt-0.5">
-                  {t('settings.overwriteLocalDesc')}
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => resolveFirstConnectConflict('overwrite_remote')}
-              className="w-full p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left flex items-start gap-3 cursor-pointer group"
-            >
-              <div className="size-8 rounded-md bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                <Upload className="size-4 text-foreground" strokeWidth={1.8} />
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-foreground">
-                  {t('settings.overwriteRemoteTitle')}
-                </div>
-                <p className="text-xs text-muted-foreground leading-normal mt-0.5">
-                  {t('settings.overwriteRemoteDesc')}
-                </p>
-              </div>
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
 
 

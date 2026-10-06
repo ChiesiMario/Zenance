@@ -65,6 +65,11 @@ export function getActiveSalt(): Uint8Array | null {
   return memorySalt;
 }
 
+export function setupE2EEInMemoryKey(key: CryptoKey, salt: Uint8Array): void {
+  memoryCryptoKey = key;
+  memorySalt = salt;
+}
+
 /**
  * 靜默初始化：從本地 KeyVault 恢復已持久化的金鑰
  * 確保在同一設備上，一旦驗證過密碼後，無論刷新頁面或重開 PWA 均始終維持已解鎖狀態

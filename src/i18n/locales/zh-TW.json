@@ -821,6 +821,37 @@
       "scoreGood": "100分 · 良好",
       "scoreNeedRepair": "{{score}}分 · 需修復",
       "checkNow": "立即體檢"
+    },
+    "initialSync": {
+      "stepCounter": "STEP {{current}} / {{total}}",
+      "authTitle": "連接 Dropbox",
+      "authDesc": "正在驗證授權憑證，請稍候...",
+      "e2eeTitle": "端對端加密驗證",
+      "e2eeDesc": "雲端資料庫已啟用 E2EE 加密保護。請輸入您的同步主密碼以解鎖金鑰。",
+      "e2eePlaceholder": "輸入 E2EE 主密碼",
+      "e2eeError": "密碼錯誤，無法解密驗證",
+      "unlockBtn": "驗證並解鎖",
+      "conflictTitle": "選擇首次同步策略",
+      "conflictDesc": "雲端檢測到 {{remote}} 筆記錄，本地現有 {{local}} 筆記錄。請選擇處理方式：",
+      "mergeTitle": "合併共存",
+      "mergeDesc": "整合兩端資料，保留雙方最新修訂",
+      "recommended": "推薦",
+      "overwriteLocalTitle": "覆蓋本地",
+      "overwriteLocalDesc": "以雲端為準，清空本地並下載所有雲端資料",
+      "overwriteRemoteTitle": "覆蓋雲端",
+      "overwriteRemoteDesc": "以本地為準，上傳並覆寫雲端資料",
+      "downloadingTitle": "下載雲端資料",
+      "downloadingDesc": "正在安全下載各模組檔案並進行解密...",
+      "downloadingProgress": "{{current}} / {{total}} 個模組 ({{percent}}%)",
+      "applyingTitle": "寫入本地資料",
+      "applyingDesc": "正在執行原子寫入，確保本地資料完整性，請勿關閉...",
+      "completedTitle": "首次同步完成",
+      "completedDesc": "所有資料已安全同步至本地設備，Dropbox 連結已生效。",
+      "summaryLedgers": "已同步帳本",
+      "summaryTransactions": "已同步交易",
+      "startUsingBtn": "開始使用",
+      "cancelBtn": "取消同步",
+      "cancelToast": "已取消同步，雲端資料未套用至本地"
     }
   }
 }

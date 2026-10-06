@@ -821,6 +821,37 @@
       "scoreGood": "100 · Good",
       "scoreNeedRepair": "{{score}} · Needs Repair",
       "checkNow": "Check Now"
+    },
+    "initialSync": {
+      "stepCounter": "STEP {{current}} / {{total}}",
+      "authTitle": "Connect Dropbox",
+      "authDesc": "Verifying authorization credentials, please wait...",
+      "e2eeTitle": "End-to-End Encryption Verification",
+      "e2eeDesc": "Remote database is protected with E2EE. Please enter your primary sync passphrase to unlock.",
+      "e2eePlaceholder": "Enter E2EE passphrase",
+      "e2eeError": "Incorrect passphrase, failed to decrypt",
+      "unlockBtn": "Verify & Unlock",
+      "conflictTitle": "Initial Sync Strategy",
+      "conflictDesc": "Found {{remote}} remote records and {{local}} local records. Choose sync strategy:",
+      "mergeTitle": "Merge Data",
+      "mergeDesc": "Combine records from both sides, keeping latest revisions",
+      "recommended": "RECOMMENDED",
+      "overwriteLocalTitle": "Overwrite Local",
+      "overwriteLocalDesc": "Wipe local database and adopt all remote data",
+      "overwriteRemoteTitle": "Overwrite Remote",
+      "overwriteRemoteDesc": "Keep local data and completely overwrite remote data",
+      "downloadingTitle": "Downloading Remote Data",
+      "downloadingDesc": "Securely downloading and decrypting module files...",
+      "downloadingProgress": "{{current}} / {{total}} modules ({{percent}}%)",
+      "applyingTitle": "Applying to Database",
+      "applyingDesc": "Executing atomic database write to ensure integrity, do not close...",
+      "completedTitle": "Initial Sync Completed",
+      "completedDesc": "All data has been safely synchronized to this device. Dropbox link is active.",
+      "summaryLedgers": "Ledgers Synced",
+      "summaryTransactions": "Transactions Synced",
+      "startUsingBtn": "Start Using",
+      "cancelBtn": "Cancel Sync",
+      "cancelToast": "Initial sync canceled. No remote data was applied."
     }
   }
 }

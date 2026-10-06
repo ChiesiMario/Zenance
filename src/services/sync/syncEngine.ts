@@ -101,7 +101,7 @@ let autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
 /**
  * 遠端交易合併後，背景無感補齊受影響帳本的歷史結算月份餘額快照
  */
-async function reconcileMonthlySnapshotsForLedger(ledgerId: string): Promise<void> {
+export async function reconcileMonthlySnapshotsForLedger(ledgerId: string): Promise<void> {
   try {
     const ledger = await db.ledgers.get(ledgerId);
     if (!ledger) return;
@@ -125,11 +125,11 @@ export function getLastSyncTime(): string | null {
   return localStorage.getItem(LAST_SYNC_KEY);
 }
 
-function setLastSyncTime(isoTime: string): void {
+export function setLastSyncTime(isoTime: string): void {
   localStorage.setItem(LAST_SYNC_KEY, isoTime);
 }
 
-function getCachedRevs(): Record<string, string> {
+export function getCachedRevs(): Record<string, string> {
   try {
     const raw = localStorage.getItem(CACHED_REVS_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -138,11 +138,11 @@ function getCachedRevs(): Record<string, string> {
   }
 }
 
-function setCachedRevs(revs: Record<string, string>): void {
+export function setCachedRevs(revs: Record<string, string>): void {
   localStorage.setItem(CACHED_REVS_KEY, JSON.stringify(revs));
 }
 
-function getPushedTimes(): Record<string, string> {
+export function getPushedTimes(): Record<string, string> {
   try {
     const raw = localStorage.getItem(TABLE_PUSH_TIME_KEY);
     return raw ? JSON.parse(raw) : {};
@@ -151,7 +151,7 @@ function getPushedTimes(): Record<string, string> {
   }
 }
 
-function setPushedTimes(times: Record<string, string>): void {
+export function setPushedTimes(times: Record<string, string>): void {
   localStorage.setItem(TABLE_PUSH_TIME_KEY, JSON.stringify(times));
 }
 
@@ -159,7 +159,7 @@ function setPushedTimes(times: Record<string, string>): void {
  * 核心演算法：支援邏輯版本號 (rev) 與時間戳雙重防護的 LWW 合併
  * 優先依據 rev 裁決，徹底免疫多設備系統時鐘偏差
  */
-function mergeEntities<T extends { id: string; updatedAt?: string; rev?: number; deleted?: boolean }>(
+export function mergeEntities<T extends { id: string; updatedAt?: string; rev?: number; deleted?: boolean }>(
   localList: T[],
   remoteList: T[]
 ): { merged: T[]; hasLocalChanges: boolean; hasRemoteChanges: boolean } {
@@ -220,7 +220,7 @@ function mergeEntities<T extends { id: string; updatedAt?: string; rev?: number;
   };
 }
 
-async function uploadAllLocalLedgers(
+export async function uploadAllLocalLedgers(
   now: string,
   cachedRevs: Record<string, string>,
   pushedTimes: Record<string, string>
@@ -261,7 +261,7 @@ async function uploadAllLocalLedgers(
 /**
  * 建立並上傳全域 manifest.json
  */
-async function uploadManifestFile(cachedRevs: Record<string, string>): Promise<void> {
+export async function uploadManifestFile(cachedRevs: Record<string, string>): Promise<void> {
   const [ledgers, allAccounts, allContacts, allCategories, allBudgets, allBudgetRules, allTransactions] =
     await Promise.all([
       db.ledgers.toArray(),

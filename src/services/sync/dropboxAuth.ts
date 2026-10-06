@@ -88,6 +88,29 @@ function setStoredTokens(tokens: DropboxTokens): void {
 /**
  * 清除已儲存的 Dropbox 登入憑證 (登出)
  */
+
+let stagingTokens: DropboxTokens | null = null;
+
+export function getStagingTokens(): DropboxTokens | null {
+  return stagingTokens;
+}
+
+export function setStagingTokens(tokens: DropboxTokens | null): void {
+  stagingTokens = tokens;
+}
+
+export function commitStagingTokens(): void {
+  if (stagingTokens) {
+    setStoredTokens(stagingTokens);
+    stagingTokens = null;
+  }
+}
+
+export function clearStagingTokens(): void {
+  stagingTokens = null;
+  sessionStorage.removeItem(SESSION_VERIFIER_KEY);
+}
+
 export function clearDropboxTokens(): void {
   localStorage.removeItem(STORAGE_TOKENS_KEY);
   sessionStorage.removeItem(SESSION_VERIFIER_KEY);
@@ -182,8 +205,59 @@ export async function exchangeCodeForTokens(code: string): Promise<DropboxTokens
 /**
  * 自動檢查並刷新過期 Access Token (無感續約)
  */
+
+/**
+ * 僅換取 Token 憑證但不持久化至 localStorage (專供首次同步事務暫存)
+ */
+export async function exchangeCodeForTokensOnly(code: string): Promise<DropboxTokens> {
+  const appKey = getDropboxAppKey();
+  if (!appKey) throw new Error('Missing Dropbox App Key');
+
+  const verifier = sessionStorage.getItem(SESSION_VERIFIER_KEY);
+  if (!verifier) {
+    throw new Error('PKCE verification failed: Code verifier missing from session.');
+  }
+
+  const redirectUri = getDropboxRedirectUri();
+  const body = new URLSearchParams({
+    code,
+    grant_type: 'authorization_code',
+    client_id: appKey,
+    redirect_uri: redirectUri,
+    code_verifier: verifier,
+  });
+
+  const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body.toString(),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Dropbox token exchange failed (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const expiresAt = Date.now() + (data.expires_in || 14400) * 1000;
+
+  const tokens: DropboxTokens = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_in: data.expires_in || 14400,
+    expires_at: expiresAt,
+    account_id: data.account_id,
+    scope: data.scope,
+  };
+
+  sessionStorage.removeItem(SESSION_VERIFIER_KEY);
+  return tokens;
+}
+
 export async function getValidAccessToken(): Promise<string | null> {
-  const tokens = getStoredTokens();
+  const tokens = stagingTokens || getStoredTokens();
   if (!tokens) return null;
 
   // 距離過期大於 5 分鐘，直接使用現存 access_token
@@ -221,7 +295,7 @@ export async function getValidAccessToken(): Promise<string | null> {
           expires_in: data.expires_in || 14400,
           expires_at: Date.now() + (data.expires_in || 14400) * 1000,
         };
-        setStoredTokens(updatedTokens);
+        if (stagingTokens) { stagingTokens = updatedTokens; } else { setStoredTokens(updatedTokens); }
         return updatedTokens.access_token;
       }
 

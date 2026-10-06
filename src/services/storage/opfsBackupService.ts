@@ -1,4 +1,5 @@
 import { db, type Ledger, type Wallet, type Contact, type Category, type Budget, type BudgetRule, type Transaction } from '@/services/db/db';
+import { groupTransactionsByMonth } from '@/services/sync/syncEngine';
 import { formatBytes, isSecureEnvironment } from './storageManager';
 
 const OPFS_DIR_NAME = 'zenance_backups';
@@ -94,7 +95,34 @@ export async function generateBackupZipBlob(): Promise<Blob> {
     ledgerFolder!.file('categories.json', JSON.stringify(cats, null, 2));
     ledgerFolder!.file('budgets.json', JSON.stringify(budgets, null, 2));
     ledgerFolder!.file('budget_rules.json', JSON.stringify(budgetRules, null, 2));
-    ledgerFolder!.file('transactions.json', JSON.stringify(txs, null, 2));
+
+    // 按月分卷寫入交易
+    const txFolder = ledgerFolder!.folder('transactions');
+    const groupedTxs = groupTransactionsByMonth(txs);
+    const bucketManifestData: Record<string, { count: number; totalCount: number; updatedAt: string }> = {};
+
+    for (const [bucket, bucketTxs] of Object.entries(groupedTxs)) {
+      txFolder!.file(`${bucket}.json`, JSON.stringify(bucketTxs, null, 2));
+      const maxBucketUpdated = bucketTxs.reduce((max, t) => (t.updatedAt > max ? t.updatedAt : max), '');
+      bucketManifestData[bucket] = {
+        count: bucketTxs.filter((t) => !t.deleted).length,
+        totalCount: bucketTxs.length,
+        updatedAt: maxBucketUpdated,
+      };
+    }
+
+    txFolder!.file(
+      'manifest.json',
+      JSON.stringify(
+        {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          buckets: bucketManifestData,
+        },
+        null,
+        2
+      )
+    );
 
     manifestLedgers.push({
       id: ledger.id,
@@ -164,14 +192,46 @@ export async function parseBackupZipBlob(blob: Blob): Promise<ParsedZipBackup | 
       const categoriesFile = lFolder.file('categories.json');
       const budgetsFile = lFolder.file('budgets.json');
       const budgetRulesFile = lFolder.file('budget_rules.json');
-      const transactionsFile = lFolder.file('transactions.json');
 
       const accounts = accountsFile ? JSON.parse(await accountsFile.async('text')) : [];
       const contacts = contactsFile ? JSON.parse(await contactsFile.async('text')) : [];
       const cats = categoriesFile ? JSON.parse(await categoriesFile.async('text')) : [];
       const budgets = budgetsFile ? JSON.parse(await budgetsFile.async('text')) : [];
       const budgetRules = budgetRulesFile ? JSON.parse(await budgetRulesFile.async('text')) : [];
-      const txs = transactionsFile ? JSON.parse(await transactionsFile.async('text')) : [];
+
+      // 支援按月分卷或舊版單體 transactions.json
+      let txs: Transaction[] = [];
+      const txFolder = lFolder.folder('transactions');
+      if (txFolder) {
+        const txFileNames: string[] = [];
+        txFolder.forEach((relPath, file) => {
+          if (relPath.endsWith('.json') && !relPath.endsWith('manifest.json') && !file.dir) {
+            txFileNames.push(relPath);
+          }
+        });
+        for (const tfName of txFileNames) {
+          const tf = txFolder.file(tfName);
+          if (tf) {
+            try {
+              const parsed = JSON.parse(await tf.async('text'));
+              if (Array.isArray(parsed)) {
+                txs.push(...parsed);
+              }
+            } catch (e) {
+              console.warn(`Failed to parse transaction chunk ${tfName}:`, e);
+            }
+          }
+        }
+      } else {
+        const transactionsFile = lFolder.file('transactions.json');
+        if (transactionsFile) {
+          try {
+            txs = JSON.parse(await transactionsFile.async('text')) || [];
+          } catch (e) {
+            console.warn('Failed to parse legacy transactions.json:', e);
+          }
+        }
+      }
 
       ledgersData.push({
         ledger: ledgerJson,

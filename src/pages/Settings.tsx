@@ -45,6 +45,7 @@ import { triggerSyncUnlockNeeded } from '@/services/sync/syncEngine';
 import { isCryptoSupported } from '@/services/crypto/webCrypto';
 import { isSecureEnvironment } from '@/services/storage/storageManager';
 import { useRollingBackups } from '@/hooks/useRollingBackups';
+import { generateBackupZipBlob } from '@/services/storage/opfsBackupService';
 import {
   db,
   type Ledger,
@@ -352,72 +353,9 @@ export default function Settings() {
     return 'DELETE';
   })();
 
-  /**
-   * Export all ledgers and related entities into a ledger-isolated ZIP archive
-   */
   const handleExport = async () => {
     try {
-      const [ledgers, allTransactions, allCategories, allAccounts, allContacts, allBudgets, allBudgetRules] =
-        await Promise.all([
-          db.ledgers.toArray(),
-          db.transactions.toArray(),
-          db.categories.toArray(),
-          db.accounts.toArray(),
-          db.contacts.toArray(),
-          db.budgets.toArray(),
-          db.budget_rules.toArray(),
-        ]);
-
-      const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
-      const manifestLedgers = [];
-      const ledgersFolder = zip.folder('ledgers');
-
-      for (const ledger of ledgers) {
-        const ledgerFolder = ledgersFolder!.folder(ledger.id);
-
-        const accounts = allAccounts.filter((a) => a.ledgerId === ledger.id);
-        const contacts = allContacts.filter((c) => c.ledgerId === ledger.id);
-        const cats = allCategories.filter((c) => c.ledgerId === ledger.id);
-        const budgets = allBudgets.filter((b) => b.ledgerId === ledger.id);
-        const budgetRules = allBudgetRules.filter((r) => r.ledgerId === ledger.id);
-        const txs = allTransactions.filter((t) => t.ledgerId === ledger.id);
-
-        ledgerFolder!.file('ledger.json', JSON.stringify(ledger, null, 2));
-        ledgerFolder!.file('accounts.json', JSON.stringify(accounts, null, 2));
-        ledgerFolder!.file('contacts.json', JSON.stringify(contacts, null, 2));
-        ledgerFolder!.file('categories.json', JSON.stringify(cats, null, 2));
-        ledgerFolder!.file('budgets.json', JSON.stringify(budgets, null, 2));
-        ledgerFolder!.file('budget_rules.json', JSON.stringify(budgetRules, null, 2));
-        ledgerFolder!.file('transactions.json', JSON.stringify(txs, null, 2));
-
-        manifestLedgers.push({
-          id: ledger.id,
-          name: ledger.name,
-          baseCurrency: ledger.baseCurrency,
-          isDefault: ledger.isDefault,
-          stats: {
-            accountsCount: accounts.length,
-            contactsCount: contacts.length,
-            categoriesCount: cats.length,
-            budgetsCount: budgets.length,
-            budgetRulesCount: budgetRules.length,
-            transactionsCount: txs.length,
-          },
-        });
-      }
-
-      const manifest = {
-        appName: 'Zenance',
-        schemaVersion: 2,
-        exportedAt: new Date().toISOString(),
-        totalLedgers: ledgers.length,
-        ledgers: manifestLedgers,
-      };
-
-      zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-
-      const blob = await zip.generateAsync({ type: 'blob' });
+      const blob = await generateBackupZipBlob();
       const dateStr = new Date().toISOString().slice(0, 10);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -484,14 +422,46 @@ export default function Settings() {
           const categoriesFile = lFolder.file('categories.json');
           const budgetsFile = lFolder.file('budgets.json');
           const budgetRulesFile = lFolder.file('budget_rules.json');
-          const transactionsFile = lFolder.file('transactions.json');
 
           const rawAccounts = accountsFile ? JSON.parse(await accountsFile.async('text')) : [];
           const rawContacts = contactsFile ? JSON.parse(await contactsFile.async('text')) : [];
           const cats = categoriesFile ? JSON.parse(await categoriesFile.async('text')) : [];
           const budgets = budgetsFile ? JSON.parse(await budgetsFile.async('text')) : [];
           const budgetRules = budgetRulesFile ? JSON.parse(await budgetRulesFile.async('text')) : [];
-          const txs = transactionsFile ? JSON.parse(await transactionsFile.async('text')) : [];
+
+          // 支援按月分卷或舊版單體 transactions.json
+          let txs: Transaction[] = [];
+          const txFolder = lFolder.folder('transactions');
+          if (txFolder) {
+            const txFileNames: string[] = [];
+            txFolder.forEach((relPath, file) => {
+              if (relPath.endsWith('.json') && !relPath.endsWith('manifest.json') && !file.dir) {
+                txFileNames.push(relPath);
+              }
+            });
+            for (const tfName of txFileNames) {
+              const tf = txFolder.file(tfName);
+              if (tf) {
+                try {
+                  const parsed = JSON.parse(await tf.async('text'));
+                  if (Array.isArray(parsed)) {
+                    txs.push(...parsed);
+                  }
+                } catch (e) {
+                  console.warn(`Failed to parse transaction chunk ${tfName}:`, e);
+                }
+              }
+            }
+          } else {
+            const transactionsFile = lFolder.file('transactions.json');
+            if (transactionsFile) {
+              try {
+                txs = JSON.parse(await transactionsFile.async('text')) || [];
+              } catch (e) {
+                console.warn('Failed to parse legacy transactions.json:', e);
+              }
+            }
+          }
 
           // 分離可能存在的舊版混裝聯絡人
           const cleanAccounts: any[] = [];

@@ -138,6 +138,37 @@ export interface SyncManifest {
   e2ee?: SyncManifestE2EE;
 }
 
+export interface TransactionsBucketInfo {
+  count: number;
+  totalCount: number;
+  updatedAt: string;
+}
+
+export interface TransactionsBucketManifest {
+  version: number;
+  updatedAt: string;
+  buckets: Record<string, TransactionsBucketInfo>;
+}
+
+export function getTransactionMonthBucket(dateStr: string): string {
+  if (!dateStr || dateStr.length < 7) {
+    return 'unknown';
+  }
+  return dateStr.slice(0, 7);
+}
+
+export function groupTransactionsByMonth(transactions: Transaction[]): Record<string, Transaction[]> {
+  const groups: Record<string, Transaction[]> = {};
+  for (const tx of transactions) {
+    const bucket = getTransactionMonthBucket(tx.date);
+    if (!groups[bucket]) {
+      groups[bucket] = [];
+    }
+    groups[bucket].push(tx);
+  }
+  return groups;
+}
+
 let isSyncInProgress = false;
 let hasPendingSyncRequest = false;
 let pendingSyncMode: 'auto' | 'overwrite_local' | 'overwrite_remote' = 'auto';
@@ -292,7 +323,36 @@ export async function uploadAllLocalLedgers(
     cachedRevs[`${prefix}/categories.json`] = await uploadJsonFile(`${prefix}/categories.json`, cats);
     cachedRevs[`${prefix}/budgets.json`] = await uploadJsonFile(`${prefix}/budgets.json`, buds);
     cachedRevs[`${prefix}/budget_rules.json`] = await uploadJsonFile(`${prefix}/budget_rules.json`, rules);
-    cachedRevs[`${prefix}/transactions.json`] = await uploadJsonFile(`${prefix}/transactions.json`, txs);
+
+    // 交易按月分卷上傳
+    const groupedTxs = groupTransactionsByMonth(txs);
+    const bucketManifestData: Record<string, TransactionsBucketInfo> = {};
+
+    for (const [bucket, bucketTxs] of Object.entries(groupedTxs)) {
+      const bucketPath = `${prefix}/transactions/${bucket}.json`;
+      cachedRevs[bucketPath] = await uploadJsonFile(bucketPath, bucketTxs);
+      const maxBucketUpdated = bucketTxs.reduce((max, t) => (t.updatedAt > max ? t.updatedAt : max), '');
+      bucketManifestData[bucket] = {
+        count: bucketTxs.filter((t) => !t.deleted).length,
+        totalCount: bucketTxs.length,
+        updatedAt: maxBucketUpdated,
+      };
+      pushedTimes[`${l.id}_tx_${bucket}`] = now;
+      pushedTimes[`${l.id}_tx_${bucket}_count`] = String(bucketTxs.length);
+    }
+
+    const txManifestPath = `${prefix}/transactions/manifest.json`;
+    const bucketManifest: TransactionsBucketManifest = {
+      version: 1,
+      updatedAt: now,
+      buckets: bucketManifestData,
+    };
+    cachedRevs[txManifestPath] = await uploadJsonFile(txManifestPath, bucketManifest);
+
+    // 清除遠端可能殘留的舊單體 transactions.json
+    await deleteRemotePath(`${prefix}/transactions.json`).catch(() => {});
+    delete cachedRevs[`${prefix}/transactions.json`];
+    delete pushedTimes[`${l.id}_transactions`];
 
     pushedTimes[`${l.id}_ledger`] = now;
     pushedTimes[`${l.id}_accounts`] = now;
@@ -300,7 +360,6 @@ export async function uploadAllLocalLedgers(
     pushedTimes[`${l.id}_categories`] = now;
     pushedTimes[`${l.id}_budgets`] = now;
     pushedTimes[`${l.id}_budget_rules`] = now;
-    pushedTimes[`${l.id}_transactions`] = now;
   }
 
   // 物理清除遠端已刪除帳本資料夾，防止雲端目錄殘留垃圾
@@ -594,7 +653,28 @@ export async function executeSync(
         const cats = await downloadJsonFile<Category[]>(`${prefix}/categories.json`);
         const buds = await downloadJsonFile<Budget[]>(`${prefix}/budgets.json`);
         const rules = await downloadJsonFile<BudgetRule[]>(`${prefix}/budget_rules.json`);
-        const txs = await downloadJsonFile<Transaction[]>(`${prefix}/transactions.json`);
+
+        // 交易分卷或舊單體下載
+        const txBucketMetas = remoteFiles.filter(
+          (f) =>
+            f.path_lower.startsWith(`${prefix}/transactions/`) &&
+            f.name.endsWith('.json') &&
+            !f.name.endsWith('manifest.json')
+        );
+
+        let txs: Transaction[] = [];
+        if (txBucketMetas.length > 0) {
+          const downloadedChunks = await Promise.all(
+            txBucketMetas.map((m) => downloadJsonFile<Transaction[]>(m.path_lower))
+          );
+          for (const chunk of downloadedChunks) {
+            if (chunk?.length) txs.push(...chunk);
+          }
+        } else {
+          // 向後相容舊單體
+          const legacyTxs = await downloadJsonFile<Transaction[]>(`${prefix}/transactions.json`);
+          if (legacyTxs?.length) txs = legacyTxs;
+        }
 
         if (l) allLedgers.push(l);
         if (accs?.length) allAccounts.push(...accs);
@@ -602,7 +682,7 @@ export async function executeSync(
         if (cats?.length) allCategories.push(...cats);
         if (buds?.length) allBudgets.push(...buds);
         if (rules?.length) allBudgetRules.push(...rules);
-        if (txs?.length) allTransactions.push(...txs);
+        if (txs.length) allTransactions.push(...txs);
       }
 
       await db.transaction(
@@ -784,22 +864,72 @@ export async function executeSync(
         cachedRevs[rulePath] = ruleMeta.rev;
       }
 
-      // 7. 檢查 transactions.json
-      const txPath = `${prefix}/transactions.json`;
-      const txMeta = remoteFileMap.get(txPath);
-      if (txMeta && cachedRevs[txPath] !== txMeta.rev) {
-        const remoteTxs = (await downloadJsonFile<Transaction[]>(txPath)) || [];
-        const localTxs = await db.transactions.where('ledgerId').equals(ledgerId).toArray();
-        const m = mergeEntities(localTxs, remoteTxs);
-        if (m.hasLocalChanges) {
-          await db.transactions.bulkPut(m.merged);
-          hasLocalModified = true;
-          affectedLedgersForSnapshots.add(ledgerId);
+      // 7. 檢查交易分卷 (Transactions Buckets) 或向後相容舊單體
+      const remoteTxBuckets = remoteFiles.filter(
+        (f) =>
+          f.path_lower.startsWith(`${prefix}/transactions/`) &&
+          f.name.endsWith('.json') &&
+          !f.name.endsWith('manifest.json')
+      );
+      const remoteTxManifestMeta = remoteFileMap.get(`${prefix}/transactions/manifest.json`);
+      const legacyTxMeta = remoteFileMap.get(`${prefix}/transactions.json`);
+
+      if (remoteTxBuckets.length > 0 || remoteTxManifestMeta) {
+        // 新版分卷模式：遍歷有 rev 異動的月份桶
+        for (const bucketMeta of remoteTxBuckets) {
+          const bucketPath = bucketMeta.path_lower;
+          if (cachedRevs[bucketPath] !== bucketMeta.rev) {
+            const bucket = bucketMeta.name.replace('.json', '');
+            const remoteBucketTxs = (await downloadJsonFile<Transaction[]>(bucketPath)) || [];
+
+            // 查詢本地該帳本且屬於該月份（或 ID 在遠端列表中）的交易進行精準合併
+            const remoteIds = new Set(remoteBucketTxs.map((t) => t.id));
+            const allLocalTxs = await db.transactions.where('ledgerId').equals(ledgerId).toArray();
+            const localBucketTxs = allLocalTxs.filter(
+              (t) => getTransactionMonthBucket(t.date) === bucket || remoteIds.has(t.id)
+            );
+
+            const m = mergeEntities(localBucketTxs, remoteBucketTxs);
+            if (m.hasLocalChanges) {
+              await db.transactions.bulkPut(m.merged);
+              hasLocalModified = true;
+              affectedLedgersForSnapshots.add(ledgerId);
+            }
+            if (m.hasRemoteChanges) {
+              hasRemoteModified = true;
+            }
+            cachedRevs[bucketPath] = bucketMeta.rev;
+          }
         }
-        if (m.hasRemoteChanges) {
-          hasRemoteModified = true;
+
+        if (remoteTxManifestMeta) {
+          cachedRevs[`${prefix}/transactions/manifest.json`] = remoteTxManifestMeta.rev;
         }
-        cachedRevs[txPath] = txMeta.rev;
+
+        // 清理殘留舊單體
+        if (legacyTxMeta) {
+          await deleteRemotePath(`${prefix}/transactions.json`).catch(() => {});
+          delete cachedRevs[`${prefix}/transactions.json`];
+        }
+      } else if (legacyTxMeta) {
+        // 舊單體模式：向後相容拉取並標記需要遷移轉換
+        const txPath = `${prefix}/transactions.json`;
+        if (cachedRevs[txPath] !== legacyTxMeta.rev) {
+          const remoteTxs = (await downloadJsonFile<Transaction[]>(txPath)) || [];
+          const localTxs = await db.transactions.where('ledgerId').equals(ledgerId).toArray();
+          const m = mergeEntities(localTxs, remoteTxs);
+          if (m.hasLocalChanges) {
+            await db.transactions.bulkPut(m.merged);
+            hasLocalModified = true;
+            affectedLedgersForSnapshots.add(ledgerId);
+          }
+          if (m.hasRemoteChanges) {
+            hasRemoteModified = true;
+          }
+          cachedRevs[txPath] = legacyTxMeta.rev;
+        }
+        // 標記在隨後的上行中進行遷移轉化
+        hasRemoteModified = true;
       }
     }
 
@@ -816,16 +946,80 @@ export async function executeSync(
     for (const l of localLedgers) {
       const prefix = `/ledgers/${l.id}`;
 
-      // 1. 檢查 transactions：是否有比上次推送更新的流水
+      // 1. 檢查 transactions：按月分卷桶化增量推送 (Dirty Buckets Only)
       const localTxs = await db.transactions.where('ledgerId').equals(l.id).toArray();
-      const lastTxPushed = pushedTimes[`${l.id}_transactions`] || '';
-      const maxTxUpdated = localTxs.reduce((max, t) => (t.updatedAt > max ? t.updatedAt : max), '');
+      const groupedTxs = groupTransactionsByMonth(localTxs);
+      const localBucketNames = new Set(Object.keys(groupedTxs));
 
-      if (!lastTxPushed || maxTxUpdated > lastTxPushed || hasRemoteModified) {
-        const txPath = `${prefix}/transactions.json`;
-        cachedRevs[txPath] = await uploadJsonFile(txPath, localTxs, cachedRevs[txPath]);
-        pushedTimes[`${l.id}_transactions`] = now;
-        hasRemoteModified = true;
+      // 檢查遠端現存的月份桶（若有孤兒月份則清理）
+      const remoteTxBucketMetas = remoteFiles.filter(
+        (f) =>
+          f.path_lower.startsWith(`${prefix}/transactions/`) &&
+          f.name.endsWith('.json') &&
+          !f.name.endsWith('manifest.json')
+      );
+
+      let txsChanged = false;
+
+      // 清理遠端孤兒月份桶 (本地已無該月任何交易)
+      for (const rMeta of remoteTxBucketMetas) {
+        const bName = rMeta.name.replace('.json', '');
+        if (!localBucketNames.has(bName)) {
+          await deleteRemotePath(rMeta.path_lower).catch(() => {});
+          delete cachedRevs[rMeta.path_lower];
+          delete pushedTimes[`${l.id}_tx_${bName}`];
+          delete pushedTimes[`${l.id}_tx_${bName}_count`];
+          txsChanged = true;
+          hasRemoteModified = true;
+        }
+      }
+
+      // 檢查每個本地月份桶
+      const bucketManifestData: Record<string, TransactionsBucketInfo> = {};
+
+      for (const [bucket, bucketTxs] of Object.entries(groupedTxs)) {
+        const bucketPath = `${prefix}/transactions/${bucket}.json`;
+        const lastBucketPushed = pushedTimes[`${l.id}_tx_${bucket}`] || '';
+        const lastBucketCount = pushedTimes[`${l.id}_tx_${bucket}_count`];
+        const maxBucketUpdated = bucketTxs.reduce((max, t) => (t.updatedAt > max ? t.updatedAt : max), '');
+
+        const isCountChanged = lastBucketCount !== undefined && lastBucketCount !== String(bucketTxs.length);
+        const isTimeUpdated = !lastBucketPushed || maxBucketUpdated > lastBucketPushed;
+        const isMissingOnRemote = !cachedRevs[bucketPath];
+
+        if (isTimeUpdated || isCountChanged || isMissingOnRemote || hasRemoteModified) {
+          cachedRevs[bucketPath] = await uploadJsonFile(bucketPath, bucketTxs, cachedRevs[bucketPath]);
+          pushedTimes[`${l.id}_tx_${bucket}`] = now;
+          pushedTimes[`${l.id}_tx_${bucket}_count`] = String(bucketTxs.length);
+          txsChanged = true;
+          hasRemoteModified = true;
+        }
+
+        bucketManifestData[bucket] = {
+          count: bucketTxs.filter((t) => !t.deleted).length,
+          totalCount: bucketTxs.length,
+          updatedAt: maxBucketUpdated,
+        };
+      }
+
+      // 若該帳本交易有任何異動或缺少 manifest.json，更新 manifest.json 並清除舊單體
+      const txManifestPath = `${prefix}/transactions/manifest.json`;
+      if (txsChanged || !cachedRevs[txManifestPath]) {
+        const bucketManifest: TransactionsBucketManifest = {
+          version: 1,
+          updatedAt: now,
+          buckets: bucketManifestData,
+        };
+        cachedRevs[txManifestPath] = await uploadJsonFile(
+          txManifestPath,
+          bucketManifest,
+          cachedRevs[txManifestPath]
+        );
+
+        // 清除遠端舊單體
+        await deleteRemotePath(`${prefix}/transactions.json`).catch(() => {});
+        delete cachedRevs[`${prefix}/transactions.json`];
+        delete pushedTimes[`${l.id}_transactions`];
       }
 
       // 2. 檢查 accounts (錢包)

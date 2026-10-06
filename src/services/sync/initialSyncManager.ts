@@ -423,8 +423,14 @@ async function executeDownloadQueue(): Promise<void> {
           staged.budgets.push(...(json as Budget[]));
         } else if (path.endsWith('/budget_rules.json')) {
           staged.budgetRules.push(...(json as BudgetRule[]));
+        } else if (path.includes('/transactions/') && path.endsWith('.json')) {
+          if (!path.endsWith('/manifest.json') && Array.isArray(json)) {
+            staged.transactions.push(...(json as Transaction[]));
+          }
         } else if (path.endsWith('/transactions.json')) {
-          staged.transactions.push(...(json as Transaction[]));
+          if (Array.isArray(json)) {
+            staged.transactions.push(...(json as Transaction[]));
+          }
         }
       }
 
@@ -495,13 +501,16 @@ async function executeAtomicCommit(): Promise<void> {
             await db.budgets.clear();
             await db.budget_rules.clear();
 
-            if (staged.ledgers.length) await db.ledgers.bulkAdd(staged.ledgers);
-            if (staged.accounts.length) await db.accounts.bulkAdd(staged.accounts);
-            if (staged.categories.length) await db.categories.bulkAdd(staged.categories);
-            if (staged.transactions.length) await db.transactions.bulkAdd(staged.transactions);
-            if (staged.contacts.length) await db.contacts.bulkAdd(staged.contacts);
-            if (staged.budgets.length) await db.budgets.bulkAdd(staged.budgets);
-            if (staged.budgetRules.length) await db.budget_rules.bulkAdd(staged.budgetRules);
+            if (staged.ledgers.length) await db.ledgers.bulkPut(staged.ledgers);
+            if (staged.accounts.length) await db.accounts.bulkPut(staged.accounts);
+            if (staged.categories.length) await db.categories.bulkPut(staged.categories);
+            if (staged.transactions.length) {
+              const uniqueTxs = Array.from(new Map(staged.transactions.map((t) => [t.id, t])).values());
+              await db.transactions.bulkPut(uniqueTxs);
+            }
+            if (staged.contacts.length) await db.contacts.bulkPut(staged.contacts);
+            if (staged.budgets.length) await db.budgets.bulkPut(staged.budgets);
+            if (staged.budgetRules.length) await db.budget_rules.bulkPut(staged.budgetRules);
           } else if (strategy === 'merge') {
             const [
               localLedgers,

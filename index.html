@@ -46,6 +46,24 @@
         color: var(--app-fg);
         overflow: hidden;
       }
+      #app-shell-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 2px;
+        width: 0%;
+        background-color: var(--app-fg);
+        z-index: 100000;
+        pointer-events: none;
+        animation: appShellProgress 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        transition: width 0.2s ease, opacity 0.3s ease;
+      }
+      @keyframes appShellProgress {
+        0% { width: 0%; opacity: 1; }
+        25% { width: 45%; }
+        60% { width: 75%; }
+        100% { width: 88%; }
+      }
       #app-shell-fallback {
         position: fixed;
         inset: 0;
@@ -54,6 +72,8 @@
         align-items: center;
         justify-content: center;
         background-color: var(--app-bg);
+        user-select: none;
+        -webkit-user-select: none;
       }
       .app-shell-icon {
         width: 52px;
@@ -62,10 +82,71 @@
         align-items: center;
         justify-content: center;
         opacity: 0.9;
+        animation: appShellPulse 2s ease-in-out infinite;
+      }
+      @keyframes appShellPulse {
+        0%, 100% { opacity: 0.9; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.97); }
+      }
+      #app-shell-status {
+        margin-top: 20px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #app-shell-status.visible {
+        opacity: 0.75;
+        transform: translateY(0);
+      }
+      .app-shell-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: currentColor;
+        opacity: 0.8;
       }
     </style>
+    <script>
+      (function() {
+        var watchdogTimer = setTimeout(function() {
+          var statusEl = document.getElementById('app-shell-status');
+          if (statusEl && document.getElementById('app-shell-fallback')) {
+            var isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+            if (!isOnline) {
+              statusEl.innerHTML = '<span class="app-shell-dot"></span><span>OFFLINE MODE</span>';
+            } else {
+              statusEl.innerHTML = '<span class="app-shell-dot"></span><span>CONNECTING...</span>';
+            }
+            statusEl.classList.add('visible');
+          }
+        }, 1800);
+
+        window.__dismissAppShell = function() {
+          clearTimeout(watchdogTimer);
+          var bar = document.getElementById('app-shell-bar');
+          if (bar) {
+            bar.style.width = '100%';
+            setTimeout(function() {
+              bar.style.opacity = '0';
+              setTimeout(function() {
+                if (bar.parentNode) bar.parentNode.removeChild(bar);
+              }, 300);
+            }, 150);
+          }
+        };
+      })();
+    </script>
   </head>
   <body>
+    <div id="app-shell-bar"></div>
     <div id="root">
       <div id="app-shell-fallback">
         <div class="app-shell-icon">
@@ -74,6 +155,7 @@
             <path d="M15 16H33L15 32H33" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
+        <div id="app-shell-status"></div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

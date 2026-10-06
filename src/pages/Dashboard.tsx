@@ -33,6 +33,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 import { useMonthTransactions } from '@/hooks/useMonthTransactions';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
   const { activeLedgerId, setActiveLedgerId } = useAppStore();
   const { t, i18n } = useTranslation();
+  const isOnline = useNetworkStatus();
 
   const [isManageLedgersOpen, setIsManageLedgersOpen] = useState(false);
   const [isCreateLedgerOpen, setIsCreateLedgerOpen] = useState(false);
@@ -360,7 +362,16 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        <div className="flex items-center gap-0.5 -mr-2 shrink-0">
+        <div className="flex items-center gap-1.5 -mr-2 shrink-0">
+          {!isOnline && (
+            <span
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-border text-[10px] font-mono uppercase tracking-wider text-muted-foreground bg-muted/40 select-none"
+              title={t('common.offline', '離線')}
+            >
+              <span className="size-1.5 rounded-full bg-amber-500/80 animate-pulse" />
+              {t('common.offline', '離線')}
+            </span>
+          )}
           <Link 
             to="/reports" 
             title={t('reports.title')}

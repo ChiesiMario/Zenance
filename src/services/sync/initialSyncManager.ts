@@ -11,6 +11,7 @@ import {
 import {
   listRemoteFolder,
   downloadJsonFile,
+  deleteRemotePath,
   type DropboxFileMetadata,
 } from './dropboxClient';
 import {
@@ -380,7 +381,13 @@ async function executeDownloadQueue(): Promise<void> {
   });
 
   const remoteFiles = staging.remoteFiles;
-  const ledgerFiles = remoteFiles.filter((f) => f.path_lower.startsWith('/ledgers/'));
+  const deletedIds = new Set<string>(staging.remoteManifest?.deletedLedgerIds || []);
+  const ledgerFiles = remoteFiles.filter((f) => {
+    if (!f.path_lower.startsWith('/ledgers/')) return false;
+    const parts = f.path_lower.split('/');
+    const ledgerId = parts[2];
+    return ledgerId && !deletedIds.has(ledgerId);
+  });
 
   if (ledgerFiles.length === 0) {
     await executeAtomicCommit();
@@ -561,9 +568,16 @@ async function executeAtomicCommit(): Promise<void> {
     // ★★★ 終態保障：所有資料操作完成後，最後一步才持久化 Token ★★★
     commitStagingTokens();
 
-    // 取得最終統計
-    const totalLedgers = await db.ledgers.count();
+    // 取得最終統計：僅統計活躍帳本數量
+    const totalLedgers = await db.ledgers.filter((l) => !l.deleted).count();
     const totalTxs = await db.transactions.filter((t) => !t.deleted).count();
+
+    // 終態保障：非同步清理雲端已刪除的歷史帳本資料夾，確保 Dropbox 目錄 1:1 乾淨
+    const deletedLedgers = await db.ledgers.filter((l) => l.deleted).toArray();
+    for (const d of deletedLedgers) {
+      deleteRemotePath(`/ledgers/${d.id}`).catch(() => {});
+    }
+    uploadManifestFile(getCachedRevs()).catch(() => {});
 
     emitState({
       step: 'COMPLETED',

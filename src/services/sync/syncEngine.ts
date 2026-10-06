@@ -12,6 +12,7 @@ import {
   listRemoteFolder,
   downloadJsonFile,
   uploadJsonFile,
+  deleteRemotePath,
   type DropboxFileMetadata,
 } from './dropboxClient';
 import { isDropboxConnected } from './dropboxAuth';
@@ -90,6 +91,7 @@ export interface SyncManifest {
   exportedAt: string;
   totalLedgers: number;
   ledgers: SyncManifestLedgerItem[];
+  deletedLedgerIds?: string[];
   e2ee?: SyncManifestE2EE;
 }
 
@@ -226,8 +228,10 @@ export async function uploadAllLocalLedgers(
   pushedTimes: Record<string, string>
 ): Promise<void> {
   const ledgers = await db.ledgers.toArray();
+  const activeLedgers = ledgers.filter((l) => !l.deleted);
+  const deletedLedgers = ledgers.filter((l) => l.deleted);
 
-  for (const l of ledgers) {
+  for (const l of activeLedgers) {
     const [accs, conts, cats, buds, rules, txs] = await Promise.all([
       db.accounts.where('ledgerId').equals(l.id).toArray(),
       db.contacts.where('ledgerId').equals(l.id).toArray(),
@@ -255,6 +259,11 @@ export async function uploadAllLocalLedgers(
     pushedTimes[`${l.id}_transactions`] = now;
   }
 
+  // 物理清除遠端已刪除帳本資料夾，防止雲端目錄殘留垃圾
+  for (const d of deletedLedgers) {
+    await deleteRemotePath(`/ledgers/${d.id}`).catch(() => {});
+  }
+
   await uploadManifestFile(cachedRevs);
 }
 
@@ -273,7 +282,10 @@ export async function uploadManifestFile(cachedRevs: Record<string, string>): Pr
       db.transactions.toArray(),
     ]);
 
-  const manifestLedgers: SyncManifestLedgerItem[] = ledgers.map((l) => ({
+  const activeLedgers = ledgers.filter((l) => !l.deleted);
+  const deletedLedgerIds = ledgers.filter((l) => l.deleted).map((l) => l.id);
+
+  const manifestLedgers: SyncManifestLedgerItem[] = activeLedgers.map((l) => ({
     id: l.id,
     name: l.name,
     baseCurrency: l.baseCurrency,
@@ -310,8 +322,9 @@ export async function uploadManifestFile(cachedRevs: Record<string, string>): Pr
     appName: 'Zenance',
     schemaVersion: 2,
     exportedAt: now,
-    totalLedgers: ledgers.length,
+    totalLedgers: manifestLedgers.length,
     ledgers: manifestLedgers,
+    deletedLedgerIds,
     e2ee: e2eeManifest,
   };
 
@@ -425,9 +438,10 @@ export async function executeSync(
     }
 
     // 3. 雙向 E2EE 狀態機握手 (Bi-directional E2EE State Reconciliation)
+    let remoteManifest: SyncManifest | null = null;
     const manifestMeta = remoteFiles.find((f) => f.path_lower === '/manifest.json');
     if (manifestMeta) {
-      const remoteManifest = await downloadJsonFile<SyncManifest>('/manifest.json');
+      remoteManifest = await downloadJsonFile<SyncManifest>('/manifest.json');
       const remoteE2EE = remoteManifest?.e2ee;
       const localModified = getE2EEUpdatedAt();
 
@@ -587,9 +601,27 @@ export async function executeSync(
       }
     }
 
+    // 同步遠端 deletedLedgerIds 至本地，確保多設備刪除狀態即時對齊
+    if (remoteManifest?.deletedLedgerIds?.length) {
+      for (const dId of remoteManifest.deletedLedgerIds) {
+        const localL = await db.ledgers.get(dId);
+        if (localL && !localL.deleted) {
+          await db.ledgers.update(dId, { deleted: true, updatedAt: now });
+          hasLocalModified = true;
+        }
+      }
+    }
+
     // 檢視各遠端檔案是否需要下載 (僅在 rev 不一致時下載)
     // 優先依據拓撲依賴順序：先建立/更新 ledger 頂層帳本實體，再裝填子實體，徹底杜絕孤兒數據
     for (const ledgerId of remoteLedgerIds) {
+      // 若該帳本在本地已標記為刪除或在遠端已刪除清單中，主動抹除雲端殘留資料夾，保持目錄清爽
+      const localLed = await db.ledgers.get(ledgerId);
+      if (localLed?.deleted || remoteManifest?.deletedLedgerIds?.includes(ledgerId)) {
+        await deleteRemotePath(`/ledgers/${ledgerId}`).catch(() => {});
+        continue;
+      }
+
       const prefix = `/ledgers/${ledgerId}`;
 
       // 1. 優先檢查並更新 ledger.json

@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Ledger } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
+import { scheduleAutoSync } from '@/services/sync/syncEngine';
 
 export function useLedgers() {
   const ledgers = useLiveQuery(
@@ -20,6 +21,7 @@ export function useLedgers() {
       deleted: false,
     };
     await db.ledgers.add(newLedger);
+    scheduleAutoSync();
     return newLedger;
   };
 
@@ -28,6 +30,7 @@ export function useLedgers() {
       deleted: true,
       updatedAt: new Date().toISOString(),
     });
+    scheduleAutoSync();
   };
 
   const updateLedger = async (id: string, updates: Partial<Ledger>) => {
@@ -35,6 +38,7 @@ export function useLedgers() {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+    scheduleAutoSync();
   };
 
   return {

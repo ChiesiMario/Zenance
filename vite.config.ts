@@ -11,7 +11,6 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons.svg', 'manifest.webmanifest'],
       manifest: {
         name: 'Zenance',
         short_name: 'Zenance',
@@ -32,7 +31,8 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff2,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        globIgnores: ['**/design-preview-*.html'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,

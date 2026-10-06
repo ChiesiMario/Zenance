@@ -286,14 +286,15 @@ export function AppLockOverlay() {
           </div>
 
           {/* Keypad Grid (1-9, Bio, 0, Del) */}
-          <div className="grid grid-cols-3 gap-3 w-full my-2">
+          <div className="grid grid-cols-3 gap-3 w-full my-2 select-none">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
               <button
                 key={digit}
                 type="button"
                 disabled={lockoutRemainingSec > 0}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleDigit(digit)}
-                className="size-16 rounded-full bg-card hover:bg-muted/60 active:scale-95 border border-border/80 flex items-center justify-center text-2xl font-mono font-medium text-foreground transition-all cursor-pointer shadow-none mx-auto disabled:opacity-30 disabled:pointer-events-none"
+                className="size-16 rounded-full bg-card hover:bg-muted/60 border border-border/80 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] flex items-center justify-center text-2xl font-mono font-medium text-foreground cursor-pointer shadow-none select-none mx-auto disabled:opacity-30 disabled:pointer-events-none"
               >
                 {digit}
               </button>
@@ -305,14 +306,15 @@ export function AppLockOverlay() {
                 <button
                   type="button"
                   disabled={lockoutRemainingSec > 0}
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {
                     setView('biometric');
                     setErrorMsg('');
                   }}
-                  className="size-16 rounded-full bg-card hover:bg-muted/60 active:scale-95 border border-border/80 flex items-center justify-center text-foreground transition-all cursor-pointer shadow-none disabled:opacity-30"
+                  className="size-16 rounded-full bg-card hover:bg-muted/60 border border-border/80 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] flex items-center justify-center text-foreground cursor-pointer shadow-none select-none disabled:opacity-30 group"
                   title={t('security.biometricButtonTitle')}
                 >
-                  <Fingerprint className="size-6 text-primary" />
+                  <Fingerprint className="size-6 text-primary group-active:text-background transition-colors" />
                 </button>
               )}
             </div>
@@ -321,8 +323,9 @@ export function AppLockOverlay() {
             <button
               type="button"
               disabled={lockoutRemainingSec > 0}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleDigit('0')}
-              className="size-16 rounded-full bg-card hover:bg-muted/60 active:scale-95 border border-border/80 flex items-center justify-center text-2xl font-mono font-medium text-foreground transition-all cursor-pointer shadow-none mx-auto disabled:opacity-30 disabled:pointer-events-none"
+              className="size-16 rounded-full bg-card hover:bg-muted/60 border border-border/80 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] flex items-center justify-center text-2xl font-mono font-medium text-foreground cursor-pointer shadow-none select-none mx-auto disabled:opacity-30 disabled:pointer-events-none"
             >
               0
             </button>
@@ -332,8 +335,10 @@ export function AppLockOverlay() {
               <button
                 type="button"
                 disabled={enteredPin.length === 0}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleDelete}
-                className="size-16 rounded-full bg-transparent hover:bg-muted/30 active:scale-95 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all cursor-pointer disabled:opacity-20 disabled:pointer-events-none"
+                className="size-16 rounded-full bg-card hover:bg-muted/60 border border-border/80 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] flex items-center justify-center text-muted-foreground hover:text-foreground active:text-background cursor-pointer shadow-none select-none disabled:opacity-20 disabled:pointer-events-none"
+                title={t('keypad.backspace', '退格')}
               >
                 <Delete className="size-6" />
               </button>

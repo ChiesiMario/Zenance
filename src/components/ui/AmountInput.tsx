@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, forwardRef, useImperative
 import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { AmountPopoverKeypad } from '@/components/ui/AmountPopoverKeypad';
-import { sanitizeAmountInput, evaluateAmountExpression, cn } from '@/lib/utils';
+import { sanitizeAmountInput, evaluateAmountExpression, formatDisplayAmount, cn } from '@/lib/utils';
 
 export interface AmountInputProps extends Omit<React.ComponentProps<'input'>, 'onChange'> {
   value?: string;
@@ -184,9 +184,40 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
+    const input = e.target;
+    const raw = input.value;
+    const cursorPos = input.selectionStart ?? raw.length;
+
+    // 計算當前游標左側有多少個「非逗號」字元
+    let nonCommaBeforeCursor = 0;
+    for (let i = 0; i < cursorPos; i++) {
+      if (raw[i] !== ',') {
+        nonCommaBeforeCursor++;
+      }
+    }
+
     const clean = sanitizeAmountInput(raw, { allowNegative });
+    const nextDisplay = formatDisplayAmount(clean, { preserveEmpty: true });
+
+    let nextCursorPos = 0;
+    let countedNonComma = 0;
+    for (let i = 0; i < nextDisplay.length; i++) {
+      if (countedNonComma >= nonCommaBeforeCursor) {
+        break;
+      }
+      if (nextDisplay[i] !== ',') {
+        countedNonComma++;
+      }
+      nextCursorPos = i + 1;
+    }
+
     triggerChange(clean);
+
+    requestAnimationFrame(() => {
+      if (inputRef.current && document.activeElement === inputRef.current) {
+        inputRef.current.setSelectionRange(nextCursorPos, nextCursorPos);
+      }
+    });
   };
 
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -245,6 +276,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   };
 
   const effectiveInputMode = disableKeypad || isMobile ? "decimal" : "none";
+  const displayValue = formatDisplayAmount(value, { preserveEmpty: true });
 
   return (
     <>
@@ -253,7 +285,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
           ref={inputRef}
           type="text"
           inputMode={effectiveInputMode}
-          value={value}
+          value={displayValue}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
@@ -267,7 +299,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
           ref={inputRef}
           type="text"
           inputMode={effectiveInputMode}
-          value={value}
+          value={displayValue}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}

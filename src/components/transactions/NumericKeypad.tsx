@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '@/components/ui/button';
 import { 
   Delete, 
   CalendarDays, 
@@ -342,6 +341,9 @@ export function NumericKeypad({
 
     return budgets.filter(b => !b.deleted);
   }, [budgets, date]);
+
+  const btnBaseClass =
+    "w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono font-medium rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none";
 
   return (
     <div className="grid grid-cols-4 gap-1.5 w-full select-none touch-manipulation">
@@ -687,37 +689,53 @@ export function NumericKeypad({
       </div>
 
       {/* Row 2 */}
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('1')}>1</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('2')}>2</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('3')}>3</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 rounded-lg bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('DEL')}>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('1')}>1</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('2')}>2</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('3')}>3</button>
+      <button 
+        type="button" 
+        onMouseDown={(e) => e.preventDefault()} 
+        className="w-full h-[38px] sm:h-10 rounded-lg bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none" 
+        onClick={() => handleKeyPress('DEL')}
+        title={t('keypad.backspace', '退格')}
+      >
         <Delete className="size-4.5" />
-      </Button>
+      </button>
 
       {/* Row 3 */}
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('4')}>4</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('5')}>5</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('6')}>6</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('-')}>-</Button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('4')}>4</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('5')}>5</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('6')}>6</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('-')}>-</button>
 
       {/* Row 4 */}
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('7')}>7</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('8')}>8</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('9')}>9</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('+')}>+</Button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('7')}>7</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('8')}>8</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('9')}>9</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('+')}>+</button>
       
       {/* Row 5 */}
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('.')}>.</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono rounded-lg bg-muted/60 text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('0')}>0</Button>
-      <Button variant="ghost" className="w-full h-[38px] sm:h-10 text-xs sm:text-sm font-mono rounded-lg bg-muted/60 tracking-wider text-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors active:scale-95" onClick={() => handleKeyPress('00')}>00</Button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('.')}>.</button>
+      <button type="button" onMouseDown={(e) => e.preventDefault()} className={btnBaseClass} onClick={() => handleKeyPress('0')}>0</button>
+      <button 
+        type="button" 
+        onMouseDown={(e) => e.preventDefault()} 
+        className="w-full h-[38px] sm:h-10 text-xs sm:text-sm font-mono tracking-wider font-medium rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none" 
+        onClick={() => handleKeyPress('00')}
+      >
+        00
+      </button>
       <button 
         type="button"
-        className={cn("w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-all active:scale-95 border cursor-pointer shadow-none", 
+        onMouseDown={(e) => e.preventDefault()}
+        className={cn(
+          "w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-transform duration-75 active:scale-[0.96] border cursor-pointer shadow-none select-none", 
           isExpression
-            ? "bg-muted/60 text-foreground hover:bg-muted border-border/40 font-bold"
-            : "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-primary font-bold"
+            ? "bg-muted/60 text-foreground hover:bg-muted border-border/40 font-bold active:bg-foreground active:text-background active:border-foreground"
+            : "bg-primary text-primary-foreground hover:bg-primary/90 border-primary font-bold active:bg-primary/80"
         )} 
         onClick={() => handleKeyPress('=')}
+        title={isExpression ? t('keypad.calculate', '計算') : t('keypad.done', '完成')}
       >
         {isExpression ? (
           <Equal className="size-5" />

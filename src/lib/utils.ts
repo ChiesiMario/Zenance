@@ -101,8 +101,19 @@ export function formatCompactAmount(val: number, currencySymbol: string = ''): s
 }
 
 
-export function formatDisplayAmount(amountStr: string): string {
-  if (!amountStr) return '0';
+export function formatDisplayAmount(
+  amountStr: string,
+  options?: { preserveEmpty?: boolean }
+): string {
+  if (!amountStr) {
+    return options?.preserveEmpty ? '' : '0';
+  }
+  if (amountStr === '-') {
+    return '-';
+  }
+  if (amountStr === '-.') {
+    return '-0.';
+  }
 
   const hasOperators = /[+\-*/]/.test(amountStr) && !/^[+-]?\d+(\.\d+)?$/.test(amountStr);
   if (hasOperators) {

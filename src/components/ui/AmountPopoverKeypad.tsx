@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Delete, Check, Equal, ChevronDown } from 'lucide-react';
+import { Delete, Check, Equal, X } from 'lucide-react';
 import { cn, evaluateAmountExpression } from '@/lib/utils';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -48,22 +48,6 @@ export function AmountPopoverKeypad({
     return /[+-]/.test(value.replace(/^[+-]/, ''));
   }, [value]);
 
-  // Live preview display
-  const previewDisplay = useMemo(() => {
-    if (!value) return '0.00';
-    if (isExpression) {
-      const evaluated = evaluateAmountExpression(value, allowNegative);
-      if (evaluated && evaluated !== value) {
-        return `= ${evaluated}`;
-      }
-      return value;
-    }
-    // Format pure number with commas for readability
-    const parts = value.split('.');
-    const intPart = (parts[0] || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const decPart = parts.length > 1 ? '.' + parts[1] : '';
-    return intPart + decPart;
-  }, [value, isExpression, allowNegative]);
 
   const handleKey = (key: string) => {
     if (key === 'C') {
@@ -219,35 +203,25 @@ export function AmountPopoverKeypad({
     >
       {/* Top Helper Bar */}
       <div className="flex items-center justify-between pb-2 border-b border-border/60">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground shrink-0">
-            {t('keypad.current', '當前')}:
-          </span>
-          <span className="text-xs sm:text-sm font-mono font-bold text-emerald-500 dark:text-emerald-400 truncate">
-            {previewDisplay}
-          </span>
-        </div>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => handleKey('C')}
+          className="text-xs font-medium h-7 px-2.5 rounded-md bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted active:bg-foreground active:text-background transition-transform duration-75 active:scale-95 cursor-pointer"
+          title={t('keypad.clear', '清空')}
+        >
+          {t('keypad.clear', '清空')}
+        </button>
 
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleKey('C')}
-            className="text-xs font-mono h-7 px-2.5 rounded-md bg-muted/60 text-foreground hover:bg-muted active:bg-foreground active:text-background transition-transform duration-75 active:scale-95 cursor-pointer"
-            title={t('keypad.clear', '清空')}
-          >
-            C
-          </button>
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onClose?.()}
-            className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:bg-foreground active:text-background transition-transform duration-75 active:scale-95 cursor-pointer"
-            title={t('keypad.collapse', '收起鍵盤')}
-          >
-            <ChevronDown className="size-4" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onClose?.()}
+          className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted active:bg-foreground active:text-background transition-transform duration-75 active:scale-95 cursor-pointer"
+          title={t('keypad.collapse', '收起鍵盤')}
+        >
+          <X className="size-4" />
+        </button>
       </div>
 
       {/* 4x4 Grid Buttons */}

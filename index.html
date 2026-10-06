@@ -46,24 +46,6 @@
         color: var(--app-fg);
         overflow: hidden;
       }
-      #app-shell-bar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 2px;
-        width: 0%;
-        background-color: var(--app-fg);
-        z-index: 100000;
-        pointer-events: none;
-        animation: appShellProgress 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        transition: width 0.2s ease, opacity 0.3s ease;
-      }
-      @keyframes appShellProgress {
-        0% { width: 0%; opacity: 1; }
-        25% { width: 45%; }
-        60% { width: 75%; }
-        100% { width: 88%; }
-      }
       #app-shell-fallback {
         position: fixed;
         inset: 0;
@@ -131,22 +113,11 @@
 
         window.__dismissAppShell = function() {
           clearTimeout(watchdogTimer);
-          var bar = document.getElementById('app-shell-bar');
-          if (bar) {
-            bar.style.width = '100%';
-            setTimeout(function() {
-              bar.style.opacity = '0';
-              setTimeout(function() {
-                if (bar.parentNode) bar.parentNode.removeChild(bar);
-              }, 300);
-            }, 150);
-          }
         };
       })();
     </script>
   </head>
   <body>
-    <div id="app-shell-bar"></div>
     <div id="root">
       <div id="app-shell-fallback">
         <div class="app-shell-icon">

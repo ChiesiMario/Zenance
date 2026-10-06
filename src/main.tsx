@@ -60,7 +60,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// 平滑關閉 PWA 首屏進度條與看門狗
+// 平滑關閉 PWA 首屏看門狗
 if (typeof (window as any).__dismissAppShell === 'function') {
   (window as any).__dismissAppShell();
 }

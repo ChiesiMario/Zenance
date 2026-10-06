@@ -270,3 +270,23 @@ export function getLocalDateString(d: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * 格式化時間為 24 小時制 (HH:mm 或 HH:mm:ss)
+ */
+export function format24Time(timestamp: number | string | Date, includeSeconds = false): string {
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    if (includeSeconds) {
+      return `${hours}:${minutes}:${pad(date.getSeconds())}`;
+    }
+    return `${hours}:${minutes}`;
+  } catch {
+    return '';
+  }
+}
+
+

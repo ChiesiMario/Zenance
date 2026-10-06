@@ -61,6 +61,49 @@ export function triggerSyncUnlockNeeded(mode: 'auto' | 'overwrite_local' | 'over
   });
 }
 
+export interface SyncEngineStatus {
+  isSyncing: boolean;
+  lastSyncTime: string | null;
+  lastSyncError: string | null;
+  justSynced: boolean;
+}
+
+let currentSyncStatus: SyncEngineStatus = {
+  isSyncing: false,
+  lastSyncTime: null,
+  lastSyncError: null,
+  justSynced: false,
+};
+
+const syncStatusListeners = new Set<(status: SyncEngineStatus) => void>();
+let justSyncedTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function getSyncEngineStatus(): SyncEngineStatus {
+  if (currentSyncStatus.lastSyncTime === null) {
+    currentSyncStatus.lastSyncTime = getLastSyncTime();
+  }
+  return { ...currentSyncStatus };
+}
+
+export function updateSyncEngineStatus(patch: Partial<SyncEngineStatus>): void {
+  currentSyncStatus = { ...currentSyncStatus, ...patch };
+  syncStatusListeners.forEach((fn) => {
+    try {
+      fn(currentSyncStatus);
+    } catch (e) {
+      console.error('Error in sync status listener:', e);
+    }
+  });
+}
+
+export function onSyncEngineStatusChange(listener: (status: SyncEngineStatus) => void): () => void {
+  syncStatusListeners.add(listener);
+  listener(getSyncEngineStatus());
+  return () => {
+    syncStatusListeners.delete(listener);
+  };
+}
+
 export interface SyncManifestLedgerStats {
   accountsCount: number;
   contactsCount: number;
@@ -129,6 +172,7 @@ export function getLastSyncTime(): string | null {
 
 export function setLastSyncTime(isoTime: string): void {
   localStorage.setItem(LAST_SYNC_KEY, isoTime);
+  updateSyncEngineStatus({ lastSyncTime: isoTime });
 }
 
 export function getCachedRevs(): Record<string, string> {
@@ -365,6 +409,8 @@ export async function executeSync(
     await initE2EEKey();
   }
 
+  updateSyncEngineStatus({ isSyncing: true, lastSyncError: null, justSynced: false });
+
   // 1. 純覆蓋雲端模式 (Overwrite Remote，例如停用 E2EE 覆寫明文或全量推送)
   if (mode === 'overwrite_remote') {
     if (isE2EEEnabled() && !isE2EEUnlocked()) {
@@ -391,9 +437,25 @@ export async function executeSync(
       setPushedTimes(pushedTimes);
       setLastSyncTime(now);
 
+      if (justSyncedTimer) clearTimeout(justSyncedTimer);
+      updateSyncEngineStatus({
+        isSyncing: false,
+        lastSyncTime: now,
+        lastSyncError: null,
+        justSynced: true,
+      });
+      justSyncedTimer = setTimeout(() => {
+        updateSyncEngineStatus({ justSynced: false });
+      }, 2500);
+
       return { success: true, timestamp: now, actionTaken: 'uploaded_local' };
     } catch (error: any) {
       console.error('Overwrite remote error:', error);
+      updateSyncEngineStatus({
+        isSyncing: false,
+        lastSyncError: error?.message || 'Overwrite remote error',
+        justSynced: false,
+      });
       return {
         success: false,
         timestamp: new Date().toISOString(),
@@ -844,6 +906,17 @@ export async function executeSync(
     setPushedTimes(pushedTimes);
     setLastSyncTime(now);
 
+    if (justSyncedTimer) clearTimeout(justSyncedTimer);
+    updateSyncEngineStatus({
+      isSyncing: false,
+      lastSyncTime: now,
+      lastSyncError: null,
+      justSynced: true,
+    });
+    justSyncedTimer = setTimeout(() => {
+      updateSyncEngineStatus({ justSynced: false });
+    }, 2500);
+
     return {
       success: true,
       timestamp: now,
@@ -861,6 +934,11 @@ export async function executeSync(
     if (isLocked) {
       triggerSyncUnlockNeeded(mode);
     }
+    updateSyncEngineStatus({
+      isSyncing: false,
+      lastSyncError: isLocked ? null : (error?.message || 'Unknown sync error'),
+      justSynced: false,
+    });
     return {
       success: false,
       timestamp: new Date().toISOString(),

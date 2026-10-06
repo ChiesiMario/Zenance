@@ -852,6 +852,22 @@
       "startUsingBtn": "开始使用",
       "cancelBtn": "取消同步",
       "cancelToast": "已取消同步，云端数据未应用至本地"
+    },
+    "syncStatus": {
+      "offline": "离线",
+      "syncing": "同步中",
+      "synced": "已同步",
+      "connected": "已连接",
+      "disconnected": "未连接",
+      "failed": "同步失败",
+      "locked": "已锁定",
+      "connectDialogTitle": "连接 Dropbox 云端同步",
+      "connectDialogDesc": "通过 Dropbox 提供多设备端到端加密（E2EE）备份与无缝实时同步。数据在本地完成加密后方才传输，保护您的财务隐私。",
+      "connectAction": "前往连接",
+      "offlineToast": "目前处于离线状态，将于连线后自动同步",
+      "reconnectingToast": "正在检查网络连线...",
+      "retryToast": "正在重试同步...",
+      "lastSyncPrefix": "上次同步"
     }
   }
 }

@@ -852,6 +852,22 @@
       "startUsingBtn": "Start Using",
       "cancelBtn": "Cancel Sync",
       "cancelToast": "Initial sync canceled. No remote data was applied."
+    },
+    "syncStatus": {
+      "offline": "Offline",
+      "syncing": "Syncing",
+      "synced": "Synced",
+      "connected": "Connected",
+      "disconnected": "Not Connected",
+      "failed": "Sync Failed",
+      "locked": "Locked",
+      "connectDialogTitle": "Connect Dropbox Cloud Sync",
+      "connectDialogDesc": "Enable multi-device end-to-end encrypted (E2EE) backup and seamless real-time sync with Dropbox. Your financial data is encrypted locally before transmission.",
+      "connectAction": "Connect Dropbox",
+      "offlineToast": "Currently offline. Sync will resume once reconnected.",
+      "reconnectingToast": "Checking network connection...",
+      "retryToast": "Retrying sync...",
+      "lastSyncPrefix": "Last synced"
     }
   }
 }

@@ -7,9 +7,12 @@ import {
 } from '@/services/sync/dropboxAuth';
 import {
   executeSync,
-  getLastSyncTime,
   scheduleAutoSync,
   onSyncUnlockNeeded,
+  onSyncEngineStatusChange,
+  getSyncEngineStatus,
+  updateSyncEngineStatus,
+  type SyncEngineStatus,
   type SyncResult,
 } from '@/services/sync/syncEngine';
 import { toast } from '@/components/ui/toast';
@@ -19,10 +22,13 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 export function useDropboxSync() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(isDropboxConnected());
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string | null>(getLastSyncTime());
+  const [syncState, setSyncState] = useState<SyncEngineStatus>(getSyncEngineStatus);
   const isOnline = useNetworkStatus();
   const prevIsOnlineRef = useRef(isOnline);
+
+  useEffect(() => {
+    return onSyncEngineStatusChange(setSyncState);
+  }, []);
 
 
 
@@ -137,6 +143,7 @@ export function useDropboxSync() {
   const disconnectDropbox = useCallback(() => {
     clearDropboxTokens();
     setIsAuthenticated(false);
+    updateSyncEngineStatus({ lastSyncError: null, justSynced: false, lastSyncTime: null });
     toast.show('已中斷與 Dropbox 的連結');
   }, []);
 
@@ -145,20 +152,18 @@ export function useDropboxSync() {
     async (
       mode: 'auto' | 'overwrite_local' | 'overwrite_remote' = 'auto'
     ): Promise<SyncResult> => {
-      if (isSyncing) {
+      if (syncState.isSyncing) {
         return { success: false, timestamp: new Date().toISOString(), actionTaken: 'up_to_date' };
       }
 
-      if (!navigator.onLine) {
+      if (!isOnline) {
         toast.show('目前處於離線狀態，將於連線後自動同步');
         return { success: false, timestamp: new Date().toISOString(), actionTaken: 'up_to_date' };
       }
 
-      setIsSyncing(true);
       try {
         const result = await executeSync(mode);
         if (result.success) {
-          setLastSyncTime(getLastSyncTime());
           if (mode === 'overwrite_remote') {
             toast.show('雲端所有備份已全數加密更新完成');
           } else {
@@ -171,37 +176,36 @@ export function useDropboxSync() {
           toast.show('同步未完成：' + (result.error || '請重試'));
         }
         return result;
-      } finally {
-        setIsSyncing(false);
+      } catch (err: any) {
+        toast.show('同步未完成：' + (err?.message || '請重試'));
+        return { success: false, timestamp: new Date().toISOString(), error: err?.message, actionTaken: 'up_to_date' };
       }
     },
-    [isSyncing]
+    [syncState.isSyncing, isOnline]
   );
 
   // 解鎖成功後自動恢復被中斷的同步任務
   const handleUnlockSuccess = useCallback(async () => {
     setIsUnlockModalOpen(false);
-    setIsSyncing(true);
     try {
       const mode = pendingSyncModeRef.current;
       const res = await executeSync(mode);
       if (res.success) {
-        setLastSyncTime(getLastSyncTime());
         toast.show('E2EE 已解鎖，同步完成');
       } else {
         toast.show('同步未完成：' + (res.error || '請重試'));
       }
-    } finally {
-      setIsSyncing(false);
+    } catch (err: any) {
+      toast.show('同步未完成：' + (err?.message || '請重試'));
     }
   }, []);
 
-
-
   return {
     isAuthenticated,
-    isSyncing,
-    lastSyncTime,
+    isSyncing: syncState.isSyncing,
+    lastSyncTime: syncState.lastSyncTime,
+    lastSyncError: syncState.lastSyncError,
+    justSynced: syncState.justSynced,
     isOnline,
     isUnlockModalOpen,
     setIsUnlockModalOpen,

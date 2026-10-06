@@ -1,94 +1,83 @@
-# Root Cause 診斷報告：PWA 離線模式下啟動直接被瀏覽器提示「無網絡，無法打開網頁」
+# Root Cause 診斷報告：手機端離線狀態下進入應用，右上角離線膠囊提示未顯示
 
 ## 1. 故障現象描述
 
-在手機端將 Zenance 安裝為 PWA 或直接訪問後，於離線（關閉 Wi-Fi / 行動網路 / 開啟飛航模式）狀態下點擊開啟應用，瀏覽器未呈現任何本地快取的應用內容，而是直接彈出系統原生的錯誤畫面：
-> **「無網絡，無法打開網頁」**（Chrome 的 ERR_INTERNET_DISCONNECTED / Safari 的「無法打開網頁，因為您的 iPhone 未連接到互聯網」）。
+在手機端（iOS / Android）處於完全離線（開啟飛航模式或關閉 Wi-Fi 與行動網路）狀態下點擊開啟 Zenance PWA：
+- 應用程式得益於先前修復的 Service Worker 本地預快取機制，能夠順暢開啟並載入首頁（Dashboard）。
+- 然而，首頁右上角預期的「離線膠囊提示」（帶有琥珀色脈衝圓點與 `OFFLINE` / `離線` 字樣的徽章）**完全沒有出現**。
 
 ---
 
 ## 2. 核心代碼定位
 
-### 關鍵檔案 1：`vite.config.ts`（第 41～53 行）
+### 關鍵檔案 1：`src/hooks/useNetworkStatus.ts`（第 6～25 行）
 
 ```typescript
-workbox: {
-  globPatterns: ['**/*.{js,css,html,svg,woff2,webmanifest}'],
-  cleanupOutdatedCaches: true,
-  clientsClaim: true,
-  skipWaiting: true,
-  navigateFallback: '/index.html',
-  navigateFallbackAllowlist: [/^(?!\/__).*/],
-  runtimeCaching: [
-    {
-      // 致命衝突點：自定義的 NetworkFirst 搶先攔截了導航請求
-      urlPattern: ({ request }) => request.mode === 'navigate',
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'zenance-nav-cache',
-        networkTimeoutSeconds: 1.5,
-        cacheableResponse: {
-          statuses: [0, 200],
-        },
-      },
-    },
-  ],
-},
-```
+export function useNetworkStatus(): boolean {
+  // 缺陷點 1：初始狀態盲目信任 navigator.onLine
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
 
-### 關鍵檔案 2：`dist/sw.js`（Workbox 編譯後的路由註冊順序）
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-```javascript
-// 路由 1：Workbox 的預快取導航回退
-e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("/index.html"),{allowlist:[/^(?!\/__).*/]}));
+    // 缺陷點 2：僅監聽動態切換事件，冷啟動時無事件觸發
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
-// 路由 2：手動添加的 NetworkFirst 運行時快取規則
-e.registerRoute(({request:e})=>"navigate"===e.mode, new e.NetworkFirst({cacheName:"zenance-nav-cache",networkTimeoutSeconds:1.5,...}), "GET");
-```
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
-### 關鍵檔案 3：`src/main.tsx`（第 17～33 行）
-
-```typescript
-// 本機開發環境 (npm run dev) 主動清理並註銷殘留的 Service Worker
-if (import.meta.env.DEV) {
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const registration of registrations) {
-        registration.unregister(); // <--- 開發模式下主動註銷所有 SW
-      }
-    });
-  }
-} else {
-  registerSW({
-    immediate: true,
-    ...
-  });
+  return isOnline;
 }
 ```
+
+### 關鍵檔案 2：`src/pages/Dashboard.tsx`（第 365～374 行）
+
+```tsx
+<div className="flex items-center gap-1.5 -mr-2 shrink-0">
+  {/* 依賴 isOnline 控制渲染，當 isOnline 誤判為 true 時整塊被省略 */}
+  {!isOnline && (
+    <span
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-border text-[10px] font-mono uppercase tracking-wider text-muted-foreground bg-muted/40 select-none"
+      title={t('common.offline', '離線')}
+    >
+      <span className="size-1.5 rounded-full bg-amber-500/80 animate-pulse" />
+      {t('common.offline', '離線')}
+    </span>
+  )}
+  <Link to="/reports" ...>
+  <Link to="/settings" ...>
+</div>
+```
+
+### 關鍵檔案 3：`src/hooks/useDropboxSync.ts`（第 23 行、89～108 行）
+
+具有完全相同的獨立 `isOnline` 狀態管理機制，同樣僅依賴 `navigator.onLine` 與 `window.addEventListener`。
 
 ---
 
 ## 3. 根因剖析 (Root Cause Analysis)
 
-經過對 PWA Service Worker 路由匹配鏈、快取分區與測試運行環境的深入排查，導致離線時直接跳出原生「無網絡」錯誤頁面的根因如下：
+### 根本原因 A：行動端 WebKit / Android PWA 冷啟動時 `navigator.onLine` 存在「預設假在線 (False Positive)」缺陷
+1. W3C 規範中 `navigator.onLine` 僅表示「設備是否具有網路配接卡或能力」，而非「是否能實際連通網際網路」。
+2. 在 iOS Safari standalone PWA（WebKit 核心）以及部分 Android 系統中，當應用程式處於冷啟動（Cold Boot）時，**WebKit 核心會將 `navigator.onLine` 預設初始化為 `true`**。
+3. WebKit 只有在實際發起網路傳輸並遭遇底層 TCP/DNS 握手失敗，或是接收到作業系統廣播的動態網路變更時，才會將其修正為 `false`。
 
-### 根本原因 A：Workbox `runtimeCaching` 劫持導航請求，引發獨立快取擊穿 (Runtime Navigation Cache Miss & Exception)
-1. **快取存儲分區隔離**：
-   - Workbox 將 `globPatterns` 匹配的所有構建產物（包括 `/index.html`、JS、CSS 等）存放在專屬的 **預快取池 (Precache Storage，如 `workbox-precache-v2-...`)** 中。
-   - 在 `vite.config.ts` 中配置的 `runtimeCaching` 規則則指定了獨立的運行時快取池 `cacheName: 'zenance-nav-cache'`。
-2. **命中失敗與例外拋出**：
-   - 當手機在離線狀態下發起導航請求（開啟 PWA）時，`request.mode === 'navigate'` 匹配到了自定義的 `NetworkFirst` 規則。
-   - `NetworkFirst` 首先發起網路請求，因離線而立刻失敗；緊接著在 `zenance-nav-cache` 中尋找請求對應的快取回應。
-   - **此時 `zenance-nav-cache` 中根本沒有 `/index.html`**（因為它一直存在於預快取池中，而非該運行時快取池）。
-   - 當網路與快取皆未命中時，Workbox 底層的 `NetworkFirst` 策略會直接拋出 `no-response` 致命異常（Unhandled Promise Rejection）。
-3. **瀏覽器接管報錯**：
-   - 由於 Service Worker 的 `fetch` 事件拋出異常且未返回有效的 `Response`，Service Worker 處理流程崩潰。
-   - 這導致 Workbox 原生的 `NavigationRoute`（`createHandlerBoundToURL('/index.html')`）無法正常發揮作用，瀏覽器底層判定請求失敗，直接降級呈現系統原生的「無網絡，無法打開網頁」頁面。
+### 根本原因 B：事件監聽機制無法感知「冷啟動前即斷網」的靜態離線狀態
+1. `window.addEventListener('offline', ...)` 是瀏覽器的狀態轉移事件（State Transition Event）。
+2. **只有當設備在頁面執行期間發生「從連線 ➔ 斷線」的切換時，該事件才會被廣播。**
+3. 用戶在測試時，通常是「先將手機切斷網路 / 開啟飛航模式」，然後再「點開 PWA 圖示啟動應用」。
+4. 由於進入應用前設備就已經是離線狀態，系統在應用啟動後**完全不會發出任何 `'offline'` 事件**，導致 `handleOffline` 從未被執行。
 
----
-
-### 根本原因 B：本機開發環境 (`npm run dev`) 下 Service Worker 完全未生效 (Dev Mode SW Disabled)
-若使用者是在目前執行的 `npm run dev` 環境下（例如透過區域網路 IP `http://192.168.x.x:3011` 在手機端打開並測試）：
-1. **主動註銷邏輯**：[`src/main.tsx`](file:///d:/GitHub/Zenance/src/main.tsx) 中明確限制了 `if (import.meta.env.DEV)` 會遍歷並**主動註銷 (unregister) 所有 Service Worker**，且不會調用 `registerSW()`。
-2. **非安全上下文限制 (Insecure Context)**：手機若透過 HTTP 內網 IP 訪問，瀏覽器會判定其為非 HTTPS 不安全來源，原生層級即完全禁止啟用 Service Worker。
-3. 在沒有任何 Service Worker 攔截與背景託管的情況下，手機一旦離線刷新，瀏覽器勢必直接顯示「無網絡」錯誤。
+### 根本原因 C：完全缺乏主動式連通性探針 (Lack of Active Connectivity Probe)
+1. 整個應用程式在啟動與掛載過程中，完全沒有任何主動式的網路探針檢測機制。
+2. 由於 Service Worker 正確攔截了導航請求，首頁的 HTML、JS、CSS、字體等資源皆在毫秒級由本地 CacheStorage 成功返回（HTTP 200）。
+3. 整個渲染過程**完全沒有任何發往外部伺服器的請求遭遇失敗**。
+4. 瀏覽器內核始終沒有任何機會發現「當前其實沒有網路」，導致 `useNetworkStatus()` 的內部 state 永遠鎖死在初始值 `true`。
+5. 最終導致 `Dashboard.tsx` 中的 `!isOnline` 條件判定為 `false`，離線膠囊節點被 React 徹底跳過，不進行任何渲染。

@@ -15,12 +15,14 @@ import {
 import { toast } from '@/components/ui/toast';
 import { startInitialSync } from '@/services/sync/initialSyncManager';
 import { useAppStore } from '@/store/useAppStore';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 export function useDropboxSync() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(isDropboxConnected());
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(getLastSyncTime());
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const isOnline = useNetworkStatus();
+  const prevIsOnlineRef = useRef(isOnline);
 
 
 
@@ -59,14 +61,14 @@ export function useDropboxSync() {
 
   // 應用啟動與切回視窗時主動檢查遠端是否有更新 (感應用戶在其他設備的變更)
   useEffect(() => {
-    if (isDropboxConnected() && navigator.onLine) {
+    if (isDropboxConnected() && isOnline) {
       scheduleAutoSync(1500);
     }
 
     let lastCheckTime = Date.now();
     const handleFocus = () => {
       const now = Date.now();
-      if (now - lastCheckTime > 8000 && isDropboxConnected() && navigator.onLine) {
+      if (now - lastCheckTime > 8000 && isDropboxConnected() && isOnline) {
         lastCheckTime = now;
         scheduleAutoSync(1000);
       }
@@ -86,26 +88,15 @@ export function useDropboxSync() {
     };
   }, []);
 
-  // 監聽連網/離線狀態
+  // 網路恢復時自動補發同步
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
+    if (!prevIsOnlineRef.current && isOnline) {
       if (isDropboxConnected()) {
         scheduleAutoSync(1000); // 網路恢復 1 秒後自動補發同步
       }
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+    }
+    prevIsOnlineRef.current = isOnline;
+  }, [isOnline]);
 
   // 首次載入偵測 OAuth 回調代碼 (?code=...)
   useEffect(() => {

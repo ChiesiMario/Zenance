@@ -232,13 +232,13 @@ export function AppLockOverlay() {
       {view === 'biometric' ? (
         /* 生物辨識首選視圖 (Biometric-First View) */
         <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
-          {/* Top Logo & Status */}
-          <div className="mb-4 flex flex-col items-center">
-            <div className="size-14 rounded-2xl bg-card border border-border shadow-none flex items-center justify-center mb-3">
-              <Logo size={32} showBorder={false} />
+          {/* Top Brand Logo & Status */}
+          <div className="mb-4 flex flex-col items-center select-none">
+            <div className="mb-3 flex items-center justify-center">
+              <Logo variant="monogram" size={44} className="text-foreground transition-transform duration-300" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
-              <Lock className="size-4 text-primary" />
+            <h1 className="text-base font-semibold tracking-tight text-foreground flex items-center gap-1.5">
+              <Lock className="size-3.5 text-primary" />
               <span>{t('security.appLocked')}</span>
             </h1>
             <p className={cn("text-xs mt-1 min-h-[1.25rem] leading-relaxed transition-colors", errorMsg ? "text-rose-500 font-medium" : "text-muted-foreground")}>
@@ -283,16 +283,16 @@ export function AppLockOverlay() {
         </div>
       ) : view === 'pin' ? (
         <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
-          {/* Top Logo & Status */}
-          <div className="mb-6 flex flex-col items-center">
-            <div className="size-14 rounded-2xl bg-card border border-border shadow-none flex items-center justify-center mb-3">
-              <Logo size={32} showBorder={false} />
+          {/* Top Brand Logo & Status */}
+          <div className="mb-5 flex flex-col items-center select-none">
+            <div className="mb-3 flex items-center justify-center">
+              <Logo variant="monogram" size={44} className="text-foreground transition-transform duration-300" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-1.5">
-              <Lock className="size-4 text-primary" />
+            <h1 className="text-base font-semibold tracking-tight text-foreground flex items-center gap-1.5">
+              <Lock className="size-3.5 text-primary" />
               <span>{t('security.appLocked')}</span>
             </h1>
-            <p className={cn("text-xs mt-1 transition-colors", isError ? "text-rose-500 font-medium" : "text-muted-foreground")}>
+            <p className={cn("text-xs mt-1 min-h-[1.25rem] transition-colors leading-relaxed", isError || errorMsg ? "text-rose-500 font-medium" : "text-muted-foreground")}>
               {lockoutRemainingSec > 0
                 ? t('security.lockoutWait', { seconds: lockoutRemainingSec })
                 : errorMsg || t('security.enterPinPrompt')}
@@ -410,14 +410,15 @@ export function AppLockOverlay() {
       ) : (
         /* 救急/重設視圖 (原位切換，零彈窗衝突) */
         <div className="w-full max-w-[280px] flex flex-col items-center text-center animate-in fade-in duration-200">
-          <div className="mb-6 flex flex-col items-center">
-            <div className="size-14 rounded-2xl bg-card border border-border shadow-none flex items-center justify-center mb-3">
-              <KeyRound className="size-7 text-primary" strokeWidth={1.5} />
+          {/* Top Brand Logo & Status */}
+          <div className="mb-6 flex flex-col items-center select-none">
+            <div className="mb-3 flex items-center justify-center text-primary">
+              <KeyRound className="size-10 text-primary" strokeWidth={1.5} />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-foreground">
+            <h1 className="text-base font-semibold tracking-tight text-foreground">
               {t('security.forgotPinTitle')}
             </h1>
-            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
               {recoverMethod === 'e2ee'
                 ? t('security.forgotPinDescE2ee')
                 : recoverMethod === 'question'

@@ -5,14 +5,38 @@ export interface LogoProps extends React.SVGProps<SVGSVGElement> {
   size?: number | string;
   className?: string;
   showBorder?: boolean;
+  variant?: 'app-icon' | 'monogram';
 }
 
 export function Logo({
   size = 48,
   className,
   showBorder = true,
+  variant = 'app-icon',
   ...props
 }: LogoProps) {
+  if (variant === 'monogram') {
+    return (
+      <svg
+        viewBox="0 0 512 512"
+        width={size}
+        height={size}
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={cn("shrink-0 select-none overflow-visible text-foreground", className)}
+        {...props}
+      >
+        {/* Zenance 純向量幾何標誌：中央基準線與穿插 Z 符號 */}
+        <g stroke="currentColor" strokeWidth="40" strokeLinecap="round" strokeLinejoin="round">
+          {/* 中央基準線 */}
+          <path d="M 256 96 L 256 416" />
+          {/* 穿插的 Z 符號 */}
+          <path d="M 136 168 L 376 168 L 136 344 L 376 344" />
+        </g>
+      </svg>
+    );
+  }
+
   return (
     <svg
       viewBox="0 0 512 512"

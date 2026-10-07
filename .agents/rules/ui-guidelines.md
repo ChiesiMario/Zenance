@@ -57,5 +57,9 @@ trigger: always_on
 - **彈窗高度穩定性與防抖規範 (Dialog Height Stability & Anti-Jitter)**：
   - **嚴禁動態插入新元素撐大彈窗容器**：彈窗本體高度必須保持絕對穩定。嚴禁在交互過程中（例如表單驗證錯誤、動態提示、警告訊息等）動態在彈窗內部插入或移除額外的文字行或區塊從而導致彈窗高度突增（Layout Shift / Jitter），這會造成視覺跳動並破壞原生級精緻質感。
   - **狀態提示規範**：錯誤與警告應優先透過元件本身的視覺狀態切換（如輸入框文字變紅 `text-destructive`、邊框變色、確認按鈕動態禁用 `disabled`、既有佔位欄位狀態切換）或透過全域 Toast 提示呈現，確保彈窗幾何尺寸在任何互動狀態下均維持恆定。
+- **破壞性動作按鈕規範與動態變數透明度禁令 (Destructive Buttons & Dynamic Alpha Prohibition)**：
+  - **實色紅底白字規範**：二次確認與破壞性高危操作的 `destructive` 按鈕統一採用「實色紅底 + 純白文字（`bg-destructive text-destructive-foreground hover:opacity-90 active:opacity-80`）」，符合 Apple HIG 人機工程學與 Shadcn 規範，嚴禁使用 `bg-destructive/10 text-destructive` 等淡底弱化樣式。
+  - **嚴禁動態 CSS 變數透明度修飾符**：嚴禁在任何引用自動態 CSS 變數的屬性上直接附加 Tailwind 透明度修飾符（如 `bg-destructive/10`、`bg-background/80` 等），徹底杜絕 Tailwind v4 編譯為 `color-mix()` 導致舊版 WebKit（如 iPhone SE 1、iOS 15）觸發 100% 實心色 Fallback。
+
 
 

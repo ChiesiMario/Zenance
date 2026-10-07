@@ -11,7 +11,7 @@
 
 ---
 
-## 2. 八大經典踩坑案例深度剖析 (Eight Critical Case Studies)
+## 2. 九大經典踩坑案例深度剖析 (Nine Critical Case Studies)
 
 ### 案例 1：iOS Safari `100vh` 陷阱導致底部導航欄被擠出螢幕
 - **現象**：在 iPhone 移動端 Safari 瀏覽器中，底部導航欄（Bottom Navigation Bar）完全消失不可見。
@@ -161,6 +161,34 @@
 
 ---
 
+### 案例 9：Tailwind CSS v4 `bg-destructive/10` 依賴 `color-mix()` 導致 iOS 15 按鈕呈現 100% 實心紅（紅底紅字不可見）
+- **現象**：在 iPhone SE（第一代或運行 iOS <= 15.8 系統的設備）上，點擊刪除交易彈出的二次確認彈窗（`ConfirmDialog`）中，右側確認按鈕呈現為 100% 完全不透明的實心紅色背景，且按鈕文字也是紅色，導致紅底紅字完全融為一體，文字徹底不可見。其他平台（iOS 16+、Chrome、Desktop）則正常顯示為淡紅半透明背景配紅色文字。
+- **底層根本原因 (Root Cause)**：
+  - `button.tsx` 的 `destructive` 變體採用了帶透明度修飾符的類名 `bg-destructive/10`（深色模式下為 `dark:bg-destructive/20`），而 `--destructive` 引用的是動態 HEX 變數（`#ff0000` / `#ff453a`）。
+  - Tailwind CSS v4 在處理帶 CSS 變數的透明度修飾符時，編譯出的 CSS 規則依賴 CSS Color Module Level 4 的 `color-mix()` 函式，並在最外層提供了實色回退：
+    ```css
+    .bg-destructive\/10 {
+      background-color: var(--color-destructive); /* 不透明實色 Fallback */
+    }
+    @supports (color: color-mix(in oklab, red, red)) {
+      .bg-destructive\/10 {
+        background-color: color-mix(in oklab, var(--color-destructive) 10%, transparent);
+      }
+    }
+    ```
+  - Apple WebKit 直到 **iOS 16.2** 才實作 `color-mix()`。iOS 15 內建的 WebKit 對 `@supports` 判定為 `false`，強制觸發 Fallback 屬性 `background-color: var(--color-destructive)`。
+  - 結果按鈕背景變成了 100% 實色純紅，而文字顏色又是 `text-destructive`（純紅），文字直接被相同顏色的實色背景吞噬！
+- **標準解法 (Standard Fix)**：
+  - **回歸 Shadcn & Apple HIG 標準實色 Destructive 按鈕**：
+    將 `destructive` 變體宣告為實色紅底白字：
+    ```typescript
+    destructive:
+      "bg-destructive text-destructive-foreground hover:opacity-90 active:opacity-80",
+    ```
+  - 徹底避免在動態 CSS 變數上附加斜槓透明度（`/10`, `/20` 等），直接使用實色 `--destructive` 搭配純白 `--destructive-foreground`。在全平台與舊版 WebKit 上 100% 原生解析，白字在紅底上呈現最高對比度（WCAG AAA 級標準），文字絕對清晰可見。
+
+---
+
 ## 3. Zenance 跨端通用架構規範總覽 (Architecture Contract)
 
 ### 規範 1：樹狀百分比高度 (100% Tree Height)
@@ -205,6 +233,10 @@
 - **手勢層 Compositor 隔離**：自定義手勢容器必須顯式宣告 `touch-none`（`touch-action: none`），告知瀏覽器排版合成器攔截原生滾動；內部滾動容器配置 `touch-pan-y` 並阻斷 `touchmove` / `touchend` 冒泡。
 - **背景主容器滾動鎖定 (Main Scroll Lock)**：全螢幕浮層掛載時，必須透過生命週期將背景主要滾動容器 `<main>` 的 `overflow` 切換為 `hidden`，並於銷毀時精準還原，達成 100% 絕對靜態防護。
 
+### 規範 8：破壞性動作按鈕高對比實色標準與透明度動態變數禁令 (Destructive Action Standard & No Dynamic Alpha Mix)
+- **破壞性按鈕實色規範**：二次確認與高危操作的 `destructive` 按鈕統一採用「實色紅底 + 純白文字（`bg-destructive text-destructive-foreground hover:opacity-90 active:opacity-80`）」，符合 Apple HIG 人機工程學與 Shadcn 規範，嚴禁使用 `bg-destructive/10 text-destructive` 等淡底弱化樣式。
+- **動態變數透明度修飾符禁令**：嚴禁在任何引用自動態 CSS 變數的屬性上直接附加 Tailwind 透明度修飾符（如 `bg-destructive/10`、`bg-background/80` 等），徹底杜絕 Tailwind v4 編譯為 `color-mix()` 導致舊版 WebKit（iOS <= 15）觸發 100% 實色 Fallback。
+
 ---
 
 ## 4. 開發檢查清單 (Do's and Don'ts)
@@ -220,5 +252,7 @@
 | **彈窗操作按鈕** | 移動端使用 `flex-col-reverse` 倒序垂直堆疊 | 統一使用 `flex-row justify-between`，取消居左、確認居右並排於同一行 |
 | **非同步資料載入** | 未防禦第 0 幀空白期，直接粗暴硬編碼預設值（如 `|| 'CNY'`）導致假陽性條件閃爍 | Hook 實作模組級單例快取（`last*Cache`），業務邏輯在狀態未確定前採保守自洽降級 |
 | **浮層手勢與滾動** | 手勢容器未宣告 `touch-action`，未在 `touchmove` 攔截，任由瀏覽器滾動鏈穿透 | 舞台宣告 `touch-none`，內部滾動區配置 `touch-pan-y`，並在彈窗開啟時將背景 `<main>` 的 `overflow` 鎖定為 `hidden` |
+| **破壞性動作按鈕** | 使用 `bg-destructive/10 text-destructive`（依賴 `color-mix()` 導致 iOS 15 實心紅吞噬文字） | 統一採用高對比實色紅底白字：`bg-destructive text-destructive-foreground`，全平台零 Fallback 缺陷 |
+
 
 

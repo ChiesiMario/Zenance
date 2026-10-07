@@ -112,11 +112,12 @@ export async function verifyBiometricCredential(
       for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
       }
-      // 不指定已廢棄的 transports，確保全平台 (Apple/Windows/Android) 現代 WebKit/Blink 核心原生相容
+      // 明確指定內部平台傳輸通道 (internal)，指示瀏覽器與密碼管理器此憑證綁定於本機硬體 (TPM/Touch ID/Windows Hello)，防止 1Password/Bitwarden 攔截
       requestOptions.allowCredentials = [
         {
           id: bytes,
           type: 'public-key',
+          transports: ['internal'],
         },
       ];
     } catch (e) {

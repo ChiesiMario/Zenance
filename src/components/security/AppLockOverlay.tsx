@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/ui/Logo';
 import { Delete, Fingerprint, Lock, KeyRound, AlertTriangle } from 'lucide-react';
@@ -46,9 +46,13 @@ export function AppLockOverlay() {
 
   const requiredLength = config?.pinLength || 4;
 
+  // 單次鎖定週期的自動喚起守衛：每個鎖定週期嚴格只自動觸發一次，避免取消後的焦點回歸觸發二次彈窗
+  const hasAutoTriggeredRef = useRef<boolean>(false);
+
   // 嘗試生物辨識解鎖 (全平台 Face ID / Touch ID / Windows Hello / Android 指紋)
   const handleBiometric = useCallback(async () => {
     if (lockoutRemainingSec > 0 || isBioVerifying) return;
+    hasAutoTriggeredRef.current = true; // 標記已觸發過生物辨識
     setIsBioVerifying(true);
     setErrorMsg('');
     try {
@@ -72,10 +76,11 @@ export function AppLockOverlay() {
     }
   }, [unlockWithBiometric, lockoutRemainingSec, isBioVerifying, bioFailCount, t]);
 
-  // 每次 App 被鎖定時，自檢硬體狀態並重設失敗計數
+  // 每次 App 被鎖定時，自檢硬體狀態並重設失敗計數與單發守衛
   useEffect(() => {
     if (isLocked) {
       initLock();
+      hasAutoTriggeredRef.current = false; // 新的鎖定週期，重設自動喚起標記
       if (isBiometricEligible) {
         setView('biometric');
         setBioFailCount(0);
@@ -87,15 +92,103 @@ export function AppLockOverlay() {
     }
   }, [isLocked, isBiometricEligible, initLock]);
 
-  // 掛載且鎖定時，若在生物識別首選視圖，自動喚起 Face ID / Windows Hello / 指紋
+  // 智慧焦點感知：僅在視窗處於前景且具備真實活動焦點時才自動喚起生物辨識；後台時保持完全靜默
   useEffect(() => {
-    if (isLocked && view === 'biometric' && isBiometricEligible && lockoutRemainingSec <= 0) {
-      const timer = setTimeout(() => {
-        handleBiometric();
-      }, 350);
-      return () => clearTimeout(timer);
+    if (!isLocked || view !== 'biometric' || !isBiometricEligible || lockoutRemainingSec > 0) {
+      return;
     }
-  }, [isLocked, view, isBiometricEligible, lockoutRemainingSec, handleBiometric]);
+
+    let timer: NodeJS.Timeout | null = null;
+    let isWindowActive = typeof document !== 'undefined' && !document.hidden && document.hasFocus();
+
+    const triggerIfFocused = (delay = 350) => {
+      // 嚴格單發守衛：本週期若已自動或手動喚起過一次，絕對不再重複自動喚起
+      if (hasAutoTriggeredRef.current) return;
+
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+
+      // 嚴格雙重守衛：視窗必須處於非隱藏且具備系統焦點狀態
+      const isVisibleAndFocused =
+        typeof document !== 'undefined' &&
+        !document.hidden &&
+        document.hasFocus() &&
+        isWindowActive;
+
+      if (!isVisibleAndFocused) return;
+
+      timer = setTimeout(() => {
+        const stillFocused =
+          typeof document !== 'undefined' &&
+          !document.hidden &&
+          document.hasFocus() &&
+          isWindowActive;
+
+        if (stillFocused && !isBioVerifying && !hasAutoTriggeredRef.current) {
+          hasAutoTriggeredRef.current = true;
+          handleBiometric();
+        }
+      }, delay);
+    };
+
+    // 1. 初次掛載嘗試 (僅在確定視窗擁有焦點時觸發)
+    if (isWindowActive) {
+      triggerIfFocused(350);
+    }
+
+    // 2. 監聽視窗焦點與可見性切換
+    const handleVisibility = () => {
+      if (document.hidden) {
+        isWindowActive = false;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      } else if (document.hasFocus()) {
+        isWindowActive = true;
+        triggerIfFocused(250);
+      }
+    };
+
+    const handleWindowFocus = () => {
+      isWindowActive = true;
+      triggerIfFocused(200);
+    };
+
+    const handleWindowBlur = () => {
+      isWindowActive = false;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    // 3. 使用者點擊或觸控回歸視窗時主動激活
+    const handleUserInteraction = () => {
+      if (!isWindowActive) {
+        isWindowActive = true;
+        triggerIfFocused(150);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('pointerdown', handleUserInteraction, { passive: true });
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('pointerdown', handleUserInteraction);
+    };
+  }, [isLocked, view, isBiometricEligible, lockoutRemainingSec, isBioVerifying, handleBiometric]);
 
   // 鍵入單個數字，並在滿碼時立即自動進行錯誤檢測
   const handleDigit = useCallback(

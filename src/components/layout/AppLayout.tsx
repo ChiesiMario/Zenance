@@ -198,6 +198,59 @@ export function AppLayout() {
     }
   };
 
+  // 阻斷行動端常規頁面的原生邊緣滑動返回（僅全螢幕彈窗如新增交易頁面豁免並支援自定義左滑返回）
+  useEffect(() => {
+    let edgeStartX = 0;
+    let isEdgeStart = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (typeof window !== 'undefined' && window.innerWidth >= 640) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      // 檢測螢幕極左側邊緣（24px 內）
+      if (touch.clientX <= 24) {
+        edgeStartX = touch.clientX;
+        isEdgeStart = true;
+      } else {
+        isEdgeStart = false;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isEdgeStart) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      // 若當前有全螢幕 Dialog / Command Deck 彈窗打開（如新增交易），放行以允許彈窗自定義手勢關閉
+      const hasActiveDialog = Boolean(document.querySelector('[data-slot="dialog-content"]'));
+      if (hasActiveDialog) return;
+
+      // 向右滑動時阻斷瀏覽器原生的邊緣歷史後退手勢
+      if (touch.clientX > edgeStartX) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      isEdgeStart = false;
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    document.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-background text-foreground w-full relative selection:bg-primary selection:text-primary-foreground overflow-hidden">
       {/* iOS PWA Status Bar Blur Shield & Color Sampler */}
@@ -345,7 +398,11 @@ export function AppLayout() {
               <button
                 key={item.path}
                 type="button"
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  if (location.pathname !== item.path) {
+                    navigate(item.path, { replace: true });
+                  }
+                }}
                 className={cn(
                   "flex flex-col items-center justify-center w-full h-full gap-1 outline-none cursor-pointer",
                   isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"

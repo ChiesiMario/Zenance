@@ -194,8 +194,15 @@ export default function Reports() {
     });
   }, [rangeTransactions, allCategories]);
 
-  // Key Totals (with refund contra-accounting)
+  // Key Totals (with refund contra-accounting; undefined during loading)
   const { totalExpense, totalIncome, netBalance } = useMemo(() => {
+    if (rangeTransactions === undefined) {
+      return {
+        totalExpense: undefined,
+        totalIncome: undefined,
+        netBalance: undefined,
+      };
+    }
     let exp = 0;
     let inc = 0;
     periodTransactions.forEach(tx => {
@@ -213,7 +220,7 @@ export default function Reports() {
       totalIncome: Math.max(0, inc),
       netBalance: inc - exp,
     };
-  }, [periodTransactions]);
+  }, [periodTransactions, rangeTransactions]);
 
   // Calculate Period Days and Daily Average
   const periodDays = useMemo(() => {
@@ -222,11 +229,12 @@ export default function Reports() {
   }, [startDate, endDate]);
 
   const dailyAverage = useMemo(() => {
+    if (totalExpense === undefined) return undefined;
     return totalExpense / periodDays;
   }, [totalExpense, periodDays]);
 
   const savingsRate = useMemo(() => {
-    if (totalIncome <= 0) return null;
+    if (totalIncome === undefined || netBalance === undefined || totalIncome <= 0) return null;
     return (netBalance / totalIncome) * 100;
   }, [netBalance, totalIncome]);
 
@@ -283,7 +291,7 @@ export default function Reports() {
       const refundList = periodTransactions.filter(
         tx => tx.parentId && (type === 'expense' ? tx.type === 'income' : tx.type === 'expense')
       );
-      const total = type === 'expense' ? totalExpense : totalIncome;
+      const total = (type === 'expense' ? totalExpense : totalIncome) ?? 0;
 
       const grouped: Record<string, { categoryId: string; name: string; amount: number; transactions: Transaction[] }> = {};
 
@@ -572,16 +580,19 @@ export default function Reports() {
             align="center"
             className={cn(
               'text-4xl sm:text-5xl font-mono tracking-tighter font-semibold px-2 leading-none max-w-full',
-              netBalance === 0
+              netBalance === undefined || netBalance === 0
                 ? 'text-muted-foreground'
                 : netBalance > 0
                   ? 'text-emerald-500'
                   : 'text-destructive'
             )}
           >
-            {netBalance < 0 ? '-' : netBalance > 0 ? '+' : ''}
+            {netBalance === undefined ? '' : netBalance < 0 ? '-' : netBalance > 0 ? '+' : ''}
             {currencySymbol}
-            <SpringNumber value={Math.abs(netBalance)} memoryKey={`reports-net-balance-${reportPeriodKey}`} />
+            <SpringNumber
+              value={netBalance !== undefined ? Math.abs(netBalance) : undefined}
+              memoryKey={`reports-net-balance-${reportPeriodKey}`}
+            />
           </AutoMarquee>
         </div>
 
@@ -607,16 +618,22 @@ export default function Reports() {
               </div>
               <p
                 className="text-[11px] font-mono text-muted-foreground mt-0.5 truncate select-text"
-                title={`${t('reports.dailyAverage', '日均支出')}: ${currencySymbol}${dailyAverage.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 1,
-                })}`}
+                title={
+                  dailyAverage !== undefined
+                    ? `${t('reports.dailyAverage', '日均支出')}: ${currencySymbol}${dailyAverage.toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 1,
+                      })}`
+                    : undefined
+                }
               >
                 {t('reports.dailyAverage', '日均支出')}: {currencySymbol}
-                {dailyAverage.toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 1,
-                })}
+                {dailyAverage !== undefined
+                  ? dailyAverage.toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 1,
+                    })
+                  : '--'}
               </p>
             </div>
           </div>
@@ -1092,7 +1109,7 @@ export default function Reports() {
                   </span>
                   <span className="text-sm font-bold text-foreground">
                     {currencySymbol}
-                    {formatAmountNumber(currentTotal)}
+                    {currentTotal !== undefined ? formatAmountNumber(currentTotal) : '--'}
                   </span>
                 </div>
               </div>

@@ -9,6 +9,9 @@ import { scheduleAutoSync } from '@/services/sync/syncEngine';
 import { getSafeMonotonicTimestamp } from '@/lib/clock';
 import { scheduleRollingBackup } from '@/services/storage/opfsBackupService';
 
+// 模組級單例記憶體快取：紀錄各帳本最新一次成功 Resolve 的交易列表，消除次級頁面首次掛載的 0 態空隙
+const lastTransactionsCache: Record<string, Transaction[]> = {};
+
 export function useTransactions() {
   const { activeLedgerId } = useAppStore();
 
@@ -24,6 +27,14 @@ export function useTransactions() {
     },
     [activeLedgerId]
   );
+
+  if (activeLedgerId && transactions !== undefined) {
+    lastTransactionsCache[activeLedgerId] = transactions;
+  }
+
+  const effectiveTransactions = transactions !== undefined
+    ? transactions
+    : (activeLedgerId ? lastTransactionsCache[activeLedgerId] : undefined);
 
   const addTransaction = async (
     data: Omit<Transaction, 'id' | 'ledgerId' | 'createdAt' | 'updatedAt' | 'deleted'> & { id?: string }
@@ -197,7 +208,8 @@ export function useTransactions() {
   };
 
   return {
-    transactions,
+    transactions: effectiveTransactions,
+    isLoading: effectiveTransactions === undefined,
     addTransaction,
     addTransactionsAtomic,
     updateTransaction,

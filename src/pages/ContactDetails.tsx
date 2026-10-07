@@ -51,11 +51,22 @@ export default function ContactDetails() {
     return sortTransactionsDesc(list);
   }, [transactions, id]);
 
+  const isLoading = transactions === undefined || allContacts === undefined;
+
   const {
     totalLent,
     totalBorrowed,
     netBalance,
   } = useMemo(() => {
+    if (isLoading || !contact) {
+      return {
+        loanBalance: undefined,
+        totalLent: undefined,
+        totalBorrowed: undefined,
+        netBalance: undefined,
+      };
+    }
+
     let bal = 0;
     let lent = 0;
     let borrowed = 0;
@@ -82,7 +93,7 @@ export default function ContactDetails() {
       totalBorrowed: Math.round(borrowed * 100) / 100,
       netBalance: Math.round(bal * 100) / 100,
     };
-  }, [contactTransactions, id]);
+  }, [contactTransactions, id, isLoading, contact]);
 
   if (allContacts !== undefined && !contact) {
     return (
@@ -159,17 +170,26 @@ export default function ContactDetails() {
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
           <div className="relative flex items-center justify-center h-5 mb-2 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
-              {netBalance === 0 ? t('contacts.settled') : netBalance > 0 ? t('contacts.owesYou') : t('contacts.youOwe')}
+              {netBalance === undefined
+                ? '\u00A0'
+                : netBalance === 0
+                  ? t('contacts.settled')
+                  : netBalance > 0
+                    ? t('contacts.owesYou')
+                    : t('contacts.youOwe')}
             </p>
             <div className="absolute right-0 flex items-center">
-              <MagnitudeBadge amount={Math.abs(netBalance)} memoryKey={`contact-net-balance-${id}`} />
+              <MagnitudeBadge
+                amount={netBalance !== undefined ? Math.abs(netBalance) : undefined}
+                memoryKey={`contact-net-balance-${id}`}
+              />
             </div>
           </div>
           <AutoMarquee
             align="center"
             className={cn(
               "text-4xl sm:text-5xl font-mono tracking-tighter font-medium leading-none px-4",
-              netBalance === 0
+              netBalance === undefined || netBalance === 0
                 ? "text-foreground"
                 : netBalance > 0
                   ? "text-emerald-500"
@@ -177,7 +197,7 @@ export default function ContactDetails() {
             )}
           >
             <AmountDisplay 
-              amount={Math.abs(netBalance)} 
+              amount={netBalance !== undefined ? Math.abs(netBalance) : undefined} 
               baseCurrency={currency} 
               type="neutral" 
               memoryKey={`contact-net-balance-${id}`}

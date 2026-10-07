@@ -46,8 +46,9 @@ export default function BudgetDetails() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
 
-  const { budgets, updateBudget, deleteBudget } = useBudgets();
-  const { transactions } = useTransactions();
+  const { budgets, updateBudget, deleteBudget, isLoading: isBudgetsLoading } = useBudgets();
+  const { transactions, isLoading: isTxLoading } = useTransactions();
+  const isLoading = isBudgetsLoading || isTxLoading;
   const { allCategories } = useCategories();
   const expenseCategories = useMemo(() => {
     return allCategories?.filter(c => c.type === 'expense') || [];
@@ -115,7 +116,7 @@ export default function BudgetDetails() {
 
   const startDate = budget?.startDate || '';
   const endDate = budget?.endDate || '';
-  const effectiveAmount = budget?.amount ?? 0;
+  const effectiveAmount = budget ? budget.amount : undefined;
 
   // Filter Transactions in active period belonging to budget categories
   const periodTransactions = useMemo(() => {
@@ -151,8 +152,9 @@ export default function BudgetDetails() {
     return sortTransactionsDesc(filtered);
   }, [transactions, budget, startDate, endDate]);
 
-  // Total spent in active period
+  // Total spent in active period (undefined during initial load to prevent flashing 0)
   const totalSpent = useMemo(() => {
+    if (isLoading || !budget) return undefined;
     const raw = periodTransactions.reduce((sum, tx) => {
       if (tx.type === 'income') {
         return sum - tx.amount;
@@ -160,11 +162,17 @@ export default function BudgetDetails() {
       return sum + tx.amount;
     }, 0);
     return Math.max(0, raw);
-  }, [periodTransactions]);
+  }, [periodTransactions, isLoading, budget]);
 
-  const percentage = effectiveAmount > 0 ? Math.min(100, (totalSpent / effectiveAmount) * 100) : 0;
-  const isOver = totalSpent > effectiveAmount;
-  const remaining = Math.max(0, effectiveAmount - totalSpent);
+  const percentage =
+    totalSpent !== undefined && effectiveAmount && effectiveAmount > 0
+      ? Math.min(100, (totalSpent / effectiveAmount) * 100)
+      : 0;
+  const isOver = totalSpent !== undefined && effectiveAmount !== undefined ? totalSpent > effectiveAmount : false;
+  const remaining =
+    totalSpent !== undefined && effectiveAmount !== undefined
+      ? Math.max(0, effectiveAmount - totalSpent)
+      : undefined;
 
   // Grouped transactions by date (newest first)
   const groupedTransactions = useMemo(() => {
@@ -292,106 +300,109 @@ export default function BudgetDetails() {
   return (
     <div className="w-full space-y-4">
       {/* Top Header Navigation & Period Info */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-2 min-w-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleGoBack}
-            className="h-8 w-8 -ml-2 mt-0.5 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div className="space-y-1 min-w-0">
+      <div className="space-y-2">
+        {/* Row 1: Back + Title and Action Buttons (Always pinned to top-right) */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleGoBack}
+              className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
             <h2 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
               {budget?.name || '\u00A0'}
             </h2>
-            <div className="flex items-center gap-1.5 flex-wrap pt-0.5 min-h-[22px]">
-              {isBudgetEnded ? (
-                <>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest bg-muted/60 text-muted-foreground border border-border shrink-0">
-                    {t('budgets.statusEnded')}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                    <Calendar className="h-2.5 w-2.5 opacity-70" />
-                    <span>{dateRange}</span>
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                    <Calendar className="h-2.5 w-2.5 opacity-70" />
-                    <span>{dateRange}</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
-                    <Clock className="h-2.5 w-2.5 opacity-70" />
-                    <span>{countdownLabel}</span>
-                  </span>
-                </>
-              )}
+          </div>
 
-              {budget?.ruleId && (
-                <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest border border-border bg-muted/60 text-muted-foreground shrink-0">
-                  <Zap className="h-2.5 w-2.5 opacity-70" />
-                  <span>{t('budgets.ruleStrategy')}</span>
-                </span>
-              )}
-            </div>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* End / Resume Button */}
+            {budget?.isEnded ? (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleResumeBudget}
+                title={t('budgets.resumeBudget')}
+                aria-label={t('budgets.resumeBudget')}
+                className="size-8 text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="size-4" />
+              </Button>
+            ) : !isNaturallyExpired && budget ? (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsEndDialogOpen(true)}
+                title={t('budgets.endBudget')}
+                aria-label={t('budgets.endBudget')}
+                className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <CircleStop className="size-4" />
+              </Button>
+            ) : null}
+
+            {/* Edit Budget Button */}
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={!budget}
+              onClick={() => budget && handleOpenEdit(budget)}
+              title={t('budgets.editBudget')}
+              aria-label={t('budgets.editBudget')}
+              className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-30"
+            >
+              <Pencil className="size-4" />
+            </Button>
+
+            {/* Delete Budget Button */}
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={!budget}
+              onClick={() => setIsDeleteDialogOpen(true)}
+              title={t('budgets.deleteBudget')}
+              aria-label={t('budgets.deleteBudget')}
+              className="size-8 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors cursor-pointer disabled:opacity-30"
+            >
+              <Trash2 className="size-4" />
+            </Button>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
-          {/* End / Resume Button */}
-          {budget?.isEnded ? (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleResumeBudget}
-              title={t('budgets.resumeBudget')}
-              aria-label={t('budgets.resumeBudget')}
-              className="size-8 text-muted-foreground hover:text-emerald-500 hover:border-emerald-500/30 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="size-4" />
-            </Button>
-          ) : !isNaturallyExpired && budget ? (
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsEndDialogOpen(true)}
-              title={t('budgets.endBudget')}
-              aria-label={t('budgets.endBudget')}
-              className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              <CircleStop className="size-4" />
-            </Button>
-          ) : null}
+        {/* Row 2: Period & Status Badges */}
+        <div className="flex items-center gap-1.5 flex-wrap pl-7 min-h-[22px]">
+          {isBudgetEnded ? (
+            <>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest bg-muted/60 text-muted-foreground border border-border shrink-0">
+                {t('budgets.statusEnded')}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                <Calendar className="h-2.5 w-2.5 opacity-70" />
+                <span>{dateRange}</span>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                <Calendar className="h-2.5 w-2.5 opacity-70" />
+                <span>{dateRange}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded font-mono uppercase tracking-widest border bg-muted/60 text-muted-foreground border-border shrink-0">
+                <Clock className="h-2.5 w-2.5 opacity-70" />
+                <span>{countdownLabel}</span>
+              </span>
+            </>
+          )}
 
-          {/* Edit Budget Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={!budget}
-            onClick={() => budget && handleOpenEdit(budget)}
-            title={t('budgets.editBudget')}
-            aria-label={t('budgets.editBudget')}
-            className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-30"
-          >
-            <Pencil className="size-4" />
-          </Button>
-
-          {/* Delete Budget Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={!budget}
-            onClick={() => setIsDeleteDialogOpen(true)}
-            title={t('budgets.deleteBudget')}
-            aria-label={t('budgets.deleteBudget')}
-            className="size-8 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors cursor-pointer disabled:opacity-30"
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          {budget?.ruleId && (
+            <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase tracking-widest border border-border bg-muted/60 text-muted-foreground shrink-0">
+              <Zap className="h-2.5 w-2.5 opacity-70" />
+              <span>{t('budgets.ruleStrategy')}</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -430,7 +441,7 @@ export default function BudgetDetails() {
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-xs font-mono font-medium">
                 <span>{t('budgets.overBudget')}</span>
                 <AmountDisplay
-                  amount={totalSpent - effectiveAmount}
+                  amount={totalSpent !== undefined && effectiveAmount !== undefined ? totalSpent - effectiveAmount : undefined}
                   baseCurrency={activeLedger?.baseCurrency}
                   type="neutral"
                 />

@@ -83,7 +83,6 @@ export function Toaster({ defaultPosition = 'bottom' }: ToasterProps) {
                 "px-4 py-2.5 rounded-lg",
                 "bg-foreground text-background text-xs sm:text-sm font-medium",
                 "border-none shadow-none",
-                "animate-in fade-in slide-in-from-bottom-2 duration-200",
                 "text-center max-w-full break-words text-pretty leading-relaxed"
               )}
             >
@@ -107,7 +106,6 @@ export function Toaster({ defaultPosition = 'bottom' }: ToasterProps) {
                 "px-4 py-2.5 rounded-lg",
                 "bg-foreground text-background text-xs sm:text-sm font-medium",
                 "border-none shadow-none",
-                "animate-in fade-in slide-in-from-top-2 duration-200",
                 "text-center max-w-full break-words text-pretty leading-relaxed"
               )}
             >

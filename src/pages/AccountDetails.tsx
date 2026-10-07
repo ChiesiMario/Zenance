@@ -73,11 +73,16 @@ export default function AccountDetails() {
 
   const hasTransactions = accountTransactions.length > 0;
 
+  const isLoading = transactions === undefined || allAccounts === undefined;
+
   const { balance, totalIncome, totalExpense } = useMemo(() => {
-    let bal = account?.initialBalance || 0;
+    if (isLoading || !account) {
+      return { balance: undefined, totalIncome: undefined, totalExpense: undefined };
+    }
+
+    let bal = account.initialBalance || 0;
     let income = 0;
     let expense = 0;
-    if (!account) return { balance: 0, totalIncome: 0, totalExpense: 0 };
     
     accountTransactions.forEach(tx => {
       const delta = getTxAccountDelta(tx, account, getRate, baseCurrency);
@@ -94,17 +99,17 @@ export default function AccountDetails() {
       totalIncome: Math.round(income * 100) / 100,
       totalExpense: Math.round(expense * 100) / 100,
     };
-  }, [accountTransactions, account, getRate, baseCurrency]);
+  }, [accountTransactions, account, getRate, baseCurrency, isLoading]);
 
   const isCreditAccount = account?.group === 'credit' || account?.group === 'credit_pay';
   const hasCreditLimit = typeof account?.creditLimit === 'number' && account.creditLimit > 0;
-  const currentDebt = Math.max(0, -balance);
-  const availableCredit = hasCreditLimit ? Math.max(0, account!.creditLimit! - currentDebt) : 0;
-  const usagePercent = hasCreditLimit ? Math.min(100, Math.round((currentDebt / account!.creditLimit!) * 100)) : 0;
+  const currentDebt = balance !== undefined ? Math.max(0, -balance) : 0;
+  const availableCredit = hasCreditLimit && balance !== undefined ? Math.max(0, account!.creditLimit! - currentDebt) : 0;
+  const usagePercent = hasCreditLimit && balance !== undefined ? Math.min(100, Math.round((currentDebt / account!.creditLimit!) * 100)) : 0;
 
   useEffect(() => {
     if (isAdjustBalanceDialogOpen) {
-      const initialStr = balance.toString();
+      const initialStr = (balance ?? 0).toString();
       setNewBalanceStr(initialStr);
     }
   }, [isAdjustBalanceDialogOpen, balance]);
@@ -119,7 +124,7 @@ export default function AccountDetails() {
   }
 
   const parsedNewBalance = parseFloat(newBalanceStr) || 0;
-  const balanceDiff = parsedNewBalance - balance;
+  const balanceDiff = parsedNewBalance - (balance ?? 0);
 
   const handleAdjustBalance = async () => {
     if (!id || balanceDiff === 0 || !newBalanceStr.trim()) {
@@ -235,7 +240,7 @@ export default function AccountDetails() {
               {t('accounts.excludedFromStatsTag')}
             </div>
           )}
-          {isForeign && (
+          {isForeign && balance !== undefined && (
             <div className="flex items-center gap-1.5 mt-2 text-xs font-mono text-muted-foreground select-text">
               <span>≈ {getCurrencySymbol(baseCurrency)}{formatAmountNumber(Math.abs(convertAmount(balance, currency, baseCurrency, getRate)))}</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-border bg-muted/20 select-none">

@@ -3,6 +3,11 @@ import { db, type Contact } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '@/store/useAppStore';
 
+// 模組級單例記憶體快取：紀錄各帳本最新一次成功 Resolve 的聯絡人列表，消除詳情頁首次掛載的 0 態空隙
+const lastContactsCache: Record<string, Contact[]> = {};
+const lastArchivedContactsCache: Record<string, Contact[]> = {};
+const lastAllContactsCache: Record<string, Contact[]> = {};
+
 export function useContacts() {
   const { activeLedgerId } = useAppStore();
 
@@ -41,6 +46,16 @@ export function useContacts() {
     },
     [activeLedgerId]
   );
+
+  if (activeLedgerId) {
+    if (contacts !== undefined) lastContactsCache[activeLedgerId] = contacts;
+    if (archivedContacts !== undefined) lastArchivedContactsCache[activeLedgerId] = archivedContacts;
+    if (allContacts !== undefined) lastAllContactsCache[activeLedgerId] = allContacts;
+  }
+
+  const effectiveContacts = contacts !== undefined ? contacts : (activeLedgerId ? lastContactsCache[activeLedgerId] : undefined);
+  const effectiveArchivedContacts = archivedContacts !== undefined ? archivedContacts : (activeLedgerId ? lastArchivedContactsCache[activeLedgerId] : undefined);
+  const effectiveAllContacts = allContacts !== undefined ? allContacts : (activeLedgerId ? lastAllContactsCache[activeLedgerId] : undefined);
 
   const addContact = async (
     name: string,
@@ -108,9 +123,9 @@ export function useContacts() {
   };
 
   return {
-    contacts,
-    archivedContacts,
-    allContacts,
+    contacts: effectiveContacts,
+    archivedContacts: effectiveArchivedContacts,
+    allContacts: effectiveAllContacts,
     addContact,
     updateContact,
     archiveContact,

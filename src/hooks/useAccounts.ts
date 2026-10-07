@@ -4,6 +4,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '@/store/useAppStore';
 import { useContacts } from '@/hooks/useContacts';
 
+// 模組級單例記憶體快取：紀錄各帳本最新一次成功 Resolve 的錢包列表，消除詳情頁首次掛載的 0 態空隙
+const lastWalletsCache: Record<string, Wallet[]> = {};
+const lastArchivedWalletsCache: Record<string, Wallet[]> = {};
+const lastAllWalletsCache: Record<string, Wallet[]> = {};
+
 export function useAccounts() {
   const { activeLedgerId } = useAppStore();
   const {
@@ -54,10 +59,20 @@ export function useAccounts() {
     [activeLedgerId]
   );
 
+  if (activeLedgerId) {
+    if (wallets !== undefined) lastWalletsCache[activeLedgerId] = wallets;
+    if (archivedWallets !== undefined) lastArchivedWalletsCache[activeLedgerId] = archivedWallets;
+    if (allWallets !== undefined) lastAllWalletsCache[activeLedgerId] = allWallets;
+  }
+
+  const effectiveWallets = wallets !== undefined ? wallets : (activeLedgerId ? lastWalletsCache[activeLedgerId] : undefined);
+  const effectiveArchivedWallets = archivedWallets !== undefined ? archivedWallets : (activeLedgerId ? lastArchivedWalletsCache[activeLedgerId] : undefined);
+  const effectiveAllWallets = allWallets !== undefined ? allWallets : (activeLedgerId ? lastAllWalletsCache[activeLedgerId] : undefined);
+
   // 向後相容別名
-  const accounts = wallets;
-  const archivedAccounts = archivedWallets;
-  const allAccounts = allWallets;
+  const accounts = effectiveWallets;
+  const archivedAccounts = effectiveArchivedWallets;
+  const allAccounts = effectiveAllWallets;
 
   const addAccount = async (
     name: string,
@@ -175,9 +190,9 @@ export function useAccounts() {
     accounts,
     archivedAccounts,
     allAccounts,
-    wallets,
-    archivedWallets,
-    allWallets,
+    wallets: effectiveWallets,
+    archivedWallets: effectiveArchivedWallets,
+    allWallets: effectiveAllWallets,
     contacts,
     archivedContacts,
     allContacts,

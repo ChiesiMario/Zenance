@@ -1,99 +1,94 @@
-# Root Cause 診斷報告：首頁切換月份統計資訊未更新及全站同類缺陷排查
+# Root Cause 診斷報告：首次切換頁面金額瞬間從 0 變為實際金額問題排查
 
 ## 1. 故障現象描述 (Phenomenon)
 
-使用者在首頁（Dashboard）點擊月份切換箭頭（上一月／下一月）切換時間維度時，頂部核心統計卡片（淨結餘、收入、支出）的數值完全沒有更新，依然固定顯示為原月份的金額。
-同時，要求對全站所有包含統計資訊與日期維度篩選的模組進行全面排查。
+- **現象**：當使用者在應用程式中「首次切換」至某一頁面（如從首頁切換至預算頁、帳戶頁、聯絡人頁或報表頁）時，頂部核心統計卡片或金額顯示欄位在第 0 幀會瞬間顯示為 `¥0`，隨後在約 10～50ms 內閃跳變更為真實計算金額（例如 `¥0` -> `¥128,450.00`）。
+- **對比**：一旦該頁面曾被訪問過，後續在分頁之間來回切換時，金額始終精確保持為真實數值，完全不會再次出現從 0 閃跳的現象。
 
 ---
 
 ## 2. 核心代碼定位 (Code Location)
 
-### 關鍵檔案 1：`src/pages/Dashboard.tsx`（第 400～454 行）
+### 關鍵檔案 1：`src/components/layout/AppLayout.tsx`（第 268～288 行）
 ```tsx
-// 缺陷點：memoryKey 寫死為全域靜態字串，未包含月份維度 (currentMonthPrefix)
-<MagnitudeBadge amount={balance} memoryKey="dashboard-net-balance" />
-<AmountDisplay amount={balance} memoryKey="dashboard-net-balance" />
-
-<MagnitudeBadge amount={income} memoryKey="dashboard-income" />
-<AmountDisplay amount={income} memoryKey="dashboard-income" />
-
-<MagnitudeBadge amount={expense} memoryKey="dashboard-expense" />
-<AmountDisplay amount={expense} memoryKey="dashboard-expense" />
+{/* 延遲掛載 (Lazy Mount) + 常駐保活 (Keep-Alive) 機制 */}
+{mountedTabs.has('/') && (
+  <div style={{ display: location.pathname === '/' ? 'block' : 'none' }}>
+    <Dashboard />
+  </div>
+)}
+{mountedTabs.has('/budgets') && (
+  <div style={{ display: location.pathname === '/budgets' ? 'block' : 'none' }}>
+    <Budgets />
+  </div>
+)}
+{mountedTabs.has('/accounts') && (
+  <div style={{ display: location.pathname === '/accounts' ? 'block' : 'none' }}>
+    <Accounts />
+  </div>
+)}
+{mountedTabs.has('/contacts') && (
+  <div style={{ display: location.pathname === '/contacts' ? 'block' : 'none' }}>
+    <Contacts />
+  </div>
+)}
 ```
 
-### 關鍵檔案 2：`src/components/ui/AmountDisplay.tsx`（第 44～51 行）
+### 關鍵檔案 2：`src/hooks/useMonthTransactions.ts` / `useTransactions.ts` / `useAccounts.ts`
 ```typescript
-// 缺陷點：將真實合法的 0 金額誤判為非同步載入中的「Pending 態」，強制覆寫為快取舊值
-const remembered = effectiveMemoryKey ? getRememberedNumber(effectiveMemoryKey) : undefined;
-const isPendingZero = amount === 0 && remembered !== undefined && remembered !== 0;
-const displayAmount = isPendingZero ? remembered : amount;
+// Dexie useLiveQuery 的非同步特性
+const transactions = useLiveQuery(
+  async () => {
+    if (!activeLedgerId || !yearMonth) return [] as Transaction[];
+    return await queryMonthTransactions(activeLedgerId, yearMonth);
+  },
+  [activeLedgerId, yearMonth]
+);
 
-if (effectiveMemoryKey && amount !== 0) {
-  setRememberedNumber(effectiveMemoryKey, amount);
-}
+// 初次掛載第 0 幀：transactions 必定為 undefined
+return {
+  transactions,
+  isLoading: transactions === undefined,
+};
 ```
 
-### 關鍵檔案 3：`src/components/ui/SpringNumber.tsx`（第 91～98 行）
+### 關鍵檔案 3：業務頁面金額統計計算邏輯（以 `src/pages/Dashboard.tsx` 為例）
 ```typescript
-// 缺陷點：當 value === 0 時直接 return 阻斷渲染更新，物理動畫拒絕降至 0
-if (value === 0 && rememberedValue !== undefined && rememberedValue !== 0) {
-  return;
-}
+const { transactions: monthTransactions } = useMonthTransactions(currentMonthPrefix);
+// 缺陷點：當 monthTransactions 處於 undefined 載入待定態時，直接降級為空陣列 []
+const filteredTransactions = monthTransactions || [];
 
-if (scopedMemoryKey && value !== 0) {
-  setRememberedNumber(scopedMemoryKey, value);
-}
-```
-
-### 關鍵檔案 4：`src/components/ui/MagnitudeBadge.tsx`（第 32～38 行）
-```typescript
-// 缺陷點：將 amount === 0 歸類為 isInvalid 並強制回退至 remembered 快取
-const isInvalid = amount === undefined || amount === null || isNaN(amount) || amount === 0;
-const remembered = scopedMemoryKey ? getRememberedNumber(scopedMemoryKey) : undefined;
-const effectiveAmount = isInvalid && remembered !== undefined ? remembered : amount;
+const { income, expense, balance } = useMemo(() => {
+  let inc = 0;
+  let exp = 0;
+  filteredTransactions.forEach(t => { ... });
+  // 空陣列自然結算出 inc = 0, exp = 0, balance = 0
+  return { income: inc, expense: exp, balance: inc - exp };
+}, [filteredTransactions]);
 ```
 
 ---
 
 ## 3. 根因剖析 (Root Cause Analysis)
 
-### 根本原因 A：首頁統計組件綁定了跨月份共享的靜態 `memoryKey`
-1. 為了防範頁面切換或重新掛載時數字從 0 彈跳，系統引入了 `numberMemory` 機制。
-2. 然而在 `Dashboard.tsx` 中，傳入 `AmountDisplay`、`SpringNumber` 與 `MagnitudeBadge` 的鍵名被硬編碼為靜態字串：
-   - `"dashboard-net-balance"`
-   - `"dashboard-income"`
-   - `"dashboard-expense"`
-3. 這些 Key 完全未附帶當前選定月份的標識（如 `currentMonthPrefix` 即 `2026-10`）。無論使用者如何切換月份，組件始終指向同一個全域記憶體槽位。
+### 根本原因 A：Dexie `useLiveQuery` 底層 IndexedDB 非同步查詢的「初始空幀 (Initial Void Frame)」
+1. 本專案採用純客戶端 IndexedDB（基於 Dexie.js 封裝）進行全本地資料管理。
+2. IndexedDB 的所有讀取事務均為原生非同步（Promise / IDBRequest）。
+3. 當任何組件初次掛載（Mount）調用 `useLiveQuery` 時，JavaScript 在第 0 幀同步執行期間無法取得尚未 Resolve 的資料庫結果，因此 `useLiveQuery` 的初始返回值必定為 `undefined`。
+4. 上層業務組件（如 `Dashboard`、`Accounts`、`Contacts`、`Reports`）普遍採用 `transactions || []` 的容錯寫法，將「資料尚在讀取中的 Pending 態」等同視為「數據為空的 Resolved 態」，導致第 0 幀計算出的金額嚴格為數字 `0`。
+5. 約 10～50 毫秒後，IndexedDB 讀取完畢並觸發 React 狀態更新（Re-render），金額瞬間替換為真實數值，造成肉眼可見的「0 -> 實際金額」跳變。
 
-### 根本原因 B：底層數值組件將「合法 0 態」錯誤判定為「非同步載入待定態 (Pending Zero)」
-1. 當使用者從有記帳的月份切換到一個**尚無記帳或某項收支恰好為 0 的月份**時，資料庫如實查詢返回空數據，上層計算得出的真實金額確實為 `0`。
-2. 但底層三處組件（`AmountDisplay`、`SpringNumber`、`MagnitudeBadge`）的判定邏輯存在嚴重漏洞：
-   - 只要 `amount === 0` 且快取中存在上一月份的非 0 記憶值，代碼就主觀認定「此時資料庫尚未返回數據，為防止 0 態閃爍，強行沿用快取中的舊數值」。
-   - `SpringNumber` 在 `value === 0` 時甚至直接 `return`，拒絕觸發任何數值更新。
-   - `MagnitudeBadge` 更將 `amount === 0` 直接判定為 `isInvalid`，強行保留上一月份的大額微膠囊。
-3. **連鎖反應**：
-   當使用者切換月份至空月份或收支為 0 的月份時，這三處防抖邏輯同時生效，將真實的 0 徹底吞噬，死死鎖定在舊月份的數值上，導致使用者視覺上「統計資訊完全沒有更新」。
+### 根本原因 B：`AppLayout` 的「延遲掛載 (Lazy Mount) + 常駐保活 (Keep-Alive)」時序差異
+1. `AppLayout.tsx` 為了節省初次開啟 App 時的 CPU 與記憶體開銷，對底部導覽的一級 Tab 採用了延遲掛載策略（`mountedTabs.has(path)`）。
+2. **首次切換頁面時**：
+   - 目標頁面此前從未掛載過，點擊 Tab 後觸發該頁面組件的首次 Mount。
+   - 首次 Mount 必然經歷「第 0 幀 IndexedDB 查詢 pending (`undefined` -> `0`)」至「第 1 幀查詢完成（真實數值）」的過程，因此出現跳變。
+3. **之後切換該頁面時**：
+   - 由於該頁面已被保留在 `mountedTabs` 集合中，後續切換僅是切換外層容器的 CSS `display: block / none`。
+   - 組件內部的記憶體狀態與 Dexie 查詢結果依然保活，未被銷毀或重新掛載，直接原樣呈現上次的真實數值，因此完全沒有跳變。
 
 ---
 
-## 4. 全站同類缺陷排查清單 (Full-Workspace Audit)
+## 4. 結論
 
-經對全站代碼進行全面語意搜尋與邏輯審查，發現以下模組存在完全相同的架構性缺陷：
-
-### 1. 報表頁面 (`src/pages/Reports.tsx`，第 567、583、596、603、642、690、697、741 行)
-- **現象**：在報表頁面切換時間跨度（週、月、季、年）或切換前後週期時：
-  - `memoryKey="reports-net-balance"`
-  - `memoryKey="reports-total-expense"`
-  - `memoryKey="reports-total-income"`
-  - `memoryKey="reports-peak-expense"`
-  - `memoryKey="reports-peak-income"`
-- **缺陷**：這些 Key 同樣為全靜態字串，未帶上週期區間鍵（如 `periodKey` 或日期字串）。當切換至無交易的區間時，同樣會被舊週期的非 0 數據鎖死。
-
-### 2. 帳戶詳情頁 (`src/pages/AccountDetails.tsx`，第 315、323、331、340 行)
-- `memoryKey={`account-income-${id}`}` 與 `memoryKey={`account-expense-${id}`}`
-- 若某個帳戶的總收入或總支出為 0（但曾有記憶值），同樣會遭遇無法歸零展示的問題。
-
-### 3. 聯絡人總覽與詳情頁 (`src/pages/Contacts.tsx` 與 `src/pages/ContactDetails.tsx`)
-- 包含 `contacts-net-balance`、`contacts-total-receivable`、`contacts-total-payable`。
-- 當所有債務或應收款全部結清歸零時，因 `amount === 0` 的攔截邏輯，卡片與徽章同樣無法正常歸零。
+本現象是由於「**IndexedDB 非同步讀取在組件首次掛載時產生短暫的 Pending 空幀（`undefined`），被業務邏輯預設歸零計算**」與「**`AppLayout` 延遲掛載保活機制**」相互疊加形成的生命週期時序問題。

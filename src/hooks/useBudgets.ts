@@ -156,6 +156,10 @@ export function formatBudgetDisplayRange(
   return `${startDate} ~ ${effectiveEnd}`;
 }
 
+// 模組級單例記憶體快取：紀錄各帳本最新一次成功 Resolve 的預算與規則列表，消除詳情頁首次掛載的 0 態空隙
+const lastBudgetsCache: Record<string, Budget[]> = {};
+const lastBudgetRulesCache: Record<string, BudgetRule[]> = {};
+
 export function useBudgets() {
   const { activeLedgerId } = useAppStore();
 
@@ -184,6 +188,14 @@ export function useBudgets() {
     },
     [activeLedgerId]
   );
+
+  if (activeLedgerId) {
+    if (budgets !== undefined) lastBudgetsCache[activeLedgerId] = budgets;
+    if (budgetRules !== undefined) lastBudgetRulesCache[activeLedgerId] = budgetRules;
+  }
+
+  const effectiveBudgets = budgets !== undefined ? budgets : (activeLedgerId ? lastBudgetsCache[activeLedgerId] : undefined);
+  const effectiveBudgetRules = budgetRules !== undefined ? budgetRules : (activeLedgerId ? lastBudgetRulesCache[activeLedgerId] : undefined);
 
   const { transactions } = useTransactions();
   const isGeneratingRef = useRef(false);
@@ -667,8 +679,9 @@ export function useBudgets() {
   };
 
   return {
-    budgets,
-    budgetRules,
+    budgets: effectiveBudgets,
+    budgetRules: effectiveBudgetRules,
+    isLoading: effectiveBudgets === undefined,
     getActiveBudgetsForMonth,
     getMonthlyBudgetSpent,
     getYearlyBudgetSpent,

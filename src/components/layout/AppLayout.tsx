@@ -145,6 +145,32 @@ export function AppLayout() {
     }
   }, [location.pathname, isCurrentTab]);
 
+  // 背景空閒預熱：在首頁就緒後，利用瀏覽器空閒回調靜默預載其餘一級 Tab，實現全 Tab 首次切換 0ms 零閃爍秒開
+  useEffect(() => {
+    const warmup = () => {
+      setMountedTabs(prev => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const tab of TAB_PATHS) {
+          if (!next.has(tab)) {
+            next.add(tab);
+            tabLastActiveRef.current[tab] = Date.now();
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const handle = (window as unknown as { requestIdleCallback: (cb: () => void, opt?: { timeout: number }) => number }).requestIdleCallback(warmup, { timeout: 1000 });
+      return () => (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(handle);
+    } else {
+      const timer = setTimeout(warmup, 120);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Periodic 30-minute cache eviction: inspect every 5 mins and prune tabs inactive for >= 30 mins
   useEffect(() => {
     const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 mins

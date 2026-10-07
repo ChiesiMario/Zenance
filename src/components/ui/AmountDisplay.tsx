@@ -1,10 +1,7 @@
 import { getCurrencySymbol, cn, formatAmountNumber, formatCompactNumber } from '@/lib/utils';
-import { SpringNumber } from '@/components/ui/SpringNumber';
-import { setRememberedNumber } from '@/lib/numberMemory';
-import { useAppStore } from '@/store/useAppStore';
 
 export interface AmountDisplayProps {
-  amount: number;
+  amount?: number | null;
   originalCurrency?: string;
   baseCurrency?: string;
   isApproximate?: boolean;
@@ -12,11 +9,11 @@ export interface AmountDisplayProps {
   showSign?: boolean;
   className?: string;
   /**
-   * Whether to animate the numeric value with smooth spring physics
+   * Kept for prop compatibility
    */
   animated?: boolean;
   /**
-   * Unique memory key for persisting previous numeric value across page transitions
+   * Kept for prop compatibility
    */
   memoryKey?: string;
   /**
@@ -33,24 +30,23 @@ export function AmountDisplay({
   type = 'neutral',
   showSign = true,
   className,
-  animated = false,
-  memoryKey,
   compact = false,
 }: AmountDisplayProps) {
-  const { activeLedgerId } = useAppStore();
-  const rawKey = memoryKey || (animated ? `amt-${type}-${baseCurrency}-${className || 'd'}` : undefined);
-  const effectiveMemoryKey = rawKey ? `${activeLedgerId || 'global'}:${rawKey}` : undefined;
-  
-  const displayAmount = amount;
+  const symbol = getCurrencySymbol(baseCurrency);
 
-  if (effectiveMemoryKey && !isNaN(amount)) {
-    setRememberedNumber(effectiveMemoryKey, amount);
+  // 待定讀取態防禦：當資料庫尚未 Resolve 時展示等寬佔位符，絕不草率誤判為 0 元
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return (
+      <span className={cn('font-mono tabular-nums font-medium select-text text-muted-foreground', className)}>
+        {symbol}--
+      </span>
+    );
   }
 
+  const displayAmount = amount;
   const effectiveIsApproximate = isApproximate !== undefined
     ? isApproximate
     : Boolean(originalCurrency && originalCurrency !== baseCurrency);
-  const symbol = getCurrencySymbol(baseCurrency);
   const formattedAmount = compact
     ? formatCompactNumber(Math.abs(displayAmount))
     : formatAmountNumber(Math.abs(displayAmount));
@@ -100,11 +96,7 @@ export function AmountDisplay({
       {effectiveIsApproximate && '≈ '}
       {sign}
       {symbol}
-      {animated && !compact ? (
-        <SpringNumber value={Math.abs(displayAmount)} memoryKey={rawKey} />
-      ) : (
-        formattedAmount
-      )}
+      {formattedAmount}
     </span>
   );
 }

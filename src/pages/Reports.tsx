@@ -163,6 +163,7 @@ export default function Reports() {
 
   const startStr = useMemo(() => format(startDate, 'yyyy-MM-dd'), [startDate]);
   const endStr = useMemo(() => format(endDate, 'yyyy-MM-dd'), [endDate]);
+  const reportPeriodKey = useMemo(() => `${periodType}-${startStr}-${endStr}`, [periodType, startStr, endStr]);
   const { transactions: rangeTransactions } = useDateRangeTransactions(startStr, endStr);
   const { transactions: allTransactions } = useTransactions();
 
@@ -564,7 +565,7 @@ export default function Reports() {
               {t('reports.netBalance')}
             </p>
             <div className="absolute right-0 flex items-center">
-              <MagnitudeBadge amount={netBalance} memoryKey="reports-net-balance" />
+              <MagnitudeBadge amount={netBalance} memoryKey={`reports-net-balance-${reportPeriodKey}`} />
             </div>
           </div>
           <AutoMarquee
@@ -580,7 +581,7 @@ export default function Reports() {
           >
             {netBalance < 0 ? '-' : netBalance > 0 ? '+' : ''}
             {currencySymbol}
-            <SpringNumber value={Math.abs(netBalance)} memoryKey="reports-net-balance" />
+            <SpringNumber value={Math.abs(netBalance)} memoryKey={`reports-net-balance-${reportPeriodKey}`} />
           </AutoMarquee>
         </div>
 
@@ -593,14 +594,14 @@ export default function Reports() {
                 <TrendingDown className="size-3.5 text-muted-foreground shrink-0" />
                 <span>{t('reports.totalExpense')}</span>
               </span>
-              <MagnitudeBadge amount={totalExpense} memoryKey="reports-total-expense" />
+              <MagnitudeBadge amount={totalExpense} memoryKey={`reports-total-expense-${reportPeriodKey}`} />
             </div>
             <div className="min-w-0">
               <div className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none min-w-0">
                 <AutoMarquee align="left">
                   <span className="whitespace-nowrap inline-flex items-center select-text">
                     {currencySymbol}
-                    <SpringNumber value={totalExpense} memoryKey="reports-total-expense" />
+                    <SpringNumber value={totalExpense} memoryKey={`reports-total-expense-${reportPeriodKey}`} />
                   </span>
                 </AutoMarquee>
               </div>
@@ -639,7 +640,7 @@ export default function Reports() {
               </span>
               <MagnitudeBadge
                 amount={peakExpenseItem ? peakExpenseItem.netAmount : 0}
-                memoryKey="reports-peak-expense"
+                memoryKey={`reports-peak-expense-${reportPeriodKey}`}
               />
             </div>
             <div className="min-w-0">
@@ -687,14 +688,14 @@ export default function Reports() {
                 <TrendingUp className="size-3.5 text-emerald-500 shrink-0" />
                 <span>{t('reports.totalIncome', '總收入')}</span>
               </span>
-              <MagnitudeBadge amount={totalIncome} memoryKey="reports-total-income" />
+              <MagnitudeBadge amount={totalIncome} memoryKey={`reports-total-income-${reportPeriodKey}`} />
             </div>
             <div className="min-w-0">
               <div className="text-2xl font-mono tracking-tight font-medium text-foreground leading-none min-w-0">
                 <AutoMarquee align="left">
                   <span className="whitespace-nowrap inline-flex items-center select-text">
                     {currencySymbol}
-                    <SpringNumber value={totalIncome} memoryKey="reports-total-income" />
+                    <SpringNumber value={totalIncome} memoryKey={`reports-total-income-${reportPeriodKey}`} />
                   </span>
                 </AutoMarquee>
               </div>
@@ -738,7 +739,7 @@ export default function Reports() {
               </span>
               <MagnitudeBadge
                 amount={peakIncomeItem ? peakIncomeItem.netAmount : 0}
-                memoryKey="reports-peak-income"
+                memoryKey={`reports-peak-income-${reportPeriodKey}`}
               />
             </div>
             <div className="min-w-0">

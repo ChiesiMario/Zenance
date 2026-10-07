@@ -400,7 +400,7 @@ export default function Dashboard() {
           <div className="relative flex items-center justify-center h-5 mb-2 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.netBalance')}</p>
             <div className="absolute right-0 flex items-center">
-              <MagnitudeBadge amount={balance} memoryKey="dashboard-net-balance" />
+              <MagnitudeBadge amount={balance} memoryKey={`dashboard-net-balance-${currentMonthPrefix}`} />
             </div>
           </div>
           <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-2 leading-none">
@@ -409,7 +409,7 @@ export default function Dashboard() {
               baseCurrency={activeLedger?.baseCurrency} 
               type="balance" 
               animated 
-              memoryKey="dashboard-net-balance"
+              memoryKey={`dashboard-net-balance-${currentMonthPrefix}`}
             />
           </AutoMarquee>
         </div>
@@ -419,7 +419,7 @@ export default function Dashboard() {
           <div className="bg-card p-4">
             <div className="flex items-center justify-between h-5 mb-1">
               <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.income')}</p>
-              <MagnitudeBadge amount={income} memoryKey="dashboard-income" />
+              <MagnitudeBadge amount={income} memoryKey={`dashboard-income-${currentMonthPrefix}`} />
             </div>
             <div className="text-2xl font-mono tracking-tight font-medium leading-none">
               <AutoMarquee align="left">
@@ -428,7 +428,7 @@ export default function Dashboard() {
                   baseCurrency={activeLedger?.baseCurrency} 
                   type="income" 
                   animated 
-                  memoryKey="dashboard-income"
+                  memoryKey={`dashboard-income-${currentMonthPrefix}`}
                 />
               </AutoMarquee>
             </div>
@@ -436,7 +436,7 @@ export default function Dashboard() {
           <div className="bg-card p-4">
             <div className="flex items-center justify-between h-5 mb-1">
               <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">{t('dashboard.expense')}</p>
-              <MagnitudeBadge amount={expense} memoryKey="dashboard-expense" />
+              <MagnitudeBadge amount={expense} memoryKey={`dashboard-expense-${currentMonthPrefix}`} />
             </div>
             <div className="text-2xl font-mono tracking-tight font-medium leading-none">
               <AutoMarquee align="left">
@@ -446,7 +446,7 @@ export default function Dashboard() {
                   type="expense" 
                   showSign={false} 
                   animated 
-                  memoryKey="dashboard-expense"
+                  memoryKey={`dashboard-expense-${currentMonthPrefix}`}
                 />
               </AutoMarquee>
             </div>

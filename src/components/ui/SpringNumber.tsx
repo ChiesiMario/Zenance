@@ -88,12 +88,7 @@ export function SpringNumber({
     const isValueChanged = prevValueRef.current !== value;
     prevValueRef.current = value;
 
-    // 若是切換頁面或初始掛載階段，且剛好是 0 態（資料庫尚未返回），不朝 0 俯衝
-    if (value === 0 && rememberedValue !== undefined && rememberedValue !== 0) {
-      return;
-    }
-
-    if (scopedMemoryKey && value !== 0) {
+    if (scopedMemoryKey && !isNaN(value)) {
       setRememberedNumber(scopedMemoryKey, value);
     }
 

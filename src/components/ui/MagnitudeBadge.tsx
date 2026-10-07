@@ -29,11 +29,11 @@ export const MagnitudeBadge: React.FC<MagnitudeBadgeProps> = ({
 }) => {
   const { activeLedgerId } = useAppStore();
   const scopedMemoryKey = memoryKey ? `${activeLedgerId || 'global'}:${memoryKey}` : undefined;
-  const isInvalid = amount === undefined || amount === null || isNaN(amount) || amount === 0;
+  const isInvalid = amount === undefined || amount === null || isNaN(amount);
   const remembered = scopedMemoryKey ? getRememberedNumber(scopedMemoryKey) : undefined;
   const effectiveAmount = isInvalid && remembered !== undefined ? remembered : amount;
 
-  if (scopedMemoryKey && amount !== undefined && amount !== null && !isNaN(amount) && amount !== 0) {
+  if (scopedMemoryKey && amount !== undefined && amount !== null && !isNaN(amount)) {
     setRememberedNumber(scopedMemoryKey, amount);
   }
 

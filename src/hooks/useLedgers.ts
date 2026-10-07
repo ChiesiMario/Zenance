@@ -3,10 +3,19 @@ import { db, type Ledger } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
 import { scheduleAutoSync } from '@/services/sync/syncEngine';
 
+// 模組級單例記憶體快取：紀錄最新一次成功 Resolve 的帳本列表，消除組件首次掛載的空白空隙
+let lastLedgersCache: Ledger[] | undefined = undefined;
+
 export function useLedgers() {
   const ledgers = useLiveQuery(
     () => db.ledgers.filter(l => !l.deleted).toArray()
   );
+
+  if (ledgers !== undefined) {
+    lastLedgersCache = ledgers;
+  }
+
+  const effectiveLedgers = ledgers !== undefined ? ledgers : lastLedgersCache;
 
   const addLedger = async (name: string, baseCurrency: string = 'CNY'): Promise<Ledger> => {
     const isFirstLedger = await db.ledgers.filter(l => !l.deleted).count() === 0;
@@ -42,7 +51,7 @@ export function useLedgers() {
   };
 
   return {
-    ledgers,
+    ledgers: effectiveLedgers,
     addLedger,
     updateLedger,
     deleteLedger,

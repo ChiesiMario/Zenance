@@ -194,6 +194,20 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     setActiveTxId(transactionId);
   }, [transactionId]);
 
+  // 背景主容器滾動鎖定 (Main Scroll Lock)：防止彈窗開啟期間背後頁面滾動
+  useEffect(() => {
+    if (!transactionId) return;
+    const mainEl = document.querySelector('main');
+    if (!mainEl) return;
+
+    const originalOverflow = mainEl.style.overflow;
+    mainEl.style.overflow = 'hidden';
+
+    return () => {
+      mainEl.style.overflow = originalOverflow;
+    };
+  }, [transactionId]);
+
   const currentTransaction = useMemo(() => {
     if (!activeTxId || !transactions) return null;
     return transactions.find((tx) => tx.id === activeTxId) || null;
@@ -225,7 +239,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   }, [initialRootTx, transactions]);
 
   // 4. 二維列結構化構建：每一列包含一個主交易及其名下的所有子退款
-  const CARD_WIDTH = 320;
+  const CARD_WIDTH = 280;
   const REFUND_GAP = 24;
   const COLUMN_GAP = 32;
   const CONNECTOR_HEIGHT = 56;
@@ -323,8 +337,14 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800,
   }));
-  const [parentHeight, setParentHeight] = useState(520);
-  const [childrenHeight, setChildrenHeight] = useState(440);
+  const [parentHeight, setParentHeight] = useState(() => {
+    if (typeof window === 'undefined') return 520;
+    return Math.min(520, Math.max(360, window.innerHeight - 130));
+  });
+  const [childrenHeight, setChildrenHeight] = useState(() => {
+    if (typeof window === 'undefined') return 440;
+    return Math.min(440, Math.max(320, window.innerHeight - 150));
+  });
 
   // 控制相機平移過渡：初次打開時為 false（禁用過渡以防滑動/跳動），後續主動切換卡片時才啟用平滑過渡
   const [isTransitionReady, setIsTransitionReady] = useState(false);
@@ -445,9 +465,19 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     return maxRight;
   }, [columnsData]);
 
-  // 7. 相機平移量：將當前選中卡片的 (x, y) 搬移到舞台中央 (stageWidth / 2, stageHeight / 2)
+  // 7. 相機平移量：針對小螢幕設備引入安全淨空，避讓底部懸浮 Dock Bar 並防止頂部裁切
   const currentTranslateX = stageSize.width / 2 - activeLocation.x;
-  const currentTranslateY = stageSize.height / 2 - activeLocation.y;
+  const currentTranslateY = useMemo(() => {
+    const DOCK_CLEARANCE = 76; // 34px Dock Bar + 24px bottom offset + 18px 呼吸間距
+    const TOP_SAFE_PADDING = 16; // 頂部至少預留 16px 安全避讓
+
+    const currentCardHeight = activeLocation.isChild ? childrenHeight : parentHeight;
+    const currentCardTopInCanvas = activeLocation.isChild ? (parentHeight + CONNECTOR_HEIGHT) : 0;
+    const safeAvailableHeight = Math.max(0, stageSize.height - DOCK_CLEARANCE - TOP_SAFE_PADDING);
+
+    const targetCardScreenY = TOP_SAFE_PADDING + Math.max(0, (safeAvailableHeight - currentCardHeight) / 2);
+    return targetCardScreenY - currentCardTopInCanvas;
+  }, [stageSize.height, activeLocation.isChild, childrenHeight, parentHeight]);
 
   // 當前聚焦列
   const currentColumn = useMemo(() => {
@@ -710,6 +740,9 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     ) {
       return t('reimbursements.writeOffCategory', '抹零');
     }
+    if (!cat && allCategories === undefined) {
+      return '\u00A0';
+    }
     return cat?.name || categoryId;
   };
 
@@ -728,37 +761,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     } catch {
       return isoStr;
     }
-  };
-
-  // Generate barcode bars based on transaction reference
-  const getBarcodeBars = (seedStr: string) => {
-    const seed = seedStr.replace(/-/g, '').toUpperCase();
-    const bars: { x: number; width: number }[] = [];
-    let currentX = 14;
-
-    bars.push({ x: currentX, width: 2 });
-    currentX += 4;
-    bars.push({ x: currentX, width: 1.5 });
-    currentX += 4;
-
-    for (let i = 0; i < seed.length && currentX < 182; i++) {
-      const code = seed.charCodeAt(i);
-      const w1 = (code % 3) + 1;
-      const s1 = ((code >> 1) % 2) + 2;
-      const w2 = ((code >> 2) % 2) + 1;
-      const s2 = 2;
-
-      bars.push({ x: currentX, width: w1 });
-      currentX += w1 + s1;
-      if (currentX >= 180) break;
-      bars.push({ x: currentX, width: w2 });
-      currentX += w2 + s2;
-    }
-
-    bars.push({ x: 184, width: 1.5 });
-    bars.push({ x: 188, width: 2 });
-
-    return bars;
   };
 
   const handleDelete = async () => {
@@ -816,7 +818,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     const isChild = !!tx.parentId;
     const displayRef = tx.displayId || tx.id.split('-')[0].toUpperCase();
     const categoryTitle = getCategoryName(tx.category, tx);
-    const barcode = getBarcodeBars(displayRef + tx.id);
 
     // Associated contact for this specific card
     const walletList = allWallets || wallets || accounts;
@@ -829,17 +830,20 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     const contactId = tx.type === 'loan' ? (isLend ? tx.toAccountId : tx.accountId) : undefined;
     const contactObj = contactId ? (contactList?.find((c) => c.id === contactId) || null) : null;
 
+    const ledgerBaseCurrency = activeLedger?.baseCurrency;
+
     const fromCurrency =
       walletList?.find((a) => a.id === tx.accountId)?.currency ||
       contactList?.find((c) => c.id === tx.accountId)?.currency ||
       tx.originalCurrency ||
-      activeLedger?.baseCurrency ||
+      ledgerBaseCurrency ||
       'CNY';
 
     const toCurrency =
       walletList?.find((a) => a.id === tx.toAccountId)?.currency ||
       contactList?.find((c) => c.id === tx.toAccountId)?.currency ||
-      activeLedger?.baseCurrency ||
+      ledgerBaseCurrency ||
+      fromCurrency ||
       'CNY';
 
     // Amount color, currency, and sign
@@ -856,11 +860,13 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
       (isTransfer || isLoan) && tx.toAccountId && fromCurrency !== toCurrency
     );
     const hasTransferIn = tx.transferInAmount !== undefined && tx.transferInAmount > 0;
-    const isForeignFrom =
-      fromCurrency !== (activeLedger?.baseCurrency || 'CNY') ||
-      Boolean(tx.originalCurrency && tx.originalCurrency !== (activeLedger?.baseCurrency || 'CNY'));
+    const isForeignFrom = ledgerBaseCurrency
+      ? (fromCurrency !== ledgerBaseCurrency ||
+          Boolean(tx.originalCurrency && tx.originalCurrency !== ledgerBaseCurrency))
+      : Boolean(tx.originalCurrency && tx.originalCurrency !== fromCurrency);
     const isForeignTo = Boolean(
-      tx.toAccountId && toCurrency !== (activeLedger?.baseCurrency || 'CNY')
+      tx.toAccountId &&
+        (ledgerBaseCurrency ? toCurrency !== ledgerBaseCurrency : toCurrency !== fromCurrency)
     );
     const showCurrencyDetails = isCrossCurrency || isForeignFrom || isForeignTo || hasTransferIn;
 
@@ -892,7 +898,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
       cardBaseCurrency = toCurrency;
     } else if (
       tx.type === 'income' &&
-      (isForeignFrom || fromCurrency !== (activeLedger?.baseCurrency || 'CNY'))
+      (isForeignFrom || (ledgerBaseCurrency ? fromCurrency !== ledgerBaseCurrency : false))
     ) {
       // 外幣卡收款/收入：展示實際收到的外幣金額 (例如 $1)
       cardAmount = tx.originalAmount ?? tx.amount;
@@ -903,10 +909,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         ? -(tx.originalAmount ?? tx.amount)
         : (tx.originalAmount ?? tx.amount);
       cardBaseCurrency =
-        tx.originalCurrency || fromCurrency || activeLedger?.baseCurrency || 'CNY';
+        tx.originalCurrency || fromCurrency || ledgerBaseCurrency || 'CNY';
     } else {
       cardAmount = isLendLoan ? -tx.amount : tx.amount;
-      cardBaseCurrency = activeLedger?.baseCurrency || 'CNY';
+      cardBaseCurrency = ledgerBaseCurrency || fromCurrency || 'CNY';
     }
 
     // Note validation
@@ -921,9 +927,9 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
     const effectiveType = isChild ? tx.type : cardType;
     const amountColorClass = (() => {
-      if (effectiveType === 'income') return 'text-emerald-500 dark:text-emerald-400';
-      if (effectiveType === 'expense') return 'text-rose-500 dark:text-rose-400';
-      if (effectiveType === 'transfer') return 'text-blue-500 dark:text-blue-400';
+      if (effectiveType === 'income') return 'text-emerald-500';
+      if (effectiveType === 'expense') return 'text-rose-500';
+      if (effectiveType === 'transfer') return 'text-blue-500';
       return 'text-foreground';
     })();
 
@@ -937,14 +943,14 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           }
         }}
         className={cn(
-          "w-[320px] shrink-0 bg-card text-card-foreground rounded-2xl shadow-none relative overflow-hidden transition-all duration-300 border border-border flex flex-col justify-between",
+          "w-[280px] max-w-[calc(100vw-32px)] max-h-[min(560px,calc(100dvh-120px))] shrink-0 bg-card text-card-foreground rounded-2xl shadow-none relative overflow-hidden transition-opacity duration-150 border border-border flex flex-col justify-between touch-none",
           isActive
             ? "opacity-100 pointer-events-auto select-text cursor-default"
             : "opacity-30 hover:opacity-60 cursor-pointer pointer-events-auto select-none"
         )}
       >
         {/* Top Paper Header: Branding & Serial */}
-        <div className="pt-5 px-5 pb-2.5 flex flex-col items-center text-center">
+        <div className="pt-3.5 sm:pt-5 px-4 sm:px-5 pb-2 sm:pb-2.5 flex flex-col items-center text-center shrink-0">
           <div className="flex items-center gap-1.5 mb-0.5">
             {isChild ? (
               <div className="w-4 h-4 rounded bg-emerald-500 text-black text-[10px] font-bold flex items-center justify-center font-mono">↩</div>
@@ -953,17 +959,17 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
             )}
             <span className={cn(
               "text-[11px] font-mono font-bold uppercase tracking-[0.25em]",
-              isChild ? "text-emerald-500 dark:text-emerald-400" : "text-foreground"
+              isChild ? "text-emerald-500" : "text-foreground"
             )}>
               {isChild ? "REFUND VOUCHER" : "ZENANCE"}
             </span>
           </div>
-          <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground block mb-2.5">
+          <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5 sm:mb-2.5">
             {isChild ? t('refund.subRefundItem', '退款憑證') : t('receipt.voucherTitle', 'TRANSACTION RECEIPT')}
           </span>
 
           {/* Serial & Date Bar (shows group index if multiple cards) */}
-          <div className="w-full flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-3 border-b border-border/70 pb-2">
+          <div className="w-full flex items-center justify-between text-[11px] font-mono text-muted-foreground pt-2 sm:pt-3 border-b border-border/70 pb-1.5 sm:pb-2">
             <div className="flex items-center gap-1 font-semibold text-foreground">
               <span>#{displayRef}</span>
               {!isChild && columnsData.length > 1 && (
@@ -977,15 +983,15 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         </div>
 
         {/* Hero Amount & Category Section */}
-        <div className="px-5 py-2 flex flex-col items-center text-center">
+        <div className="px-4 sm:px-5 py-1 sm:py-2 flex flex-col items-center text-center shrink-0">
           {/* Category Capsule / Transfer Route & Status Badges */}
           <div className="flex items-center justify-center gap-1.5 mb-1.5 flex-wrap">
             {isChild ? (
               <span className={cn(
                 "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border leading-none shrink-0",
                 tx.type === 'expense'
-                  ? "bg-rose-500/10 text-rose-500 dark:text-rose-400 border-rose-500/20"
-                  : "bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 border-emerald-500/20"
+                  ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                  : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
               )}>
                 {tx.type === 'income' ? t('refund.title', '支出退款') : t('refund.title', '收入退款')}
               </span>
@@ -1059,7 +1065,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               <div className="text-[11px] font-mono text-muted-foreground mt-0.5 flex items-center gap-1">
                 <span>{getAccountName(tx.accountId)}</span>
                 <span className="text-muted-foreground/60">·</span>
-                <span className="text-emerald-500 dark:text-emerald-400 font-medium">
+                <span className="text-emerald-500 font-medium">
                   {t('refund.refunded', '已退款')} {formatAmountNumber(cardRefundedTotal)}
                 </span>
               </div>
@@ -1068,7 +1074,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         </div>
 
         {/* Ticket Notches & Dashed Perforation Line */}
-        <div className="relative py-2 flex items-center justify-center -mx-5 my-0.5">
+        <div className="relative py-1.5 sm:py-2 flex items-center justify-center -mx-5 my-0.5 shrink-0">
           {/* Left Notch */}
           <div className="absolute -left-[10px] size-5 rounded-full bg-background border border-border" />
           {/* Perforation Dashed Line */}
@@ -1077,10 +1083,15 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           <div className="absolute -right-[10px] size-5 rounded-full bg-background border border-border" />
         </div>
 
-        {/* Dot Matrix Details Grid */}
-        <div className="px-5 py-2 space-y-1.5 font-mono text-xs">
+        {/* Dot Matrix Details Grid (彈性滾動區塊，小高度設備可自適應內部捲動) */}
+        <div
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          className="px-4 sm:px-5 pt-1.5 sm:pt-2 pb-[30px] space-y-1 sm:space-y-1.5 font-mono text-xs flex-1 min-h-0 overflow-y-auto overscroll-contain select-text [scrollbar-width:thin] touch-pan-y"
+        >
           {/* Column Title Row */}
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border/50 pb-1 mb-2">
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border/50 pb-1 mb-1.5 sticky top-0 bg-card z-10">
             <span>{t('receipt.item', '項目')}</span>
             <span>{t('receipt.details', '明細')}</span>
           </div>
@@ -1195,27 +1206,6 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               </p>
             </div>
           )}
-
-
-        </div>
-
-        {/* Barcode & Footer Receipt Section */}
-        <div className="px-5 pt-3 pb-5 flex flex-col items-center text-center border-t border-border/60 mt-1">
-          <svg
-            className="w-44 h-7 opacity-85 dark:opacity-75 text-foreground"
-            viewBox="0 0 200 32"
-            fill="currentColor"
-          >
-            {barcode.map((b, bIdx) => (
-              <rect key={bIdx} x={b.x} y={0} width={b.width} height={32} />
-            ))}
-          </svg>
-          <span className="text-[10px] font-mono tracking-[0.25em] text-muted-foreground mt-2.5">
-            * {displayRef} *
-          </span>
-          <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60 mt-1.5">
-            ZENANCE · LOCAL-FIRST VOUCHER
-          </span>
         </div>
       </div>
     );
@@ -1229,7 +1219,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
       <DialogContent
         showCloseButton={false}
         fullscreen={true}
-        className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !overflow-hidden !pointer-events-none select-none duration-200"
+        className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !overflow-hidden !pointer-events-none select-none"
       >
         <DialogTitle className="sr-only">
           {t('receipt.voucherTitle', '交易憑證')} - #{currentTransaction.displayId || currentTransaction.id}
@@ -1254,7 +1244,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           {/* Scrollable / Centered 2D Stage (佔滿全螢幕高度，杜絕上下邊界裁切) */}
           <div
             ref={stageRef}
-            className="absolute inset-0 w-full h-full overflow-hidden pointer-events-auto select-none"
+            className="absolute inset-0 w-full h-full overflow-hidden pointer-events-auto select-none touch-none"
             onWheel={handleWheel}
             onClick={onClose}
           >
@@ -1262,7 +1252,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
               className={cn(
-                "absolute left-0 top-0 cursor-default will-change-transform",
+                "absolute left-0 top-0 cursor-default will-change-transform touch-none",
                 isTransitionReady
                   ? "transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
                   : "transition-none"
@@ -1352,7 +1342,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           {/* 3. 懸浮 4 欄 Dock Bar（固定在底部中央，毛玻璃懸浮，不侵佔舞台高度） */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[280px] select-none font-mono pointer-events-auto shrink-0 animate-in fade-in-0 duration-200 ease-out fill-mode-forwards"
+            className="absolute bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 w-[280px] max-w-[calc(100vw-32px)] select-none font-mono pointer-events-auto shrink-0"
           >
             <div className="grid grid-cols-4 divide-x divide-border/40 border border-border/50 rounded-full bg-background/40 dark:bg-zinc-900/40 backdrop-blur-xl overflow-hidden text-xs">
               {/* 1. 刪除 */}

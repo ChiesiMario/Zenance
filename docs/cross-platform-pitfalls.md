@@ -11,7 +11,7 @@
 
 ---
 
-## 2. 五大經典踩坑案例深度剖析 (Five Critical Case Studies)
+## 2. 八大經典踩坑案例深度剖析 (Eight Critical Case Studies)
 
 ### 案例 1：iOS Safari `100vh` 陷阱導致底部導航欄被擠出螢幕
 - **現象**：在 iPhone 移動端 Safari 瀏覽器中，底部導航欄（Bottom Navigation Bar）完全消失不可見。
@@ -119,6 +119,48 @@
 
 ---
 
+### 案例 7：非同步資料空白期與硬編碼預設值引發假陽性渲染閃爍 (Phantom Foreign Currency Flickering)
+- **現象**：在基準貨幣非 CNY 的帳本（如 USD、EUR、HKD 等）中，打開一筆普通的同幣種交易詳情卡片，卡片下方在第 0 幀短暫顯示了「原始金額」與「匯率」欄位，約 20ms ~ 50ms 後突然消失，視覺上產生了「匯率資訊一閃而過」的跳動閃爍。
+- **底層根本原因 (Root Cause)**：
+  - **資料查詢 Hook 首次掛載空白期**：Dexie 的 `useLiveQuery` 進行 IndexedDB 查詢時是非同步微任務，在組件掛載的第一幀（第 0 幀）返回 `undefined`。若 Hook 未實作模組級單例快取，每次新組件掛載必定產生短暫的資料空白。
+  - **過早降級與硬編碼值衝突 (Premature Fallback to Hardcoded Value)**：業務層在計算是否為外幣交易時，寫死了 `(activeLedger?.baseCurrency || 'CNY')`：
+    ```typescript
+    const isForeignFrom =
+      fromCurrency !== (activeLedger?.baseCurrency || 'CNY') ||
+      Boolean(tx.originalCurrency && tx.originalCurrency !== (activeLedger?.baseCurrency || 'CNY'));
+    ```
+  - **假陽性判斷 (False Positive)**：在 USD 帳本中，該筆交易的 `fromCurrency` 正確為 `'USD'`，但在第 0 幀時 `activeLedger` 尚未讀出，基準貨幣被粗暴降級為 `'CNY'`。導致 `'USD' !== 'CNY'` 評估為 `true`，React 誤將同幣種交易當作外幣交易短暫掛載了外幣明細行；待資料庫查詢完成更新 `activeLedger` 為 `'USD'` 後，條件變為 `false`，DOM 被瞬間卸載，造成肉眼可見的閃爍跳動。
+- **標準解法 (Standard Fix)**：
+  - **資料 Hook 實作模組級單例快取 (Singleton Memory Cache)**：
+    ```typescript
+    let lastLedgersCache: Ledger[] | undefined = undefined;
+
+    export function useLedgers() {
+      const ledgers = useLiveQuery(() => db.ledgers.filter(l => !l.deleted).toArray());
+      if (ledgers !== undefined) lastLedgersCache = ledgers;
+      const effectiveLedgers = ledgers !== undefined ? ledgers : lastLedgersCache;
+      return { ledgers: effectiveLedgers, ... };
+    }
+    ```
+    應用全生命週期中，後續彈窗或頁面掛載的第一幀即可同步獲取前次 Resolve 的快取，消除空白期。
+  - **業務層基準貨幣安全防禦 (Defensive Fallback)**：
+    移除硬編碼 `'CNY'`，當帳本基準貨幣未知時，安全降級為交易自身的貨幣 `fromCurrency`；且僅在帳本基準貨幣明確存在且不同時才判定為外幣，徹底杜絕非 CNY 帳本在載入期間的假陽性誤判。
+
+---
+
+### 案例 8：浮層手勢外洩與背景 `<main>` 滾動鏈穿透 (Scroll Chaining & Background Leakage)
+- **現象**：在打開全螢幕交易詳情卡片（`TransactionDetailsDialog`）時，用戶在卡片上進行上下滑動（如切換退款卡片或瀏覽明細），背後的主頁面（交易列表）被輕易連帶滾動。
+- **底層根本原因 (Root Cause)**：
+  - **手勢未消費與 CSS `touch-action` 缺失**：卡片與舞台實作了自定義滑動手勢，但僅在 `touchend` 處理位移，在連續滑動的 `touchmove` 階段未進行攔截與 `preventDefault`，且未設置 CSS `touch-action: none`。瀏覽器判定該滑動為未消費的原生垂直滾動手勢。
+  - **瀏覽器滾動鏈 (Scroll Chaining) 機制**：在 WebKit（iOS Safari / PWA）與 Chromium 行動端內核中，當觸摸事件發生在自身不具備原生滾動能力（`overflow: hidden`）的元素上時，瀏覽器會沿 DOM 樹向上將滾動轉交給最近的可滾動父容器。
+  - **樹狀百分比架構下的背景 `<main>` 未被鎖定**：標準 UI 庫預設僅鎖定 `document.body` 的 `overflow: hidden`，而 Zenance 遵循樹狀 100% 高度規範，主要滾動容器是 `<main className="flex-1 overflow-y-auto">`，在彈窗開啟時未進行 Scroll Lock，導致穿透手勢可肆意滾動背景。
+- **標準解法 (Standard Fix)**：
+  - **雙層全鏈路防護 (Defense-in-Depth)**：
+    1. **Compositor 級手勢隔離**：在舞台、畫布與卡片本體宣告 `touch-none`（`touch-action: none`），由瀏覽器排版合成器層面直接阻斷原生滾動分發；內部滾動區域配置 `touch-pan-y` 並阻斷 `touchmove` / `touchend` 冒泡。
+    2. **背景主容器滾動鎖定 (Main Scroll Lock)**：在彈窗掛載期間將 `<main>` 的 `overflow` 設為 `hidden`，關閉時精準復原，徹底保證背景在底層物理層面的絕對靜態且滾動位置無損保留。
+
+---
+
 ## 3. Zenance 跨端通用架構規範總覽 (Architecture Contract)
 
 ### 規範 1：樹狀百分比高度 (100% Tree Height)
@@ -155,6 +197,14 @@
 - 遵循「**取消在最左側 (Cancel on Left)、確認/新增在最右側 (Confirm/Add on Right)**」的人機工程學規範，符合雙手與單手拇指操作直覺。
 - 只有單一按鈕（如關閉/確定）時，自動靠右對齊 (`[&>*:only-child]:ml-auto`)。
 
+### 規範 6：資料查詢 Hook 單例快取與安全降級 (Singleton Memory Cache & Defensive Fallback)
+- **單例快取消除空白期**：所有透過 `useLiveQuery` 或非同步微任務查詢資料的自定義 Hook（`useTransactions`、`useCategories`、`useAccounts`、`useLedgers`），必須在模組級建立 `last*Cache` 單例記憶體快取，確保所有新掛載組件在第 0 幀可同步取值。
+- **禁止硬編碼業務預設值**：嚴禁在狀態未確定前假設使用者預設偏好（如硬編碼 `|| 'CNY'`）。降級策略必須具備上下文自洽性（如回退至當前項目的自身幣種），並在未就緒時保持保守條件判斷，杜絕假陽性渲染。
+
+### 規範 7：全域浮層雙層手勢與滾動隔離 (Compositor Touch Isolation & Main Scroll Lock)
+- **手勢層 Compositor 隔離**：自定義手勢容器必須顯式宣告 `touch-none`（`touch-action: none`），告知瀏覽器排版合成器攔截原生滾動；內部滾動容器配置 `touch-pan-y` 並阻斷 `touchmove` / `touchend` 冒泡。
+- **背景主容器滾動鎖定 (Main Scroll Lock)**：全螢幕浮層掛載時，必須透過生命週期將背景主要滾動容器 `<main>` 的 `overflow` 切換為 `hidden`，並於銷毀時精準還原，達成 100% 絕對靜態防護。
+
 ---
 
 ## 4. 開發檢查清單 (Do's and Don'ts)
@@ -168,4 +218,7 @@
 | **遮罩濾鏡** | 全螢幕動態毛玻璃跑 `fade-in` 或使用 `isolate` | 遮罩瞬間就位（`data-closed:hidden`），無 `isolate`，半徑 2px |
 | **遮罩透明度** | 直接在 HEX 變數上使用 Tailwind 修飾符（如 `bg-background/80`，觸發 `color-mix()` 導致 iOS 15 Fallback 成 100% 實色） | 採用內嵌 RGBA 的專屬語意變數 `bg-overlay`（`rgba(255,255,255,0.8)` / `rgba(0,0,0,0.8)`） |
 | **彈窗操作按鈕** | 移動端使用 `flex-col-reverse` 倒序垂直堆疊 | 統一使用 `flex-row justify-between`，取消居左、確認居右並排於同一行 |
+| **非同步資料載入** | 未防禦第 0 幀空白期，直接粗暴硬編碼預設值（如 `|| 'CNY'`）導致假陽性條件閃爍 | Hook 實作模組級單例快取（`last*Cache`），業務邏輯在狀態未確定前採保守自洽降級 |
+| **浮層手勢與滾動** | 手勢容器未宣告 `touch-action`，未在 `touchmove` 攔截，任由瀏覽器滾動鏈穿透 | 舞台宣告 `touch-none`，內部滾動區配置 `touch-pan-y`，並在彈窗開啟時將背景 `<main>` 的 `overflow` 鎖定為 `hidden` |
+
 

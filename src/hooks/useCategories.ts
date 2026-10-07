@@ -4,6 +4,11 @@ import { db, type Category } from '@/services/db/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useAppStore } from '@/store/useAppStore';
 
+// 模組級單例記憶體快取：紀錄各帳本最新一次成功 Resolve 的分類列表，消除組件首次掛載的空白空隙
+const lastCategoriesCache: Record<string, Category[]> = {};
+const lastArchivedCategoriesCache: Record<string, Category[]> = {};
+const lastAllCategoriesCache: Record<string, Category[]> = {};
+
 export function useCategories() {
   const { activeLedgerId } = useAppStore();
 
@@ -57,6 +62,28 @@ export function useCategories() {
     },
     [activeLedgerId]
   );
+
+  if (activeLedgerId && categories !== undefined) {
+    lastCategoriesCache[activeLedgerId] = categories;
+  }
+  if (activeLedgerId && archivedCategories !== undefined) {
+    lastArchivedCategoriesCache[activeLedgerId] = archivedCategories;
+  }
+  if (activeLedgerId && allCategories !== undefined) {
+    lastAllCategoriesCache[activeLedgerId] = allCategories;
+  }
+
+  const effectiveCategories = categories !== undefined
+    ? categories
+    : (activeLedgerId ? lastCategoriesCache[activeLedgerId] : undefined);
+
+  const effectiveArchivedCategories = archivedCategories !== undefined
+    ? archivedCategories
+    : (activeLedgerId ? lastArchivedCategoriesCache[activeLedgerId] : undefined);
+
+  const effectiveAllCategories = allCategories !== undefined
+    ? allCategories
+    : (activeLedgerId ? lastAllCategoriesCache[activeLedgerId] : undefined);
 
   const addCategory = async (name: string, type: 'income' | 'expense', isDefault = false): Promise<Category> => {
     if (!activeLedgerId) throw new Error('No active ledger');
@@ -233,9 +260,10 @@ export function useCategories() {
   };
 
   return {
-    categories,
-    archivedCategories,
-    allCategories,
+    categories: effectiveCategories,
+    archivedCategories: effectiveArchivedCategories,
+    allCategories: effectiveAllCategories,
+    isLoading: effectiveAllCategories === undefined,
     addCategory,
     updateCategory,
     archiveCategory,

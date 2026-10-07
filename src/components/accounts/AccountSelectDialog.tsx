@@ -273,7 +273,7 @@ export function AccountSelectDialog({
                                   rawBalance > 0 ? (
                                     <span className={cn(
                                       "font-mono text-sm font-semibold block leading-tight",
-                                      isSelected ? "text-emerald-300 dark:text-emerald-400" : "text-emerald-500 dark:text-emerald-400"
+                                      isSelected ? "text-emerald-300" : "text-emerald-500"
                                     )}>
                                       <span className="text-xs font-sans font-medium mr-1">{t('contacts.toCollect')}</span>
                                       {sym}{formatAmountNumber(Math.abs(rawBalance))}
@@ -281,7 +281,7 @@ export function AccountSelectDialog({
                                   ) : rawBalance < 0 ? (
                                     <span className={cn(
                                       "font-mono text-sm font-semibold block leading-tight",
-                                      isSelected ? "text-rose-300 dark:text-rose-400" : "text-rose-500 dark:text-rose-400"
+                                      isSelected ? "text-rose-300" : "text-rose-500"
                                     )}>
                                       <span className="text-xs font-sans font-medium mr-1">{t('contacts.toPay')}</span>
                                       {sym}{formatAmountNumber(Math.abs(rawBalance))}
@@ -299,7 +299,7 @@ export function AccountSelectDialog({
                                     className={cn(
                                       "font-mono text-sm font-semibold block leading-tight",
                                       rawBalance < 0
-                                        ? isSelected ? "text-rose-300 dark:text-rose-400" : "text-rose-500 dark:text-rose-400"
+                                        ? isSelected ? "text-rose-300" : "text-rose-500"
                                         : isSelected ? "text-background font-bold" : "text-foreground"
                                     )}
                                   >

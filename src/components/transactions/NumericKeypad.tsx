@@ -343,14 +343,14 @@ export function NumericKeypad({
   }, [budgets, date]);
 
   const btnBaseClass =
-    "w-full h-[38px] sm:h-10 text-lg sm:text-xl font-mono font-medium rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none";
+    "w-full h-12 sm:h-10 text-2xl sm:text-xl font-mono font-medium rounded-xl sm:rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none";
 
   return (
     <div className="grid grid-cols-4 gap-1.5 w-full select-none touch-manipulation">
       
       {/* Row 1: Action Buttons (Date, Budget, Reimbursement, Fee, Rate, Contact) */}
       <div className={cn(
-        "col-span-4 w-full h-8",
+        "col-span-4 w-full h-9.5 sm:h-8",
         showReimburseButton
           ? "grid grid-cols-3 gap-1.5"
           : isCrossCurrency && (type === 'transfer' || type === 'loan')
@@ -362,10 +362,10 @@ export function NumericKeypad({
         <div className="relative w-full h-full">
           <button 
             type="button" 
-            className="w-full h-full flex gap-1.5 items-center justify-center p-0 rounded-lg bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors cursor-pointer" 
+            className="w-full h-full flex gap-1.5 items-center justify-center p-0 rounded-xl sm:rounded-lg bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/40 transition-colors cursor-pointer" 
             onClick={() => setIsCalendarOpen(true)}
           >
-            <CalendarDays className="size-3.5 shrink-0" />
+            <CalendarDays className="size-4 sm:size-3.5 shrink-0" />
             <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[80px]">{dateDisplay}</span>
           </button>
 
@@ -404,13 +404,13 @@ export function NumericKeypad({
                 type="button"
                 onClick={() => onSelectAmountField?.('out')}
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                  "w-full h-full flex gap-1 items-center justify-center px-1 py-0 rounded-xl sm:rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
                   activeAmountField === 'out' && !isFeeActive
                     ? "bg-foreground text-background border-foreground font-semibold"
                     : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
                 )}
               >
-                <span className="text-[11px] uppercase tracking-wider font-semibold truncate">
+                <span className="text-xs sm:text-[11px] uppercase tracking-wider font-semibold truncate">
                   {t('add.outflowCurrency', { currency: fromCurrency || '', defaultValue: `出款 ${fromCurrency || ''}` })}
                 </span>
               </button>
@@ -422,13 +422,13 @@ export function NumericKeypad({
                 type="button"
                 onClick={() => onSelectAmountField?.('in')}
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                  "w-full h-full flex gap-1 items-center justify-center px-1 py-0 rounded-xl sm:rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
                   activeAmountField === 'in' && !isFeeActive
                     ? "bg-foreground text-background border-foreground font-semibold"
                     : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
                 )}
               >
-                <span className="text-[11px] uppercase tracking-wider font-semibold truncate">
+                <span className="text-xs sm:text-[11px] uppercase tracking-wider font-semibold truncate">
                   {t('add.inflowCurrency', { currency: toCurrency || '', defaultValue: `到款 ${toCurrency || ''}` })}
                 </span>
               </button>
@@ -444,13 +444,13 @@ export function NumericKeypad({
               onClick={onToggleGift}
               title={t('add.giftHint', '標記為贈與，不計入應收與應還')}
               className={cn(
-                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-xl sm:rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
                 isGift
                   ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/40 hover:bg-purple-500/25 font-semibold"
                   : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
               )}
             >
-              <Gift className={cn("size-3.5 shrink-0 transition-colors", isGift ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground group-hover:text-foreground")} />
+              <Gift className={cn("size-4 sm:size-3.5 shrink-0 transition-colors", isGift ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground group-hover:text-foreground")} />
               <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
                 {t('add.gift', '贈與')}
               </span>
@@ -465,13 +465,13 @@ export function NumericKeypad({
               <DropdownMenuTrigger
                 type="button"
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-lg transition-colors outline-none cursor-pointer group border",
+                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl sm:rounded-lg transition-colors outline-none cursor-pointer group border",
                   matchingBudget
                     ? "bg-muted text-foreground border-border font-medium"
                     : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40"
                 )}
               >
-                <Target className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <Target className="size-4 sm:size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
                 <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[65px]">
                   {budgetDisplayLabel}
                 </span>
@@ -605,7 +605,7 @@ export function NumericKeypad({
               type="button"
               onClick={onToggleFeeMode || onFeeClick}
               className={cn(
-                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
+                "w-full h-full flex gap-1.5 items-center justify-center px-1.5 py-0 rounded-xl sm:rounded-lg transition-all outline-none cursor-pointer group border shadow-none",
                 isFeeActive
                   ? "bg-foreground text-background border-foreground font-semibold"
                   : feeAmount && feeAmount > 0
@@ -615,14 +615,14 @@ export function NumericKeypad({
             >
               {isFeeActive ? (
                 <>
-                  <Check className="size-3.5 shrink-0" />
+                  <Check className="size-4 sm:size-3.5 shrink-0" />
                   <span className="text-xs uppercase tracking-wider font-semibold truncate max-w-[95px]">
                     {t('add.feeDone', '完成')}
                   </span>
                 </>
               ) : (
                 <>
-                  <Zap className={cn("size-3.5 shrink-0 transition-colors", feeAmount && feeAmount > 0 ? "text-amber-500" : "text-muted-foreground group-hover:text-foreground")} />
+                  <Zap className={cn("size-4 sm:size-3.5 shrink-0 transition-colors", feeAmount && feeAmount > 0 ? "text-amber-500" : "text-muted-foreground group-hover:text-foreground")} />
                   <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[85px]">
                     {feeAmount && feeAmount > 0 ? `${t('add.fee', '手續費')} ${currencySymbol}${feeAmount}` : t('add.feeSetting', '手續費')}
                   </span>
@@ -653,7 +653,7 @@ export function NumericKeypad({
                   setIsSplitDialogOpen(true);
                 }}
                 className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-lg transition-all outline-none border",
+                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl sm:rounded-lg transition-all outline-none border",
                   !isAmountValid
                     ? "bg-muted/30 text-muted-foreground/40 opacity-40 cursor-not-allowed border-border/20"
                     : isSplitActive
@@ -662,7 +662,7 @@ export function NumericKeypad({
                 )}
               >
                 {currentSplits.length > 1 ? (
-                  <Users className={cn("size-3.5 shrink-0", !isAmountValid ? "text-muted-foreground/40" : "text-amber-500")} />
+                  <Users className={cn("size-4 sm:size-3.5 shrink-0", !isAmountValid ? "text-muted-foreground/40" : "text-amber-500")} />
                 ) : (
                   <Receipt className={cn("size-3.5 shrink-0 transition-colors", !isAmountValid ? "text-muted-foreground/40" : isSplitActive ? "text-amber-500" : "text-muted-foreground group-hover:text-foreground")} />
                 )}
@@ -695,11 +695,11 @@ export function NumericKeypad({
       <button 
         type="button" 
         onMouseDown={(e) => e.preventDefault()} 
-        className="w-full h-[38px] sm:h-10 rounded-lg bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none" 
+        className="w-full h-12 sm:h-10 rounded-xl sm:rounded-lg bg-muted/60 text-destructive hover:bg-destructive/10 hover:text-destructive border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none" 
         onClick={() => handleKeyPress('DEL')}
         title={t('keypad.backspace', '退格')}
       >
-        <Delete className="size-4.5" />
+        <Delete className="size-5 sm:size-4.5" />
       </button>
 
       {/* Row 3 */}
@@ -720,7 +720,7 @@ export function NumericKeypad({
       <button 
         type="button" 
         onMouseDown={(e) => e.preventDefault()} 
-        className="w-full h-[38px] sm:h-10 text-xs sm:text-sm font-mono tracking-wider font-medium rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none" 
+        className="w-full h-12 sm:h-10 text-sm sm:text-sm font-mono tracking-wider font-medium rounded-xl sm:rounded-lg bg-muted/60 text-foreground hover:bg-muted border border-border/40 active:bg-foreground active:text-background active:border-foreground transition-transform duration-75 active:scale-[0.96] select-none cursor-pointer flex items-center justify-center shadow-none" 
         onClick={() => handleKeyPress('00')}
       >
         00
@@ -729,7 +729,7 @@ export function NumericKeypad({
         type="button"
         onMouseDown={(e) => e.preventDefault()}
         className={cn(
-          "w-full h-[38px] sm:h-10 rounded-lg flex gap-1 items-center justify-center transition-transform duration-75 active:scale-[0.96] border cursor-pointer shadow-none select-none", 
+          "w-full h-12 sm:h-10 rounded-xl sm:rounded-lg flex gap-1 items-center justify-center transition-transform duration-75 active:scale-[0.96] border cursor-pointer shadow-none select-none", 
           isExpression
             ? "bg-muted/60 text-foreground hover:bg-muted border-border/40 font-bold active:bg-foreground active:text-background active:border-foreground"
             : "bg-primary text-primary-foreground hover:bg-primary/90 border-primary font-bold active:bg-primary/80"
@@ -738,10 +738,10 @@ export function NumericKeypad({
         title={isExpression ? t('keypad.calculate', '計算') : t('keypad.done', '完成')}
       >
         {isExpression ? (
-          <Equal className="size-5" />
+          <Equal className="size-6 sm:size-5" />
         ) : (
           <Check
-            className="size-5 stroke-[2.5]"
+            className="size-6 sm:size-5 stroke-[2.5]"
             style={{
               color: 'var(--primary-foreground)',
               stroke: 'var(--primary-foreground)',

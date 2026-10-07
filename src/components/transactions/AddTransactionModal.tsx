@@ -919,6 +919,47 @@ export function AddTransactionModal({
     })();
   };
 
+  // 手機端螢幕左側邊緣向右滑動返回 (Edge Swipe-Back)
+  const edgeTouchStartXRef = useRef<number>(0);
+  const edgeTouchStartYRef = useRef<number>(0);
+  const isEdgeSwipeActiveRef = useRef<boolean>(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 640) return;
+    if (accountSelectConfig.open || isCatPickerOpen || isCatDialogOpen) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    // 限制在螢幕左側邊緣 44px 內起手（符合 Apple HIG 標準熱區）
+    if (touch.clientX <= 44) {
+      edgeTouchStartXRef.current = touch.clientX;
+      edgeTouchStartYRef.current = touch.clientY;
+      isEdgeSwipeActiveRef.current = true;
+    } else {
+      isEdgeSwipeActiveRef.current = false;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isEdgeSwipeActiveRef.current) return;
+    isEdgeSwipeActiveRef.current = false;
+
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const deltaX = touch.clientX - edgeTouchStartXRef.current;
+    const deltaY = touch.clientY - edgeTouchStartYRef.current;
+
+    // 向右滑動超過 60px，且水平位移顯著大於垂直位移（避免垂直滑動時誤觸）
+    if (deltaX > 60 && deltaX > Math.abs(deltaY) * 1.5) {
+      triggerHaptic('light');
+      onClose();
+    }
+  };
+
+  const handleTouchCancel = () => {
+    isEdgeSwipeActiveRef.current = false;
+  };
+
   return (
     <>
       <Dialog 
@@ -939,6 +980,9 @@ export function AddTransactionModal({
         showCloseButton={false}
         className="select-none min-h-0 sm:overflow-visible"
         aria-describedby={undefined}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{transactionToEditId ? t('dashboard.edit', '編輯') : t('nav.add')}</DialogTitle>
@@ -946,9 +990,9 @@ export function AddTransactionModal({
 
         {/* Scrollable Content Wrapper to prevent squashing and ensure scrolling below minimum threshold */}
         <div className="w-full min-h-full flex flex-col gap-2.5 sm:gap-3">
-          {/* 1. Top Bar: Segmented Control & Close Button (h-9 / 36px, Sticky Top) */}
+          {/* 1. Top Bar: Segmented Control & Close Button (h-10 / 40px on mobile, Sticky Top) */}
           <div className="sticky top-0 z-20 w-full flex items-center justify-between gap-2 shrink-0 bg-background/95 sm:bg-card/95 backdrop-blur-md py-1 -mt-1">
-            <div className="relative h-9 flex-1 bg-muted/80 border border-border p-0.5 rounded-full flex items-center justify-between text-xs font-medium select-none overflow-hidden">
+            <div className="relative h-10 sm:h-9 flex-1 bg-muted/80 border border-border p-0.5 rounded-full flex items-center justify-between text-sm sm:text-xs font-medium select-none overflow-hidden">
               {/* Sliding Segmented Indicator */}
               <div
                 className="absolute inset-y-0.5 rounded-full bg-primary pointer-events-none z-0 shadow-none transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -1022,10 +1066,10 @@ export function AddTransactionModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
+              className="w-10 h-10 sm:w-9 sm:h-9 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 cursor-pointer"
               aria-label="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4.5 h-4.5 sm:w-4 sm:h-4" />
             </button>
           </div>
 
@@ -1034,7 +1078,7 @@ export function AddTransactionModal({
             {/* Case A: Expense / Income -> [Account Badge] then [Amount] */}
             {(type === 'expense' || type === 'income') && (
               <>
-                <div className="mb-1.5 flex justify-center">
+                <div className="mb-2 sm:mb-1.5 flex justify-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -1046,9 +1090,9 @@ export function AddTransactionModal({
                         onSelect: (acc) => setValue('accountId', acc.id),
                       });
                     }}
-                    className="h-7 px-3 py-0 rounded-full bg-muted/80 border border-border text-xs text-foreground hover:bg-muted transition-colors cursor-pointer inline-flex items-center gap-1.5 w-auto shadow-none"
+                    className="h-8.5 sm:h-7 px-3.5 sm:px-3 py-0 rounded-full bg-muted/80 border border-border text-sm sm:text-xs text-foreground hover:bg-muted transition-colors cursor-pointer inline-flex items-center gap-2 sm:gap-1.5 w-auto shadow-none"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="w-2 h-2 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 shrink-0" />
                     <span>
                       {selectedAccountId ? accounts?.find(a => a.id === selectedAccountId)?.name : t('add.account')}
                     </span>
@@ -1123,7 +1167,7 @@ export function AddTransactionModal({
                 </div>
 
                 {/* Transfer Fee Pill & Cross Currency Rate Pill */}
-                <div className="h-7 flex items-center justify-center gap-2 my-1">
+                <div className="h-8 sm:h-7 flex items-center justify-center gap-2 my-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -1135,7 +1179,7 @@ export function AddTransactionModal({
                       }
                     }}
                     className={cn(
-                      "h-7 px-3 rounded-full border text-[11px] inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-none shrink-0",
+                      "h-8 sm:h-7 px-3.5 sm:px-3 rounded-full border text-xs sm:text-[11px] inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-none shrink-0",
                       focusedField === 'fee'
                         ? "bg-amber-500/15 border-amber-500/70 text-foreground ring-1 ring-amber-500/40 font-semibold"
                         : parsedFeeAmount > 0
@@ -1143,7 +1187,7 @@ export function AddTransactionModal({
                           : "bg-muted/60 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                     )}
                   >
-                    <Zap className={cn("w-3 h-3", (focusedField === 'fee' || parsedFeeAmount > 0) ? "text-amber-500" : "text-muted-foreground")} />
+                    <Zap className={cn("w-3.5 h-3.5 sm:w-3 sm:h-3", (focusedField === 'fee' || parsedFeeAmount > 0) ? "text-amber-500" : "text-muted-foreground")} />
                     <span>{t('add.fee', '手續費')}：</span>
                     <span className="font-mono font-semibold text-foreground">
                       {parsedFeeAmount > 0 ? `${parsedFeeAmount.toLocaleString()} ${fromCurrency}` : t('add.noFee', '無手續費')}
@@ -1152,9 +1196,9 @@ export function AddTransactionModal({
 
                   {isCrossCurrency && (
                     <div
-                      className="h-7 px-2.5 rounded-full border border-border bg-muted/60 text-[11px] font-mono inline-flex items-center gap-1 shadow-none text-muted-foreground select-none shrink-0"
+                      className="h-8 sm:h-7 px-3 sm:px-2.5 rounded-full border border-border bg-muted/60 text-xs sm:text-[11px] font-mono inline-flex items-center gap-1 shadow-none text-muted-foreground select-none shrink-0"
                     >
-                      <ArrowRightLeft className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <ArrowRightLeft className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-muted-foreground shrink-0" />
                       {calculatedRate !== null ? (
                         <span>1 {fromCurrency} ≈ {parseFloat(calculatedRate.toFixed(4)).toString()} {toCurrency}</span>
                       ) : parsedAmount > 0 ? (
@@ -1201,7 +1245,7 @@ export function AddTransactionModal({
                         });
                       }}
                       className={cn(
-                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        "w-full h-full min-h-[76px] rounded-2xl border p-3.5 flex flex-col justify-between items-start text-left cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
                         selectedFromAccountId && accounts?.some(a => a.id === selectedFromAccountId)
                           ? "bg-card border-border hover:bg-muted/30"
                           : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
@@ -1213,7 +1257,7 @@ export function AddTransactionModal({
                         </span>
                       </div>
                       <div className="w-full min-w-0 pr-3">
-                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
+                        <span className="text-lg font-bold text-foreground truncate block leading-tight">
                           {accounts?.find(a => a.id === selectedFromAccountId)?.name || '\u00A0'}
                         </span>
                       </div>
@@ -1228,10 +1272,10 @@ export function AddTransactionModal({
                         e.stopPropagation();
                         handleSwapTransferAccounts();
                       }}
-                      className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                      className="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
                       title={t('add.swapAccounts', '對調帳戶')}
                     >
-                      <ArrowRightLeft className="w-3.5 h-3.5" />
+                      <ArrowRightLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                   </div>
 
@@ -1264,7 +1308,7 @@ export function AddTransactionModal({
                         });
                       }}
                       className={cn(
-                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        "w-full h-full min-h-[76px] rounded-2xl border p-3.5 flex flex-col justify-between items-end text-right cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
                         selectedToAccountId && accounts?.some(a => a.id === selectedToAccountId)
                           ? "bg-card border-border hover:bg-muted/30"
                           : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
@@ -1276,7 +1320,7 @@ export function AddTransactionModal({
                         </span>
                       </div>
                       <div className="w-full min-w-0 pl-3">
-                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
+                        <span className="text-lg font-bold text-foreground truncate block leading-tight text-right">
                           {accounts?.find(a => a.id === selectedToAccountId)?.name || '\u00A0'}
                         </span>
                       </div>
@@ -1325,22 +1369,22 @@ export function AddTransactionModal({
                   </button>
                 </div>
 
-                {/* Loan Info Row: Gift Badge (Left) & Rate Pill (Right) - Same Row, Fixed Height h-7 */}
-                <div className="h-7 flex items-center justify-center gap-2 my-1">
+                {/* Loan Info Row: Gift Badge (Left) & Rate Pill (Right) - Same Row, Fixed Height */}
+                <div className="h-8 sm:h-7 flex items-center justify-center gap-2 my-1">
                   {isGift && (
                     <div
-                      className="h-7 px-2.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-[11px] font-medium inline-flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 select-none shrink-0"
+                      className="h-8 sm:h-7 px-3 sm:px-2.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 text-xs sm:text-[11px] font-medium inline-flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150 select-none shrink-0"
                     >
-                      <Gift className="w-3 h-3 text-purple-500 shrink-0" />
+                      <Gift className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-purple-500 shrink-0" />
                       <span>{t('add.gift', '贈與')}</span>
                     </div>
                   )}
 
                   {isCrossCurrency && (
                     <div
-                      className="h-7 px-2.5 rounded-full border border-border bg-muted/60 text-[11px] font-mono inline-flex items-center gap-1 shadow-none text-muted-foreground select-none shrink-0"
+                      className="h-8 sm:h-7 px-3 sm:px-2.5 rounded-full border border-border bg-muted/60 text-xs sm:text-[11px] font-mono inline-flex items-center gap-1 shadow-none text-muted-foreground select-none shrink-0"
                     >
-                      <ArrowRightLeft className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <ArrowRightLeft className="w-3.5 h-3.5 sm:w-3 sm:h-3 text-muted-foreground shrink-0" />
                       {calculatedRate !== null ? (
                         <span>1 {fromCurrency} ≈ {parseFloat(calculatedRate.toFixed(4)).toString()} {toCurrency}</span>
                       ) : parsedAmount > 0 ? (
@@ -1414,7 +1458,7 @@ export function AddTransactionModal({
                         });
                       }}
                       className={cn(
-                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-start text-left cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        "w-full h-full min-h-[76px] rounded-2xl border p-3.5 flex flex-col justify-between items-start text-left cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
                         (loanType === 'lend' ? (selectedFromAccountId && accounts?.some(a => a.id === selectedFromAccountId)) : Boolean(loanContact))
                           ? "bg-card border-border hover:bg-muted/30"
                           : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
@@ -1426,7 +1470,7 @@ export function AddTransactionModal({
                         </span>
                       </div>
                       <div className="w-full min-w-0 pr-3">
-                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight">
+                        <span className="text-lg font-bold text-foreground truncate block leading-tight">
                           {loanType === 'lend'
                             ? (accounts?.find(a => a.id === selectedFromAccountId)?.name || '\u00A0')
                             : (loanContact?.name || '\u00A0')}
@@ -1443,10 +1487,10 @@ export function AddTransactionModal({
                         e.stopPropagation();
                         toggleLoanType();
                       }}
-                      className="w-8 h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
+                      className="w-9 h-9 sm:w-8 sm:h-8 rounded-full bg-card hover:bg-muted border border-border flex items-center justify-center text-foreground transition-all active:scale-90 cursor-pointer shadow-none"
                       title={loanType === 'lend' ? t('add.lend') : t('add.borrow')}
                     >
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <ArrowRight className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                   </div>
 
@@ -1508,7 +1552,7 @@ export function AddTransactionModal({
                         });
                       }}
                       className={cn(
-                        "w-full h-full min-h-[72px] sm:min-h-[76px] rounded-2xl border p-3 sm:p-3.5 flex flex-col justify-between items-end text-right cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
+                        "w-full h-full min-h-[76px] rounded-2xl border p-3.5 flex flex-col justify-between items-end text-right cursor-pointer transition-all shadow-none focus-visible:ring-1 focus-visible:ring-foreground",
                         (loanType === 'lend' ? Boolean(loanContact) : (selectedToAccountId && accounts?.some(a => a.id === selectedToAccountId)))
                           ? "bg-card border-border hover:bg-muted/30"
                           : "bg-muted/20 border-dashed border-border/80 hover:bg-muted/40 hover:border-border"
@@ -1520,7 +1564,7 @@ export function AddTransactionModal({
                         </span>
                       </div>
                       <div className="w-full min-w-0 pl-3">
-                        <span className="text-base sm:text-lg font-bold text-foreground truncate block leading-tight text-right">
+                        <span className="text-lg font-bold text-foreground truncate block leading-tight text-right">
                           {loanType === 'lend'
                             ? (loanContact?.name || '\u00A0')
                             : (accounts?.find(a => a.id === selectedToAccountId)?.name || '\u00A0')}
@@ -1559,7 +1603,7 @@ export function AddTransactionModal({
                           setIsCategoryWarning(false);
                         }}
                         className={cn(
-                          "px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
+                          "px-3.5 sm:px-3 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
                           isSelected
                             ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
                             : isCategoryWarning
@@ -1568,7 +1612,7 @@ export function AddTransactionModal({
                         )}
                       >
                         {isPredicted && (
-                          <Sparkles className={cn("w-3 h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
+                          <Sparkles className={cn("w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
                         )}
                         <span>{cat.name}</span>
                       </button>
@@ -1581,15 +1625,15 @@ export function AddTransactionModal({
                       setIsCategoryWarning(false);
                     }}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1",
+                      "px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1",
                       isCategoryWarning
                         ? "border-destructive/80 text-foreground hover:border-foreground/50"
                         : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                     )}
                     title={t('add.moreCategories', '更多分類')}
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span className="text-[11px]">{t('common.more', '更多')}</span>
+                    <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-xs sm:text-[11px]">{t('common.more', '更多')}</span>
                   </button>
                 </>
               ) : (
@@ -1602,13 +1646,13 @@ export function AddTransactionModal({
                       setIsCategoryWarning(false);
                     }}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-medium border border-dashed transition-colors duration-500 cursor-pointer flex items-center gap-1.5",
+                      "px-3.5 sm:px-3 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium border border-dashed transition-colors duration-500 cursor-pointer flex items-center gap-1.5",
                       isCategoryWarning
                         ? "border-destructive/80 text-foreground hover:border-foreground/50"
                         : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
                     )}
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     <span>{t('add.createCategory')}</span>
                   </button>
                 </div>
@@ -1624,7 +1668,7 @@ export function AddTransactionModal({
               placeholder={t('add.note', '填寫備註...')} 
               value={watch('note') || ''} 
               onChange={(e) => setValue('note', e.target.value, { shouldDirty: true })} 
-              className="w-full h-8 px-3 rounded-xl bg-muted/60 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
+              className="w-full h-10 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-muted/60 border border-border text-sm sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
             />
           </div>
 

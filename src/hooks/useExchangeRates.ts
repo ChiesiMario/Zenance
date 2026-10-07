@@ -6,11 +6,11 @@ import {
   getHistoricalRateWithFallback,
 } from '@/services/rates/exchangeRateService';
 
+import { POPULAR_CURRENCIES } from '@/lib/currencies';
+
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-export const COMMON_CURRENCIES = [
-  'CNY', 'TWD', 'USD', 'EUR', 'JPY', 'GBP', 'KRW', 'HKD'
-];
+export const COMMON_CURRENCIES = POPULAR_CURRENCIES.map(c => c.code);
 
 export function useExchangeRates() {
   const rates = useLiveQuery(() => db.exchange_rates.toArray());

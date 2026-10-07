@@ -22,16 +22,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
+import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
 import { useNavigate, Link } from 'react-router-dom';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
-import { COMMON_CURRENCIES } from '@/hooks/useExchangeRates';
 import { useMonthTransactions } from '@/hooks/useMonthTransactions';
 import { SyncStatusPill } from '@/components/sync/SyncStatusPill';
 
@@ -46,7 +40,8 @@ export default function Dashboard() {
   const [isManageLedgersOpen, setIsManageLedgersOpen] = useState(false);
   const [isCreateLedgerOpen, setIsCreateLedgerOpen] = useState(false);
   const [newLedgerName, setNewLedgerName] = useState('');
-  const [newLedgerCurrency, setNewLedgerCurrency] = useState('CNY');
+  const [newLedgerCurrency, setNewLedgerCurrency] = useState(i18n.language === 'zh-TW' ? 'TWD' : i18n.language === 'zh-CN' ? 'CNY' : 'USD');
+  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
   
   const [editingLedgerId, setEditingLedgerId] = useState<string | null>(null);
   const [editingLedgerName, setEditingLedgerName] = useState('');
@@ -303,16 +298,11 @@ export default function Dashboard() {
               </div>
               <div className="space-y-1">
                 <label className="block text-sm font-medium">{t('ledgers.baseCurrency')}</label>
-                <Select value={newLedgerCurrency} onValueChange={(val) => { if (val) setNewLedgerCurrency(val); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Currency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMMON_CURRENCIES.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CurrencyTrigger
+                  currency={newLedgerCurrency}
+                  onClick={() => setIsCurrencyDialogOpen(true)}
+                  className="w-full justify-between"
+                />
               </div>
             </div>
             <DialogFooter>
@@ -328,6 +318,14 @@ export default function Dashboard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* 平級 Sibling 貨幣選擇彈窗，防 Portal 巢狀吞噬遮罩 */}
+        <CurrencySelectDialog
+          open={isCurrencyDialogOpen}
+          onOpenChange={setIsCurrencyDialogOpen}
+          selectedCurrency={newLedgerCurrency}
+          onSelectCurrency={setNewLedgerCurrency}
+        />
 
         <Dialog open={!!ledgerToDelete} onOpenChange={(open) => !open && setLedgerToDelete(null)}>
           <DialogContent className="sm:max-w-[425px]">

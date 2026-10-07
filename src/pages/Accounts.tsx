@@ -17,7 +17,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
+import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
+import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { cn, getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
@@ -38,6 +40,7 @@ export default function Accounts() {
   const [newAccountName, setNewAccountName] = useState('');
   const [newAccountInitialBalance, setNewAccountInitialBalance] = useState('');
   const [newAccountCurrency, setNewAccountCurrency] = useState('');
+  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
   const [newAccountGroup, setNewAccountGroup] = useState('cash');
   const [newCreditLimit, setNewCreditLimit] = useState('');
   const [newStatementDay, setNewStatementDay] = useState('');
@@ -237,16 +240,11 @@ export default function Accounts() {
                 <div className="space-y-1.5">
                   <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.initialBalance')}</label>
                   <div className="flex">
-                    <Select value={selectedCurrency} onValueChange={(val) => { if (val) setNewAccountCurrency(val); }}>
-                      <SelectTrigger className="w-[90px] rounded-r-none border-r-0 focus:ring-0 focus:ring-offset-0 bg-muted/30">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMON_CURRENCIES.map(c => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <CurrencyTrigger
+                      currency={selectedCurrency}
+                      onClick={() => setIsCurrencyDialogOpen(true)}
+                      variant="inline"
+                    />
                     <AmountInput
                       className="rounded-l-none font-mono flex-1 min-w-0"
                       placeholder="0.00"
@@ -588,6 +586,13 @@ export default function Accounts() {
           )}
         </div>
       )}
+      {/* 平級 Sibling 貨幣選擇彈窗，防 Portal 巢狀吞噬遮罩 */}
+      <CurrencySelectDialog
+        open={isCurrencyDialogOpen}
+        onOpenChange={setIsCurrencyDialogOpen}
+        selectedCurrency={selectedCurrency}
+        onSelectCurrency={setNewAccountCurrency}
+      />
       </div>
     </div>
   );

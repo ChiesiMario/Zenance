@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
+import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
 import { Cloud } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 
@@ -16,6 +17,7 @@ export default function Setup() {
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
+  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
   
   // Default currency logic
   const getDefaultCurrency = () => {
@@ -92,31 +94,30 @@ export default function Setup() {
           />
 
           <div className="mt-16 w-full flex flex-col items-center gap-6">
-            <div className="flex items-center gap-4 text-muted-foreground">
-              <span className="text-sm font-mono uppercase tracking-widest">{t('setup.currency')}</span>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as string)}>
-                <SelectTrigger className="w-[100px] border-none shadow-none focus:ring-0 bg-transparent text-center font-mono text-lg text-foreground p-0 h-auto [&>svg]:hidden">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TWD">TWD</SelectItem>
-                  <SelectItem value="CNY">CNY</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                  <SelectItem value="JPY">JPY</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <span className="text-xs font-mono uppercase tracking-widest">{t('setup.currency')}</span>
+              <CurrencyTrigger
+                currency={currency}
+                onClick={() => setIsCurrencyDialogOpen(true)}
+              />
             </div>
 
             <Button
               onClick={handleNext}
               disabled={!name.trim()}
-              className="w-full max-w-[200px] h-12 text-md font-medium mt-4"
+              className="w-full max-w-[200px] h-12 text-md font-medium mt-4 cursor-pointer"
             >
               {t('setup.next')}
             </Button>
           </div>
         </div>
+
+        <CurrencySelectDialog
+          open={isCurrencyDialogOpen}
+          onOpenChange={setIsCurrencyDialogOpen}
+          selectedCurrency={currency}
+          onSelectCurrency={setCurrency}
+        />
       </div>
     );
   }

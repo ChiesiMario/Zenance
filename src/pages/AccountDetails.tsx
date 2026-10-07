@@ -9,11 +9,13 @@ import { AmountInput } from '@/components/ui/AmountInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
+import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
 import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber, getLocalDateString } from '@/lib/utils';
-import { COMMON_CURRENCIES, useExchangeRates } from '@/hooks/useExchangeRates';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
@@ -43,6 +45,7 @@ export default function AccountDetails() {
   const [editName, setEditName] = useState('');
   const [editGroup, setEditGroup] = useState('cash');
   const [editCurrency, setEditCurrency] = useState('');
+  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
   const [editCreditLimit, setEditCreditLimit] = useState('');
   const [editStatementDay, setEditStatementDay] = useState('');
   const [editDueDay, setEditDueDay] = useState('');
@@ -443,16 +446,12 @@ export default function AccountDetails() {
                 <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                   {t('accounts.currency')}
                 </span>
-                <Select disabled={hasTransactions} value={editCurrency || activeLedger?.baseCurrency || 'CNY'} onValueChange={(val) => { if (val) setEditCurrency(val); }}>
-                  <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-mono font-medium text-right justify-end gap-1.5 disabled:opacity-50 cursor-pointer">
-                    <SelectValue className="flex-none text-right" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMMON_CURRENCIES.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CurrencyTrigger
+                  disabled={hasTransactions}
+                  currency={editCurrency || activeLedger?.baseCurrency || 'CNY'}
+                  onClick={() => setIsCurrencyDialogOpen(true)}
+                  variant="row"
+                />
               </div>
 
               {(editGroup === 'credit' || editGroup === 'credit_pay') && (
@@ -658,6 +657,13 @@ export default function AccountDetails() {
         </DialogContent>
       </Dialog>
       
+      {/* 平級 Sibling 貨幣選擇彈窗，防 Portal 巢狀吞噬遮罩 */}
+      <CurrencySelectDialog
+        open={isCurrencyDialogOpen}
+        onOpenChange={setIsCurrencyDialogOpen}
+        selectedCurrency={editCurrency || activeLedger?.baseCurrency || 'CNY'}
+        onSelectCurrency={setEditCurrency}
+      />
     </div>
   );
 }

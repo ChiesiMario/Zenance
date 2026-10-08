@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenance - Setup Concept (Refined Minimalist)</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #000000;
+      --card: #ffffff;
+      --card-hover: #f4f4f5;
+      --border: #e4e4e7;
+      --muted: #71717a;
+      --muted-bg: #f4f4f5;
+      --primary: #000000;
+      --primary-fg: #ffffff;
+      --overlay: rgba(255, 255, 255, 0.85);
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    }
+
+    html.dark {
+      --bg: #000000;
+      --fg: #ffffff;
+      --card: #000000;
+      --card-hover: #121214;
+      --border: #27272a;
+      --muted: #a1a1aa;
+      --muted-bg: #18181b;
+      --primary: #ffffff;
+      --primary-fg: #000000;
+      --overlay: rgba(0, 0, 0, 0.85);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Top Controls Bar */
+    .top-controls {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 50;
+    }
+
+    .ctrl-btn {
+      background: var(--muted-bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: border-color 0.15s, background-color 0.15s;
+    }
+    .ctrl-btn:hover {
+      border-color: var(--fg);
+    }
+
+    /* Wizard Shell (Strictly Flat, Fixed Width, Pin Footer to Bottom) */
+    .wizard-shell {
+      width: 100%;
+      max-width: 420px;
+      height: 100%;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 20px;
+      position: relative;
+    }
+
+    /* Screen Views (Content Centered, Footer Pinned at Bottom) */
+    .screen-view {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      height: 100%;
+      justify-content: space-between;
+    }
+    .screen-view.current {
+      display: flex;
+    }
+    .screen-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: auto 0;
+      width: 100%;
+    }
+
+    /* Top Visual Area (Icon / Logo) - Strict 56px Box, Centered */
+    .visual-slot {
+      height: 56px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .app-logo-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 13px;
+      border: 1px solid var(--border);
+      background: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .app-icon-symbol {
+      width: 32px;
+      height: 32px;
+    }
+
+    /* Feature Icon Box (Same 56px dimensions for strict alignment) */
+    .icon-box-uniform {
+      width: 56px;
+      height: 56px;
+      border-radius: 13px;
+      border: 1px solid var(--border);
+      background: var(--muted-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .icon-box-uniform svg {
+      width: 26px;
+      height: 26px;
+      stroke: var(--fg);
+      stroke-width: 1.8;
+      fill: none;
+    }
+
+    /* Title Area (Centered, Fixed Height to Prevent Shift) */
+    .title-area {
+      min-height: 84px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+    .hero-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      color: var(--fg);
+    }
+    .hero-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 320px;
+    }
+
+    /* Feature List Card (100% Flat, 1px Border, Fit Content Width) */
+    .feature-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+    .feature-row {
+      min-height: 68px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .feature-row:last-child {
+      border-bottom: none;
+    }
+    .feature-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--muted-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .feature-icon-box svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--fg);
+      stroke-width: 1.8;
+      fill: none;
+    }
+    .feature-text {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .feature-heading {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+      letter-spacing: -0.01em;
+    }
+    .feature-caption {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    /* Screen 3: Choices Stack (Strict Alignment) */
+    .choice-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .choice-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      background: var(--card);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.15s, background-color 0.15s;
+    }
+    .choice-card:hover {
+      border-color: var(--fg);
+      background: var(--card-hover);
+    }
+    .choice-card.active {
+      border-color: var(--fg);
+      background: var(--card);
+    }
+    .choice-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .choice-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .choice-radio {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+      flex-shrink: 0;
+    }
+    .choice-card.active .choice-radio {
+      border-color: var(--fg);
+    }
+    .choice-radio-inner {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: transparent;
+    }
+    .choice-card.active .choice-radio-inner {
+      background: var(--fg);
+    }
+    .choice-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--fg);
+    }
+    .choice-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: var(--muted-bg);
+    }
+    .choice-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      padding-left: 26px;
+    }
+
+    /* Screen 3 Sub-Form: Standardized 40px Height Items */
+    .subform-area {
+      padding-top: 10px;
+      margin-top: 4px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-left: 26px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+    }
+    .form-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+    .standard-input {
+      width: 100%;
+      height: 40px;
+      background: var(--muted-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 12px;
+      color: var(--fg);
+      font-size: 13px;
+      outline: none;
+      font-family: var(--font-sans);
+      transition: border-color 0.15s;
+    }
+    .standard-input:focus {
+      border-color: var(--fg);
+    }
+    .standard-currency-btn {
+      width: 100%;
+      height: 40px;
+      background: var(--muted-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--fg);
+      font-size: 13px;
+      transition: border-color 0.15s;
+    }
+    .standard-currency-btn:hover {
+      border-color: var(--fg);
+    }
+    .currency-code-tag {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    /* Footer Buttons (Strict 40px Height, Aligned Baseline) */
+    .btn-footer {
+      width: 100%;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 16px;
+      flex-shrink: 0;
+    }
+    .btn {
+      height: 40px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1px solid transparent;
+      padding: 0 16px;
+      user-select: none;
+      font-family: var(--font-sans);
+      transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-fg);
+      border-color: var(--primary);
+      flex: 1;
+    }
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-secondary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      min-width: 84px;
+    }
+    .btn-secondary:hover {
+      background: var(--muted-bg);
+    }
+
+    /* Restore Modal (Instant Pop, Strictly Flat) */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: var(--overlay);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+    .modal-card {
+      width: 100%;
+      max-width: 360px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal-item {
+      height: 52px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      background: var(--card);
+      transition: border-color 0.15s, background-color 0.15s;
+    }
+    .modal-item:hover {
+      border-color: var(--fg);
+      background: var(--muted-bg);
+    }
+    .modal-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .modal-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .modal-item-desc {
+      font-size: 11px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Controls: Theme & Language Toggle -->
+  <div class="top-controls">
+    <button class="ctrl-btn" onclick="toggleLanguage()">
+      <span id="lang-indicator">繁體中文</span>
+    </button>
+    <button class="ctrl-btn" onclick="toggleTheme()">
+      <span id="theme-indicator">☀️ 淺色</span>
+    </button>
+  </div>
+
+  <div class="wizard-shell">
+
+    <!-- ================= Screen 1: App Identity & Local-First ================= -->
+    <div class="screen-view current" id="screen-1">
+      <div class="screen-content">
+        <!-- Official Zenance App Logo -->
+        <div class="visual-slot">
+          <div class="app-logo-box">
+            <svg class="app-icon-symbol" viewBox="0 0 512 512" fill="none">
+              <g stroke="#ffffff" stroke-width="38" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M 256 120 L 256 392" />
+                <path d="M 150 180 L 362 180 L 150 332 L 362 332" />
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <div class="title-area">
+          <h1 class="hero-title" data-i18n="s1-title">
+            全本地優先，<br>極速流暢的記帳體驗。
+          </h1>
+          <p class="hero-desc" data-i18n="s1-desc">
+            Zenance 採用無伺服器架構。所有資料均 100% 留存在您的裝置本機，零等待、零窺探、永久完全可用。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-row">
+            <div class="feature-icon-box">
+              <svg viewBox="0 0 24 24">
+                <line x1="1" y1="1" x2="23" y2="23"/>
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                <line x1="12" y1="20" x2="12.01" y2="20"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <span class="feature-heading" data-i18n="s1-f1-head">無網路也能隨時記帳</span>
+              <span class="feature-caption" data-i18n="s1-f1-body">如同原生 App 般疾速啟動，無網路亦能順暢記帳。</span>
+            </div>
+          </div>
+          <div class="feature-row">
+            <div class="feature-icon-box">
+              <svg viewBox="0 0 24 24">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                <line x1="12" y1="18" x2="12.01" y2="18"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <span class="feature-heading" data-i18n="s1-f2-head">100% 數據主權歸您所有</span>
+              <span class="feature-caption" data-i18n="s1-f2-body">帳目僅儲存在本機設備，無伺服器監視或收集。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-footer">
+        <div style="flex: 1;"></div>
+        <button class="btn btn-primary" onclick="goToScreen(2)" data-i18n="btn-continue">
+          繼續
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= Screen 2: End-to-End Encryption & Cloud Sync ================= -->
+    <div class="screen-view" id="screen-2">
+      <div class="screen-content">
+        <!-- Security & Sync Icon (56px Dimension Matched) -->
+        <div class="visual-slot">
+          <div class="icon-box-uniform">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <circle cx="12" cy="11" r="1.5"/>
+              <line x1="12" y1="12.5" x2="12" y2="15.5"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="title-area">
+          <h1 class="hero-title" data-i18n="s2-title">
+            端到端加密，<br>自由安全的雲端同步。
+          </h1>
+          <p class="hero-desc" data-i18n="s2-desc">
+            需要跨手機與電腦同步時，可綁定個人 Dropbox。備份離開封閉設備前全額加密，無人能窺探明文。
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-row">
+            <div class="feature-icon-box">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <span class="feature-heading" data-i18n="s2-f1-head">軍工級零知識加密</span>
+              <span class="feature-caption" data-i18n="s2-f1-body">金鑰僅保存在本機，雲端平台無法解密任何帳目。</span>
+            </div>
+          </div>
+          <div class="feature-row">
+            <div class="feature-icon-box">
+              <svg viewBox="0 0 24 24">
+                <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+              </svg>
+            </div>
+            <div class="feature-text">
+              <span class="feature-heading" data-i18n="s2-f2-head">直接串接個人儲存空間</span>
+              <span class="feature-caption" data-i18n="s2-f2-body">串接個人 Dropbox，跨設備隨時保持帳目一致。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-footer">
+        <button class="btn btn-secondary" onclick="goToScreen(1)" data-i18n="btn-back">
+          上一步
+        </button>
+        <button class="btn btn-primary" onclick="goToScreen(3)" data-i18n="btn-continue">
+          繼續
+        </button>
+      </div>
+    </div>
+
+    <!-- ================= Screen 3: Decision Screen (Create vs Restore) ================= -->
+    <div class="screen-view" id="screen-3">
+      <div class="screen-content">
+        <!-- Welcome Monogram Slot (56px Dimension Matched) -->
+        <div class="visual-slot">
+          <div class="icon-box-uniform">
+            <svg viewBox="0 0 24 24">
+              <polyline points="9 11 12 14 22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="title-area">
+          <h1 class="hero-title" data-i18n="s3-title">
+            開始使用 Zenance
+          </h1>
+          <p class="hero-desc" data-i18n="s3-desc">
+            請選擇您進入軟體的方式：全新創建帳本，或從現有備份中還原。
+          </p>
+        </div>
+
+        <div class="choice-stack">
+          <!-- Choice A: Create New Ledger -->
+          <div class="choice-card active" id="card-choice-create" onclick="selectChoice('create')">
+            <div class="choice-header">
+              <div class="choice-title-row">
+                <div class="choice-radio">
+                  <div class="choice-radio-inner"></div>
+                </div>
+                <span class="choice-title" data-i18n="choice-create-title">創建新帳本</span>
+              </div>
+              <span class="choice-pill">全新開始</span>
+            </div>
+            <p class="choice-desc" data-i18n="choice-create-desc">
+              適合初次使用的全新用戶，配置帳本與基準貨幣後立即開始記帳。
+            </p>
+
+            <!-- Standardized 40px Input Rows with Labels -->
+            <div class="subform-area" id="create-subform">
+              <div class="form-group">
+                <label class="form-label" data-i18n="ledger-name-label">帳本名稱</label>
+                <input
+                  type="text"
+                  id="new-ledger-name"
+                  class="standard-input"
+                  value="日常帳本"
+                  placeholder="請輸入帳本名稱"
+                  onclick="event.stopPropagation()"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" data-i18n="currency-label">預設貨幣</label>
+                <div class="standard-currency-btn" onclick="cycleCurrency(event)">
+                  <span id="currency-name">TWD (新台幣)</span>
+                  <span class="currency-code-tag" style="color: var(--muted); font-size: 11px;">變更 ▾</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Choice B: Restore from Backup -->
+          <div class="choice-card" id="card-choice-restore" onclick="selectChoice('restore')">
+            <div class="choice-header">
+              <div class="choice-title-row">
+                <div class="choice-radio">
+                  <div class="choice-radio-inner"></div>
+                </div>
+                <span class="choice-title" data-i18n="choice-restore-title">從備份中恢復</span>
+              </div>
+              <span class="choice-pill">還原資料</span>
+            </div>
+            <p class="choice-desc" data-i18n="choice-restore-desc">
+              適合既有用戶或新設備換機，從 Dropbox 雲端或本機檔案快速恢復。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-footer">
+        <button class="btn btn-secondary" onclick="goToScreen(2)" data-i18n="btn-back">
+          上一步
+        </button>
+        <button class="btn btn-primary" id="btn-submit-action" onclick="handleSubmitAction()" data-i18n="btn-finish-create">
+          進入 Zenance
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Restore Sources Modal Dialog (Instant Pop, Flat) -->
+  <div class="modal-backdrop" id="restore-modal">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="font-size: 15px; font-weight: 600;" data-i18n="modal-title">選擇還原方式</h3>
+        <span style="font-family: var(--font-mono); font-size: 15px; cursor: pointer; color: var(--muted);" onclick="closeRestoreModal()">✕</span>
+      </div>
+      <p style="font-size: 12px; color: var(--muted); line-height: 1.45;" data-i18n="modal-desc">
+        請選擇您的備份儲存來源，系統將在驗證後直接恢復完整帳目：
+      </p>
+
+      <div class="modal-item" onclick="alert('發起 Dropbox OAuth 登入並拉取雲端加密備份資料庫')">
+        <svg style="width: 20px; height: 20px; stroke: var(--fg); fill: none; stroke-width: 1.8;" viewBox="0 0 24 24">
+          <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+        </svg>
+        <div class="modal-item-info">
+          <span class="modal-item-title" data-i18n="modal-opt-dropbox-title">從 Dropbox 雲端直接同步</span>
+          <span class="modal-item-desc" data-i18n="modal-opt-dropbox-desc">登入 Dropbox 並自動解析雲端最新備份</span>
+        </div>
+      </div>
+
+      <div class="modal-item" onclick="alert('打開本地檔案選擇器選擇 .zip / .json 備份檔')">
+        <svg style="width: 20px; height: 20px; stroke: var(--fg); fill: none; stroke-width: 1.8;" viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <div class="modal-item-info">
+          <span class="modal-item-title" data-i18n="modal-opt-file-title">匯入本機備份檔 (.zip / .json)</span>
+          <span class="modal-item-desc" data-i18n="modal-opt-file-desc">從本地檔案選取 ZIP 備份進行解析還原</span>
+        </div>
+      </div>
+
+      <button class="btn btn-secondary" style="height: 38px; margin-top: 4px; width: 100%;" onclick="closeRestoreModal()" data-i18n="btn-cancel">
+        取消
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let currentScreen = 1;
+    let selectedChoice = 'create';
+
+    const currencies = [
+      { code: 'TWD', symbol: 'NT$', label: 'TWD (新台幣)' },
+      { code: 'CNY', symbol: '¥', label: 'CNY (人民幣)' },
+      { code: 'USD', symbol: '$', label: 'USD (美元)' },
+      { code: 'EUR', symbol: '€', label: 'EUR (歐元)' },
+      { code: 'JPY', symbol: '¥', label: 'JPY (日圓)' },
+      { code: 'HKD', symbol: 'HK$', label: 'HKD (港幣)' }
+    ];
+    let curIndex = 0;
+
+    function goToScreen(screen) {
+      document.querySelectorAll('.screen-view').forEach(v => v.classList.remove('current'));
+      const target = document.getElementById(`screen-${screen}`);
+      if (target) target.classList.add('current');
+      currentScreen = screen;
+    }
+
+    function selectChoice(choice) {
+      selectedChoice = choice;
+      const cardCreate = document.getElementById('card-choice-create');
+      const cardRestore = document.getElementById('card-choice-restore');
+      const createSubform = document.getElementById('create-subform');
+      const submitBtn = document.getElementById('btn-submit-action');
+      const isEn = document.getElementById('lang-indicator').textContent === 'English';
+
+      if (choice === 'create') {
+        cardCreate.classList.add('active');
+        cardRestore.classList.remove('active');
+        createSubform.style.display = 'flex';
+        submitBtn.textContent = isEn ? 'Enter Zenance' : '進入 Zenance';
+      } else {
+        cardCreate.classList.remove('active');
+        cardRestore.classList.add('active');
+        createSubform.style.display = 'none';
+        submitBtn.textContent = isEn ? 'Choose Backup' : '選擇還原方式';
+      }
+    }
+
+    function cycleCurrency(e) {
+      if (e) e.stopPropagation();
+      curIndex = (curIndex + 1) % currencies.length;
+      document.getElementById('currency-name').textContent = currencies[curIndex].label;
+    }
+
+    function openRestoreModal() {
+      document.getElementById('restore-modal').classList.add('open');
+    }
+
+    function closeRestoreModal() {
+      document.getElementById('restore-modal').classList.remove('open');
+    }
+
+    function handleSubmitAction() {
+      if (selectedChoice === 'create') {
+        const name = document.getElementById('new-ledger-name').value.trim() || '日常帳本';
+        const cur = currencies[curIndex].code;
+        alert(`創建新帳本完成！\n帳本名稱: ${name}\n基準貨幣: ${cur}\n立即寫入本地 IndexedDB 並進入記帳主畫面。`);
+      } else {
+        openRestoreModal();
+      }
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const indicator = document.getElementById('theme-indicator');
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        indicator.textContent = '🌙 深色';
+      } else {
+        html.classList.add('dark');
+        indicator.textContent = '☀️ 淺色';
+      }
+    }
+
+    function toggleLanguage() {
+      const indicator = document.getElementById('lang-indicator');
+      const isZh = indicator.textContent === '繁體中文';
+      indicator.textContent = isZh ? 'English' : '繁體中文';
+
+      const t = isZh ? {
+        's1-title': 'Local-First Architecture,<br>Pure and Instant.',
+        's1-desc': 'Zenance operates completely without centralized servers. All data remains 100% on your device with instant responsiveness and offline capability.',
+        's1-f1-head': 'Instant Offline Availability',
+        's1-f1-body': 'Launches instantly like a native app. Fully usable offline.',
+        's1-f2-head': '100% Data Sovereignty',
+        's1-f2-body': 'Records stay strictly on device. Zero cloud surveillance.',
+        'btn-continue': 'Continue',
+        's2-title': 'End-to-End Encryption,<br>Freedom in Cloud Sync.',
+        's2-desc': 'Sync across devices seamlessly with your personal Dropbox. Encrypted before leaving your device; zero plain-text leaks.',
+        's2-f1-head': 'Military-Grade Zero-Knowledge Encryption',
+        's2-f1-body': 'Keys remain on device. Cloud hosts cannot decrypt records.',
+        's2-f2-head': 'Autonomous Personal Cloud Storage',
+        's2-f2-body': 'Links directly to personal Dropbox for seamless multi-device sync.',
+        'btn-back': 'Back',
+        's3-title': 'Get Started with Zenance',
+        's3-desc': 'Choose how you want to enter the app: create a fresh ledger or restore from an existing backup.',
+        'choice-create-title': 'Create New Ledger',
+        'choice-create-desc': 'Ideal for new users. Configure your ledger name and currency to start tracking.',
+        'ledger-name-label': 'Ledger Name',
+        'currency-label': 'Default Currency',
+        'choice-restore-title': 'Restore from Backup',
+        'choice-restore-desc': 'For returning users or device migration. Restore easily from Dropbox or local file.',
+        'modal-title': 'Select Restore Source',
+        'modal-desc': 'Choose where your backup is located to restore your financial database:',
+        'modal-opt-dropbox-title': 'Sync directly from Dropbox Cloud',
+        'modal-opt-dropbox-desc': 'Sign in to Dropbox and pull the latest encrypted remote backup',
+        'modal-opt-file-title': 'Import Local Backup File (.zip / .json)',
+        'modal-opt-file-desc': 'Pick a backup archive from local storage to parse and restore',
+        'btn-cancel': 'Cancel'
+      } : {
+        's1-title': '全本地優先，<br>極速流暢的記帳體驗。',
+        's1-desc': 'Zenance 採用無伺服器架構。所有資料均 100% 留存在您的裝置本機，零等待、零窺探、永久完全可用。',
+        's1-f1-head': '無網路也能隨時記帳',
+        's1-f1-body': '如同原生 App 般疾速啟動，無網路亦能順暢記帳。',
+        's1-f2-head': '100% 數據主權歸您所有',
+        's1-f2-body': '帳目僅儲存在本機設備，無伺服器監視或收集。',
+        'btn-continue': '繼續',
+        's2-title': '端到端加密，<br>自由安全的雲端同步。',
+        's2-desc': '需要跨手機與電腦同步時，可綁定個人 Dropbox。備份離開封閉設備前全額加密，無人能窺探明文。',
+        's2-f1-head': '軍工級零知識加密',
+        's2-f1-body': '金鑰僅保存在本機，雲端平台無法解密任何帳目。',
+        's2-f2-head': '直接串接個人儲存空間',
+        's2-f2-body': '串接個人 Dropbox，跨設備隨時保持帳目一致。',
+        'btn-back': '上一步',
+        's3-title': '開始使用 Zenance',
+        's3-desc': '請選擇您進入軟體的方式：全新創建帳本，或從現有備份中還原。',
+        'choice-create-title': '創建新帳本',
+        'choice-create-desc': '適合初次使用的全新用戶，配置帳本與基準貨幣後立即開始記帳。',
+        'ledger-name-label': '帳本名稱',
+        'currency-label': '預設貨幣',
+        'choice-restore-title': '從備份中恢復',
+        'choice-restore-desc': '適合既有用戶或新設備換機，從 Dropbox 雲端或本機檔案快速恢復。',
+        'modal-title': '選擇還原方式',
+        'modal-desc': '請選擇您的備份儲存來源，系統將在驗證後直接恢復完整帳目：',
+        'modal-opt-dropbox-title': '從 Dropbox 雲端直接同步',
+        'modal-opt-dropbox-desc': '登入 Dropbox 並自動解析雲端最新備份',
+        'modal-opt-file-title': '匯入本機備份檔 (.zip / .json)',
+        'modal-opt-file-desc': '從本地檔案選取 ZIP 備份進行解析還原',
+        'btn-cancel': '取消'
+      };
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) el.innerHTML = t[key];
+      });
+
+      // Update submit button text based on selection
+      selectChoice(selectedChoice);
+    }
+  </script>
+</body>
+</html>

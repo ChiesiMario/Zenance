@@ -7,11 +7,8 @@ import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { AmountInput } from '@/components/ui/AmountInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
-import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
-import { ChevronLeft, Edit, Trash2, ArchiveRestore, Scale, CreditCard } from 'lucide-react';
+import { AccountFormDialog } from '@/components/accounts/AccountFormDialog';
+import { ChevronLeft, Edit, Scale, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber, getLocalDateString } from '@/lib/utils';
@@ -28,7 +25,7 @@ export default function AccountDetails() {
   const { t } = useTranslation();
   const { getRate } = useExchangeRates();
   
-  const { allAccounts, updateAccount, deleteAccount, archiveAccount, unarchiveAccount } = useAccounts();
+  const { allAccounts } = useAccounts();
   const { transactions, addTransaction } = useTransactions();
   const { getOrCreateSystemBalanceAdjustmentCategory } = useCategories();
   const { activeLedgerId, openAddModal } = useAppStore();
@@ -42,32 +39,9 @@ export default function AccountDetails() {
   const isForeign = currency !== baseCurrency;
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editGroup, setEditGroup] = useState('cash');
-  const [editCurrency, setEditCurrency] = useState('');
-  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
-  const [editCreditLimit, setEditCreditLimit] = useState('');
-  const [editStatementDay, setEditStatementDay] = useState('');
-  const [editDueDay, setEditDueDay] = useState('');
-  const [editExcludeFromStats, setEditExcludeFromStats] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-  
   const [isAdjustBalanceDialogOpen, setIsAdjustBalanceDialogOpen] = useState(false);
   const [newBalanceStr, setNewBalanceStr] = useState('');
   const adjustInputRef = useRef<HTMLInputElement>(null);
-  
-  useEffect(() => {
-    if (account) {
-      setEditName(account.name);
-      setEditGroup(account.group || 'cash');
-      setEditCurrency(account.currency || '');
-      setEditCreditLimit(typeof account.creditLimit === 'number' ? account.creditLimit.toString() : '');
-      setEditStatementDay(account.statementDay ? account.statementDay.toString() : '');
-      setEditDueDay(account.dueDay ? account.dueDay.toString() : '');
-      setEditExcludeFromStats(!!account.excludeFromStats);
-      setDeleteError('');
-    }
-  }, [account, isEditDialogOpen]);
 
   const accountTransactions = useMemo(() => {
     const list = transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id) || [];
@@ -155,54 +129,7 @@ export default function AccountDetails() {
     setIsAdjustBalanceDialogOpen(false);
   };
 
-  const handleUpdate = async () => {
-    if (!editName.trim() || !id) return;
-    const isCredit = editGroup === 'credit' || editGroup === 'credit_pay';
-    const limitNum = parseFloat(editCreditLimit);
-    const stmtDayNum = parseInt(editStatementDay, 10);
-    const dueDayNum = parseInt(editDueDay, 10);
 
-    await updateAccount(id, {
-      name: editName.trim(),
-      group: editGroup,
-      currency: editCurrency,
-      creditLimit: isCredit ? (isNaN(limitNum) ? undefined : limitNum) : undefined,
-      statementDay: isCredit ? (isNaN(stmtDayNum) ? undefined : stmtDayNum) : undefined,
-      dueDay: isCredit ? (isNaN(dueDayNum) ? undefined : dueDayNum) : undefined,
-      excludeFromStats: editExcludeFromStats,
-    });
-    setIsEditDialogOpen(false);
-  };
-
-  const handleDelete = async () => {
-    if (!id) return;
-    const res = await deleteAccount(id);
-    if (!res.success) {
-      setDeleteError(res.reason === 'has_transactions' ? t('accounts.cannotDeleteHasTransactions', 'Cannot delete account with existing transactions. You can archive it instead.') : t('common.error'));
-    } else {
-      navigate('/accounts');
-    }
-  };
-  
-  const handleArchive = async () => {
-    if (!id) return;
-    if (account?.archived) {
-      await unarchiveAccount(id);
-    } else {
-      await archiveAccount(id);
-    }
-    navigate('/accounts');
-  };
-
-
-  const GROUP_I18N_KEYS: Record<string, string> = {
-    cash: 'groupCash',
-    debit: 'groupDebit',
-    credit: 'groupCredit',
-    credit_pay: 'groupCreditPay',
-    investment: 'groupInvestment',
-    other: 'groupOther'
-  };
 
   return (
     <div className="w-full space-y-4 pb-8">
@@ -395,188 +322,15 @@ export default function AccountDetails() {
         }
       />
 
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader>
-            <DialogTitle className="text-center">{t('accounts.editAccount')}</DialogTitle>
-          </DialogHeader>
-
-          <div className="py-2 space-y-5">
-            {/* 無邊界大字體名稱輸入區 */}
-            <div className="flex flex-col items-center justify-center pt-2 pb-1">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
-                {t('accounts.accountName')}
-              </span>
-              <input 
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && editName.trim() && handleUpdate()}
-                placeholder={t('accounts.namePlaceholder')}
-                className="w-full text-center text-3xl font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/40"
-              />
-            </div>
-
-            {/* Vercel Usage 風格屬性清單卡片 */}
-            <div className="rounded-lg border border-border divide-y divide-border bg-card overflow-hidden">
-              {/* 帳戶分類 */}
-              <div className="flex items-center justify-between p-3">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('accounts.accountGroup')}
-                </span>
-                <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
-                  <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-medium justify-end gap-1.5 cursor-pointer">
-                    <SelectValue className="flex-none text-right">
-                      {t(`accounts.${GROUP_I18N_KEYS[editGroup]}` as any)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">{t('accounts.groupCash')}</SelectItem>
-                    <SelectItem value="debit">{t('accounts.groupDebit')}</SelectItem>
-                    <SelectItem value="credit">{t('accounts.groupCredit')}</SelectItem>
-                    <SelectItem value="credit_pay">{t('accounts.groupCreditPay')}</SelectItem>
-                    <SelectItem value="investment">{t('accounts.groupInvestment')}</SelectItem>
-                    <SelectItem value="other">{t('accounts.groupOther')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* 預設貨幣 */}
-              <div className="flex items-center justify-between p-3">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('accounts.currency')}
-                </span>
-                <CurrencyTrigger
-                  disabled={hasTransactions}
-                  currency={editCurrency || activeLedger?.baseCurrency || 'CNY'}
-                  onClick={() => setIsCurrencyDialogOpen(true)}
-                  variant="row"
-                />
-              </div>
-
-              {(editGroup === 'credit' || editGroup === 'credit_pay') && (
-                <>
-                  {/* 信用額度 */}
-                  <div className="flex items-center justify-between p-3">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                      {t('accounts.creditLimit')}
-                    </span>
-                    <AmountInput 
-                      placeholder={t('accounts.limitPlaceholder')}
-                      value={editCreditLimit}
-                      onValueChange={setEditCreditLimit}
-                      unstyled
-                      className="text-sm font-mono font-medium text-right bg-transparent outline-none w-32 placeholder:text-muted-foreground/40 text-foreground"
-                    />
-                  </div>
-
-                  {/* 帳單日 */}
-                  <div className="flex items-center justify-between p-3">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                      {t('accounts.statementDay')}
-                    </span>
-                    <Select value={editStatementDay || 'none'} onValueChange={(val) => setEditStatementDay(!val || val === 'none' ? '' : val)}>
-                      <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-mono font-medium text-right justify-end gap-1.5 cursor-pointer">
-                        <SelectValue placeholder={t('accounts.notSet')}>
-                          {editStatementDay ? t('accounts.dayOfMonth', { day: editStatementDay }) : t('accounts.notSet')}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="max-h-48">
-                        <SelectItem value="none">{t('accounts.notSet')}</SelectItem>
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                          <SelectItem key={d} value={d.toString()}>{t('accounts.dayOfMonth', { day: d })}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* 還款日 */}
-                  <div className="flex items-center justify-between p-3">
-                    <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                      {t('accounts.dueDay')}
-                    </span>
-                    <Select value={editDueDay || 'none'} onValueChange={(val) => setEditDueDay(!val || val === 'none' ? '' : val)}>
-                      <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-mono font-medium text-right justify-end gap-1.5 cursor-pointer">
-                        <SelectValue placeholder={t('accounts.notSet')}>
-                          {editDueDay ? t('accounts.dayOfMonth', { day: editDueDay }) : t('accounts.notSet')}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="max-h-48">
-                        <SelectItem value="none">{t('accounts.notSet')}</SelectItem>
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                          <SelectItem key={d} value={d.toString()}>{t('accounts.dayOfMonth', { day: d })}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-
-              {/* 排除資產統計 */}
-              <div className="flex items-center justify-between p-3">
-                <div className="space-y-0.5 pr-2">
-                  <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium block">
-                    {t('accounts.excludeFromStats')}
-                  </span>
-                  <p className="text-[11px] text-muted-foreground/70 leading-tight">
-                    {t('accounts.excludeFromStatsDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={editExcludeFromStats}
-                  onCheckedChange={setEditExcludeFromStats}
-                  aria-label={t('accounts.excludeFromStats')}
-                />
-              </div>
-            </div>
-
-            {hasTransactions && (
-              <p className="text-[11px] text-muted-foreground text-center leading-normal px-2">
-                {t('accounts.cannotEditCurrencyHasTransactions')}
-              </p>
-            )}
-
-            {deleteError && (
-              <div className="text-xs text-destructive bg-destructive/10 p-2.5 rounded-md text-center">
-                {deleteError}
-              </div>
-            )}
-            
-            {/* 幽靈輔助操作（歸檔 · 刪除） */}
-            <div className="flex items-center justify-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={handleArchive}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <ArchiveRestore className="h-3.5 w-3.5" />
-                <span>{account?.archived ? t('settings.unarchive', '取消歸檔') : t('accounts.archiveAccount')}</span>
-              </button>
-              
-              <span className="text-border select-none">·</span>
-
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={hasTransactions}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>{t('accounts.deleteAccount')}</span>
-              </button>
-            </div>
-          </div>
-
-          <DialogFooter className="grid grid-cols-2 gap-2 sm:gap-2 pt-2">
-            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button onClick={handleUpdate} disabled={!editName.trim()} className="cursor-pointer">
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AccountFormDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        mode="edit"
+        account={account}
+        hasTransactions={hasTransactions}
+        onDeleted={() => navigate('/accounts')}
+        onArchived={() => navigate('/accounts')}
+      />
       
       <Dialog open={isAdjustBalanceDialogOpen} onOpenChange={setIsAdjustBalanceDialogOpen}>
         <DialogContent className="sm:max-w-[380px]">
@@ -642,7 +396,7 @@ export default function AccountDetails() {
             </div>
           </div>
 
-          <DialogFooter className="grid grid-cols-2 gap-2 sm:gap-2">
+          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
             <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
               {t('common.cancel')}
             </DialogClose>
@@ -656,14 +410,6 @@ export default function AccountDetails() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      {/* 平級 Sibling 貨幣選擇彈窗，防 Portal 巢狀吞噬遮罩 */}
-      <CurrencySelectDialog
-        open={isCurrencyDialogOpen}
-        onOpenChange={setIsCurrencyDialogOpen}
-        selectedCurrency={editCurrency || activeLedger?.baseCurrency || 'CNY'}
-        onSelectCurrency={setEditCurrency}
-      />
     </div>
   );
 }

@@ -5,8 +5,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import { Plus, ChevronDown, Check } from 'lucide-react';
 import {
   DropdownMenu,
@@ -25,15 +24,13 @@ import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
 
 export default function Contacts() {
   const { t } = useTranslation();
-  const { contacts, archivedContacts, allContacts, addContact } = useContacts();
+  const { contacts, archivedContacts, allContacts } = useContacts();
   const { transactions } = useTransactions();
   const { getRate } = useExchangeRates();
   const { latestSnapshotsMap } = useBalanceSnapshots();
   
   const [currentView, setCurrentView] = useState<'active' | 'archived'>('active');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newContactName, setNewContactName] = useState('');
-  const [newContactGroup, setNewContactGroup] = useState('personal');
   const [filterType, setFilterType] = useState<'all' | 'personal' | 'organization'>('all');
 
   const { activeLedgerId } = useAppStore();
@@ -106,14 +103,6 @@ export default function Contacts() {
     });
   }, [contacts, archivedContacts, currentView, filterType, contactBalances]);
 
-  const handleAddContact = async () => {
-    if (!newContactName.trim()) return;
-    await addContact(newContactName.trim(), newContactGroup);
-    setNewContactName('');
-    setNewContactGroup('personal');
-    setIsDialogOpen(false);
-  };
-
   return (
     <div className="w-full">
       
@@ -145,62 +134,21 @@ export default function Contacts() {
         </DropdownMenu>
 
         {currentView === 'active' ? (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer" />}>
+          <>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => setIsDialogOpen(true)}
+            >
               <Plus className="h-5 w-5" />
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[300px]">
-              <DialogHeader>
-                <DialogTitle>{t('contacts.addContact')}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-1">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {t('contacts.type')}
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      type="button" 
-                      variant={newContactGroup === 'personal' ? 'default' : 'outline'} 
-                      className="h-10 text-sm cursor-pointer" 
-                      onClick={() => setNewContactGroup('personal')}
-                    >
-                      {t('contacts.groupPersonal')}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant={newContactGroup === 'organization' ? 'default' : 'outline'} 
-                      className="h-10 text-sm cursor-pointer" 
-                      onClick={() => setNewContactGroup('organization')}
-                    >
-                      {t('contacts.groupOrganization')}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {t('contacts.contactName')}
-                  </label>
-                  <Input 
-                    placeholder={t('contacts.namePlaceholder')} 
-                    value={newContactName}
-                    onChange={(e) => setNewContactName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddContact()}
-                    className="h-10 text-sm"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose render={<Button variant="ghost" className="cursor-pointer" />}>
-                  {t('contacts.cancel')}
-                </DialogClose>
-                <Button onClick={handleAddContact} disabled={!newContactName.trim()} className="cursor-pointer">
-                  {t('contacts.add')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </Button>
+            <ContactFormDialog 
+              open={isDialogOpen} 
+              onOpenChange={setIsDialogOpen} 
+              mode="create" 
+            />
+          </>
         ) : (
           <div className="w-8 h-8" />
         )}

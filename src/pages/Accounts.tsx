@@ -5,10 +5,6 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { AmountInput } from '@/components/ui/AmountInput';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { Plus, Wallet, ChevronDown, Check, RefreshCcw } from 'lucide-react';
 import {
   DropdownMenu,
@@ -16,9 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
-import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
+import { AccountFormDialog } from '@/components/accounts/AccountFormDialog';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { cn, getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import { Link } from 'react-router-dom';
@@ -30,28 +24,18 @@ import { useBalanceSnapshots } from '@/hooks/useBalanceSnapshots';
 
 export default function Accounts() {
   const { t } = useTranslation();
-  const { wallets, archivedWallets, allContacts, addAccount, unarchiveAccount } = useAccounts();
+  const { wallets, archivedWallets, allContacts, unarchiveAccount } = useAccounts();
   const { transactions } = useTransactions();
   const { getRate } = useExchangeRates();
   const { latestSnapshotsMap } = useBalanceSnapshots();
   
   const [currentView, setCurrentView] = useState<'active' | 'archived'>('active');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newAccountName, setNewAccountName] = useState('');
-  const [newAccountInitialBalance, setNewAccountInitialBalance] = useState('');
-  const [newAccountCurrency, setNewAccountCurrency] = useState('');
-  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
-  const [newAccountGroup, setNewAccountGroup] = useState('cash');
-  const [newCreditLimit, setNewCreditLimit] = useState('');
-  const [newStatementDay, setNewStatementDay] = useState('');
-  const [newDueDay, setNewDueDay] = useState('');
-  const [newAccountExcludeFromStats, setNewAccountExcludeFromStats] = useState(false);
 
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
-  const selectedCurrency = newAccountCurrency || baseCurrency;
 
   // 匯總所有錢包實體（含已歸檔）與往來對象（含已歸檔），用於全面計算原生餘額
   const allAccountsAndContacts = useMemo(() => {
@@ -136,42 +120,6 @@ export default function Accounts() {
     };
   }, [wallets, allContacts, accountBalances, baseCurrency, getRate]);
 
-  const handleAddAccount = async () => {
-    if (!newAccountName.trim()) return;
-    const balanceNum = parseFloat(newAccountInitialBalance);
-    const limitNum = parseFloat(newCreditLimit);
-    const stmtDayNum = parseInt(newStatementDay, 10);
-    const dueDayNum = parseInt(newDueDay, 10);
-
-    const isCredit = newAccountGroup === 'credit' || newAccountGroup === 'credit_pay';
-
-    await addAccount(
-      newAccountName.trim(),
-      'wallet',
-      isNaN(balanceNum) ? 0 : balanceNum,
-      selectedCurrency,
-      newAccountGroup,
-      {
-        ...(isCredit ? {
-          creditLimit: isNaN(limitNum) ? undefined : limitNum,
-          statementDay: isNaN(stmtDayNum) ? undefined : stmtDayNum,
-          dueDay: isNaN(dueDayNum) ? undefined : dueDayNum,
-        } : {}),
-        excludeFromStats: newAccountExcludeFromStats ? true : undefined,
-      }
-    );
-
-    setNewAccountName('');
-    setNewAccountInitialBalance('');
-    setNewAccountCurrency('');
-    setNewAccountGroup('cash');
-    setNewCreditLimit('');
-    setNewStatementDay('');
-    setNewDueDay('');
-    setNewAccountExcludeFromStats(false);
-    setIsDialogOpen(false);
-  };
-
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2">
@@ -201,138 +149,21 @@ export default function Accounts() {
         </DropdownMenu>
 
         {currentView === 'active' ? (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer" />}>
+          <>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => setIsDialogOpen(true)}
+            >
               <Plus className="h-5 w-5" />
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[300px]">
-              <DialogHeader>
-                <DialogTitle>{t('accounts.addAccount')}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-1">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.accountName')}</label>
-                  <Input 
-                    placeholder={t('accounts.namePlaceholder')} 
-                    value={newAccountName}
-                    onChange={(e) => setNewAccountName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddAccount()}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.accountGroup')}</label>
-                  <Select value={newAccountGroup} onValueChange={(val) => { if (val) setNewAccountGroup(val); }}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue>
-                        {t(`accounts.${GROUP_I18N_KEYS[newAccountGroup]}` as any)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">{t('accounts.groupCash')}</SelectItem>
-                      <SelectItem value="debit">{t('accounts.groupDebit')}</SelectItem>
-                      <SelectItem value="credit">{t('accounts.groupCredit')}</SelectItem>
-                      <SelectItem value="credit_pay">{t('accounts.groupCreditPay')}</SelectItem>
-                      <SelectItem value="investment">{t('accounts.groupInvestment')}</SelectItem>
-                      <SelectItem value="other">{t('accounts.groupOther')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.initialBalance')}</label>
-                  <div className="flex">
-                    <CurrencyTrigger
-                      currency={selectedCurrency}
-                      onClick={() => setIsCurrencyDialogOpen(true)}
-                      variant="inline"
-                    />
-                    <AmountInput
-                      className="rounded-l-none font-mono flex-1 min-w-0"
-                      placeholder="0.00"
-                      value={newAccountInitialBalance}
-                      onValueChange={setNewAccountInitialBalance}
-                      allowNegative
-                      onSubmitAmount={handleAddAccount}
-                    />
-                  </div>
-                </div>
-
-                {(newAccountGroup === 'credit' || newAccountGroup === 'credit_pay') && (
-                  <div className="space-y-4 pt-1 border-t border-border animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.limit')}</label>
-                      <AmountInput 
-                        className="font-mono"
-                        placeholder={t('accounts.limitPlaceholder')}
-                        value={newCreditLimit}
-                        onValueChange={setNewCreditLimit}
-                        onSubmitAmount={handleAddAccount}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1.5">
-                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.statementDay')}</label>
-                        <Select value={newStatementDay || 'none'} onValueChange={(val) => setNewStatementDay(!val || val === 'none' ? '' : val)}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder={t('accounts.notSet')}>
-                              {newStatementDay ? t('accounts.dayOfMonth', { day: newStatementDay }) : t('accounts.notSet')}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48">
-                            <SelectItem value="none">{t('accounts.notSet')}</SelectItem>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                              <SelectItem key={d} value={d.toString()}>{t('accounts.dayOfMonth', { day: d })}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('accounts.dueDay')}</label>
-                        <Select value={newDueDay || 'none'} onValueChange={(val) => setNewDueDay(!val || val === 'none' ? '' : val)}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder={t('accounts.notSet')}>
-                              {newDueDay ? t('accounts.dayOfMonth', { day: newDueDay }) : t('accounts.notSet')}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="max-h-48">
-                            <SelectItem value="none">{t('accounts.notSet')}</SelectItem>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                              <SelectItem key={d} value={d.toString()}>{t('accounts.dayOfMonth', { day: d })}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-2 border-t border-border flex items-center justify-between">
-                  <div className="space-y-0.5 pr-2">
-                    <label className="text-xs font-medium text-foreground cursor-pointer block" onClick={() => setNewAccountExcludeFromStats(!newAccountExcludeFromStats)}>
-                      {t('accounts.excludeFromStats')}
-                    </label>
-                    <p className="text-[11px] text-muted-foreground leading-tight">
-                      {t('accounts.excludeFromStatsDesc')}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={newAccountExcludeFromStats}
-                    onCheckedChange={setNewAccountExcludeFromStats}
-                    aria-label={t('accounts.excludeFromStats')}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <DialogClose render={<Button variant="ghost" type="button" />}>
-                  {t('accounts.cancel')}
-                </DialogClose>
-                <Button onClick={handleAddAccount} disabled={!newAccountName.trim()} className="cursor-pointer">
-                  {t('accounts.add')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </Button>
+            <AccountFormDialog 
+              open={isDialogOpen} 
+              onOpenChange={setIsDialogOpen} 
+              mode="create" 
+            />
+          </>
         ) : (
           <div className="w-8 h-8" />
         )}
@@ -586,13 +417,6 @@ export default function Accounts() {
           )}
         </div>
       )}
-      {/* 平級 Sibling 貨幣選擇彈窗，防 Portal 巢狀吞噬遮罩 */}
-      <CurrencySelectDialog
-        open={isCurrencyDialogOpen}
-        onOpenChange={setIsCurrencyDialogOpen}
-        selectedCurrency={selectedCurrency}
-        onSelectCurrency={setNewAccountCurrency}
-      />
       </div>
     </div>
   );

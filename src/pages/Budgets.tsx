@@ -36,12 +36,15 @@ import {
 import { cn } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
+import { BudgetCategoryPicker } from '@/components/budgets/BudgetCategoryPicker';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { type Budget, type BudgetRule } from '@/services/db/db';
 
 export default function Budgets() {
   const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const {
     budgets,
@@ -81,8 +84,6 @@ export default function Budgets() {
 
   const currentBudgetFilter: 'ongoing' | 'ended' =
     queryTab === 'ended' ? 'ended' : queryTab === 'rules' ? lastBudgetFilter : 'ongoing';
-
-  const [budgetToDelete, setBudgetToDelete] = useState<Budget | null>(null);
 
   const handleBudgetFilterChange = (filter: 'ongoing' | 'ended') => {
     setLastBudgetFilter(filter);
@@ -128,10 +129,17 @@ export default function Budgets() {
     }
   };
 
-  const handleDeleteBudget = async () => {
-    if (!budgetToDelete) return;
-    await deleteBudget(budgetToDelete.id);
-    setBudgetToDelete(null);
+  const handleDeleteBudget = async (budget: Budget) => {
+    const confirmed = await confirm({
+      title: t('budgets.deleteBudget'),
+      description: `${t('budgets.deleteBudgetConfirm')} (${budget.name})`,
+      confirmText: t('budgets.delete'),
+      cancelText: t('budgets.cancel'),
+      variant: 'destructive',
+    });
+    if (confirmed) {
+      await deleteBudget(budget.id);
+    }
   };
 
   const today = useMemo(() => new Date(), []);
@@ -320,7 +328,6 @@ export default function Budgets() {
   const [formRuleAmount, setFormRuleAmount] = useState('');
   const [formRulePeriodType, setFormRulePeriodType] = useState<'monthly' | 'yearly'>('monthly');
   const [formRuleCategoryIds, setFormRuleCategoryIds] = useState<string[]>([]);
-  const [ruleToDelete, setRuleToDelete] = useState<BudgetRule | null>(null);
 
   const handleOpenAddRule = () => {
     setEditingRule(null);
@@ -364,10 +371,17 @@ export default function Budgets() {
     setIsRuleModalOpen(false);
   };
 
-  const handleDeleteRule = async () => {
-    if (!ruleToDelete) return;
-    await deleteBudgetRule(ruleToDelete.id);
-    setRuleToDelete(null);
+  const handleDeleteRule = async (rule: BudgetRule) => {
+    const confirmed = await confirm({
+      title: t('budgets.deleteRule'),
+      description: `${t('budgets.deleteRuleConfirm')} (${rule.name})`,
+      confirmText: t('budgets.delete'),
+      cancelText: t('budgets.cancel'),
+      variant: 'destructive',
+    });
+    if (confirmed) {
+      await deleteBudgetRule(rule.id);
+    }
   };
 
   return (
@@ -732,7 +746,7 @@ export default function Budgets() {
                       className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer -mr-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setBudgetToDelete(budget);
+                        handleDeleteBudget(budget);
                       }}
                       title={t('budgets.deleteBudget')}
                     >
@@ -844,7 +858,7 @@ export default function Budgets() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive cursor-pointer"
-                        onClick={() => setRuleToDelete(rule)}
+                        onClick={() => handleDeleteRule(rule)}
                         title={t('common.delete', '刪除')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -972,55 +986,14 @@ export default function Budgets() {
             </div>
 
             {/* Category Monitoring Selection */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-baseline">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t('budgets.categories')}
-                </label>
-                <span className="text-[11px] text-muted-foreground">
-                  {formBudgetCategoryIds.length === 0
-                    ? t('budgets.noCategoriesSelected')
-                    : t('budgets.categoriesSelected', { count: formBudgetCategoryIds.length })}
-                </span>
-              </div>
-              <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 flex flex-wrap gap-1.5 bg-background">
-                {expenseCategories.length > 0 ? (
-                  expenseCategories.map(cat => {
-                    const isSelected = formBudgetCategoryIds.includes(cat.id);
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setFormBudgetCategoryIds(prev =>
-                            isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
-                          );
-                        }}
-                        className={cn(
-                          'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
-                          isSelected
-                            ? 'bg-foreground text-background border-foreground font-medium'
-                            : 'border-border bg-card text-card-foreground hover:bg-muted'
-                        )}
-                      >
-                        {isSelected && <Check className="h-3 w-3" />}
-                        <span>{cat.name}</span>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="w-full py-4 text-center text-xs text-muted-foreground">
-                    {t('budgets.noCategoriesAvailable')}
-                  </div>
-                )}
-              </div>
-              <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
-              </p>
-            </div>
+            <BudgetCategoryPicker
+              selectedCategoryIds={formBudgetCategoryIds}
+              onChange={setFormBudgetCategoryIds}
+              expenseCategories={expenseCategories}
+            />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
             <DialogClose render={<Button variant="ghost" type="button" />}>
               {t('budgets.cancel')}
             </DialogClose>
@@ -1099,55 +1072,14 @@ export default function Budgets() {
             </div>
 
             {/* Category Monitoring Selection */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between items-baseline">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t('budgets.categories')}
-                </label>
-                <span className="text-[11px] text-muted-foreground">
-                  {formRuleCategoryIds.length === 0
-                    ? t('budgets.noCategoriesSelected')
-                    : t('budgets.categoriesSelected', { count: formRuleCategoryIds.length })}
-                </span>
-              </div>
-              <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 flex flex-wrap gap-1.5 bg-background">
-                {expenseCategories.length > 0 ? (
-                  expenseCategories.map(cat => {
-                    const isSelected = formRuleCategoryIds.includes(cat.id);
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setFormRuleCategoryIds(prev =>
-                            isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
-                          );
-                        }}
-                        className={cn(
-                          'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
-                          isSelected
-                            ? 'bg-foreground text-background border-foreground font-medium'
-                            : 'border-border bg-card text-card-foreground hover:bg-muted'
-                        )}
-                      >
-                        {isSelected && <Check className="h-3 w-3" />}
-                        <span>{cat.name}</span>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="w-full py-4 text-center text-xs text-muted-foreground">
-                    {t('budgets.noCategoriesAvailable')}
-                  </div>
-                )}
-              </div>
-              <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
-              </p>
-            </div>
+            <BudgetCategoryPicker
+              selectedCategoryIds={formRuleCategoryIds}
+              onChange={setFormRuleCategoryIds}
+              expenseCategories={expenseCategories}
+            />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
             <DialogClose render={<Button variant="ghost" type="button" />}>
               {t('budgets.cancel')}
             </DialogClose>
@@ -1157,61 +1089,6 @@ export default function Budgets() {
               className="cursor-pointer"
             >
               {editingRule ? t('budgets.save') : t('budgets.addRule')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-
-      {/* -------------------------------------------------- */}
-      {/* Modal 4: Delete Rule Confirmation                  */}
-      {/* -------------------------------------------------- */}
-      <Dialog open={!!ruleToDelete} onOpenChange={open => !open && setRuleToDelete(null)}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.deleteRule')}</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-2">
-            <p className="text-sm text-muted-foreground">{t('budgets.deleteRuleConfirm')}</p>
-            {ruleToDelete && (
-              <p className="text-sm font-semibold font-mono bg-muted p-2 rounded border border-border">
-                {ruleToDelete.name}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setRuleToDelete(null)}>
-              {t('budgets.cancel')}
-            </Button>
-            <Button variant="destructive" type="button" onClick={handleDeleteRule}>
-              {t('budgets.delete')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* -------------------------------------------------- */}
-      {/* Modal 5: Delete Budget Confirmation (Ended Budget) */}
-      {/* -------------------------------------------------- */}
-      <Dialog open={!!budgetToDelete} onOpenChange={open => !open && setBudgetToDelete(null)}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.deleteBudget')}</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-2">
-            <p className="text-sm text-muted-foreground">{t('budgets.deleteBudgetConfirm')}</p>
-            {budgetToDelete && (
-              <p className="text-sm font-semibold font-mono bg-muted p-2 rounded border border-border">
-                {budgetToDelete.name}
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setBudgetToDelete(null)}>
-              {t('budgets.cancel')}
-            </Button>
-            <Button variant="destructive" type="button" onClick={handleDeleteBudget}>
-              {t('budgets.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -95,6 +95,19 @@ export function useAccounts() {
         .equals(activeLedgerId)
         .filter(a => !a.deleted)
         .count()) === 0;
+
+    const shouldBeDefault = extra?.isDefault !== undefined ? Boolean(extra.isDefault) : isFirstAccount;
+
+    if (shouldBeDefault) {
+      const others = await db.accounts
+        .where('ledgerId')
+        .equals(activeLedgerId)
+        .filter(a => !a.deleted && a.isDefault)
+        .toArray();
+      for (const other of others) {
+        await db.accounts.update(other.id, { isDefault: false, updatedAt: new Date().toISOString() });
+      }
+    }
     
     const newWallet: Wallet = {
       id: uuidv4(),
@@ -102,7 +115,7 @@ export function useAccounts() {
       name,
       type: 'wallet',
       group,
-      isDefault: isFirstAccount,
+      isDefault: shouldBeDefault,
       initialBalance,
       currency,
       ...extra,
@@ -120,6 +133,20 @@ export function useAccounts() {
     if (isContact) {
       await updateContact(id, updates as any);
       return;
+    }
+
+    if (updates.isDefault === true) {
+      const current = await db.accounts.get(id);
+      if (current) {
+        const others = await db.accounts
+          .where('ledgerId')
+          .equals(current.ledgerId)
+          .filter(a => a.id !== id && !a.deleted && a.isDefault)
+          .toArray();
+        for (const other of others) {
+          await db.accounts.update(other.id, { isDefault: false, updatedAt: new Date().toISOString() });
+        }
+      }
     }
 
     await db.accounts.update(id, {

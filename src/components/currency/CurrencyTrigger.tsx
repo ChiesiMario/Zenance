@@ -1,12 +1,16 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { getCurrencyInfo } from '@/lib/currencies';
 import { cn } from '@/lib/utils';
 
 export interface CurrencyTriggerProps {
   currency: string;
   onClick?: () => void;
   disabled?: boolean;
-  variant?: 'inline' | 'button' | 'row';
+  variant?: 'inline' | 'button' | 'row' | 'card';
+  label?: React.ReactNode;
+  showName?: boolean;
   className?: string;
   showChevron?: boolean;
 }
@@ -16,10 +20,15 @@ export const CurrencyTrigger: React.FC<CurrencyTriggerProps> = ({
   onClick,
   disabled = false,
   variant = 'button',
+  label,
+  showName = false,
   className,
   showChevron = true,
 }) => {
+  const { t } = useTranslation();
   const code = currency?.toUpperCase() || 'USD';
+  const info = getCurrencyInfo(code);
+  const localizedName = info?.i18nKey ? t(info.i18nKey) : undefined;
 
   if (variant === 'inline') {
     return (
@@ -43,6 +52,38 @@ export const CurrencyTrigger: React.FC<CurrencyTriggerProps> = ({
     );
   }
 
+  if (variant === 'card') {
+    return (
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+          "w-full border border-border rounded-lg p-2.5 flex items-center justify-between bg-card transition-colors select-none text-left",
+          !disabled ? "hover:bg-muted/30 active:bg-muted/50 cursor-pointer" : "opacity-60 cursor-not-allowed",
+          className
+        )}
+      >
+        {label && (
+          <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+        )}
+        <div className="inline-flex items-center justify-end gap-1.5 min-w-0 pl-2">
+          <span className="font-mono text-sm font-semibold tracking-tight text-foreground shrink-0">
+            {code}
+          </span>
+          {showName && localizedName && (
+            <span className="text-xs font-normal text-muted-foreground opacity-60 truncate">
+              ({localizedName})
+            </span>
+          )}
+          {showChevron && (
+            <ChevronDown className="size-3.5 text-muted-foreground shrink-0 opacity-70" />
+          )}
+        </div>
+      </button>
+    );
+  }
+
   if (variant === 'row') {
     return (
       <button
@@ -57,6 +98,11 @@ export const CurrencyTrigger: React.FC<CurrencyTriggerProps> = ({
         )}
       >
         <span>{code}</span>
+        {showName && localizedName && (
+          <span className="text-xs font-normal text-muted-foreground opacity-60 truncate">
+            ({localizedName})
+          </span>
+        )}
         {showChevron && (
           <ChevronDown className="size-3.5 text-muted-foreground shrink-0 opacity-70" />
         )}
@@ -77,7 +123,14 @@ export const CurrencyTrigger: React.FC<CurrencyTriggerProps> = ({
         className
       )}
     >
-      <span>{code}</span>
+      <div className="inline-flex items-center gap-1.5 min-w-0">
+        <span className="shrink-0">{code}</span>
+        {showName && localizedName && (
+          <span className="text-xs font-normal text-muted-foreground opacity-60 truncate">
+            ({localizedName})
+          </span>
+        )}
+      </div>
       {showChevron && (
         <ChevronDown className="size-3.5 text-muted-foreground shrink-0 opacity-70" />
       )}

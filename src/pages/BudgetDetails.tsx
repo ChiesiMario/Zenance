@@ -6,7 +6,6 @@ import {
   Pencil,
   Trash2,
   Zap,
-  Check,
   CircleStop,
   RotateCcw,
   Infinity as InfinityIcon,
@@ -23,6 +22,8 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
+import { BudgetCategoryPicker } from '@/components/budgets/BudgetCategoryPicker';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/AmountInput';
@@ -44,6 +45,7 @@ export default function BudgetDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const confirm = useConfirm();
 
   const { budgets, updateBudget, deleteBudget, isLoading: isBudgetsLoading } = useBudgets();
   const { transactions, isLoading: isTxLoading } = useTransactions();
@@ -66,12 +68,6 @@ export default function BudgetDetails() {
   const [formEndDate, setFormEndDate] = useState('');
   const [formCategoryIds, setFormCategoryIds] = useState<string[]>([]);
   const [isUnlimited, setIsUnlimited] = useState(false);
-
-  // Delete Budget Confirmation Dialog State
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
-  // End Budget Confirmation Dialog State
-  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
 
   const todayStr = useMemo(() => {
     const today = new Date();
@@ -227,15 +223,31 @@ export default function BudgetDetails() {
 
   const handleDeleteBudget = async () => {
     if (!budget) return;
-    await deleteBudget(budget.id);
-    navigate('/budgets');
+    const confirmed = await confirm({
+      title: t('budgets.deleteBudget'),
+      description: t('budgets.deleteBudgetConfirm'),
+      confirmText: t('budgets.delete'),
+      cancelText: t('budgets.cancel'),
+      variant: 'destructive',
+    });
+    if (confirmed) {
+      await deleteBudget(budget.id);
+      navigate('/budgets');
+    }
   };
 
   const handleEndBudget = async () => {
     if (!budget) return;
-    await updateBudget(budget.id, { isEnded: true, endedAt: todayStr });
-    setIsEndDialogOpen(false);
-    toast.show(t('budgets.budgetEnded'));
+    const confirmed = await confirm({
+      title: t('budgets.endBudget'),
+      description: t('budgets.endBudgetConfirm'),
+      confirmText: t('budgets.confirmEnd'),
+      cancelText: t('budgets.cancel'),
+    });
+    if (confirmed) {
+      await updateBudget(budget.id, { isEnded: true, endedAt: todayStr });
+      toast.show(t('budgets.budgetEnded'));
+    }
   };
 
   const handleResumeBudget = async () => {
@@ -315,7 +327,7 @@ export default function BudgetDetails() {
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => setIsEndDialogOpen(true)}
+                onClick={handleEndBudget}
                 title={t('budgets.endBudget')}
                 aria-label={t('budgets.endBudget')}
                 className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -342,7 +354,7 @@ export default function BudgetDetails() {
               variant="outline"
               size="icon"
               disabled={!budget}
-              onClick={() => setIsDeleteDialogOpen(true)}
+              onClick={handleDeleteBudget}
               title={t('budgets.deleteBudget')}
               aria-label={t('budgets.deleteBudget')}
               className="size-8 text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors cursor-pointer disabled:opacity-30"
@@ -624,56 +636,15 @@ export default function BudgetDetails() {
             )}
 
             {/* Category Monitoring Selection */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-baseline">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  {t('budgets.categories')}
-                </label>
-                <span className="text-[11px] text-muted-foreground">
-                  {formCategoryIds.length === 0
-                    ? t('budgets.noCategoriesSelected')
-                    : t('budgets.categoriesSelected', { count: formCategoryIds.length })}
-                </span>
-              </div>
-              <div className="max-h-36 overflow-y-auto border border-border rounded-md p-2 flex flex-wrap gap-1.5 bg-background">
-                {expenseCategories.length > 0 ? (
-                  expenseCategories.map(cat => {
-                    const isSelected = formCategoryIds.includes(cat.id);
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          setFormCategoryIds(prev =>
-                            isSelected ? prev.filter(cId => cId !== cat.id) : [...prev, cat.id]
-                          );
-                        }}
-                        className={cn(
-                          'text-xs px-2.5 py-1 rounded-md border transition-colors flex items-center gap-1.5 cursor-pointer',
-                          isSelected
-                            ? 'bg-foreground text-background border-foreground font-medium'
-                            : 'border-border bg-card text-card-foreground hover:bg-muted'
-                        )}
-                      >
-                        {isSelected && <Check className="h-3 w-3" />}
-                        <span>{cat.name}</span>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="w-full py-4 text-center text-xs text-muted-foreground">
-                    {t('budgets.noCategoriesAvailable')}
-                  </div>
-                )}
-              </div>
-              <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
-                {t('budgets.categoriesHint', '勾選分類後，相關支出將自動納入預算；未設定亦可於記帳時手動指定。')}
-              </p>
-            </div>
+            <BudgetCategoryPicker
+              selectedCategoryIds={formCategoryIds}
+              onChange={setFormCategoryIds}
+              expenseCategories={expenseCategories}
+            />
           </div>
 
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" type="button" />}>
+          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
+            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
               {t('budgets.cancel')}
             </DialogClose>
             <Button
@@ -687,56 +658,9 @@ export default function BudgetDetails() {
                   (!isUnlimited && (!formEndDate || formStartDate > formEndDate))
                 ))
               }
+              className="cursor-pointer"
             >
               {t('budgets.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Budget Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.deleteBudget')}</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground leading-relaxed py-2">
-            {t('budgets.deleteBudgetConfirm')}
-          </p>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('budgets.cancel')}
-            </DialogClose>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteBudget}
-              className="cursor-pointer"
-            >
-              {t('budgets.delete')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* End Budget Confirmation Dialog */}
-      <Dialog open={isEndDialogOpen} onOpenChange={setIsEndDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.endBudget')}</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground leading-relaxed py-2">
-            {t('budgets.endBudgetConfirm')}
-          </p>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <DialogClose render={<Button variant="outline" type="button" />}>
-              {t('budgets.cancel')}
-            </DialogClose>
-            <Button
-              variant="default"
-              onClick={handleEndBudget}
-              className="cursor-pointer"
-            >
-              {t('budgets.confirmEnd')}
             </Button>
           </DialogFooter>
         </DialogContent>

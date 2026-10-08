@@ -4,11 +4,10 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, Edit, Trash2, ArchiveRestore, ArrowUpRight, ArrowDownLeft, User, Building2 } from 'lucide-react';
+import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
+import { ChevronLeft, Edit, ArrowUpRight, ArrowDownLeft, User, Building2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
@@ -20,7 +19,7 @@ export default function ContactDetails() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   
-  const { allContacts, updateContact, deleteContact, archiveContact, unarchiveContact } = useContacts();
+  const { allContacts } = useContacts();
   const { transactions } = useTransactions();
   const { activeLedgerId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
@@ -31,17 +30,6 @@ export default function ContactDetails() {
   const currency = contact?.currency || baseCurrency;
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editGroup, setEditGroup] = useState('personal');
-  const [deleteError, setDeleteError] = useState('');
-  
-  useEffect(() => {
-    if (contact) {
-      setEditName(contact.name);
-      setEditGroup(contact.group || 'personal');
-      setDeleteError('');
-    }
-  }, [contact, isEditDialogOpen]);
 
   // Include transactions associated with this contact (loans & transfers)
   const contactTransactions = useMemo(() => {
@@ -104,34 +92,7 @@ export default function ContactDetails() {
     );
   }
 
-  const handleUpdate = async () => {
-    if (!editName.trim() || !id) return;
-    await updateContact(id, {
-      name: editName.trim(),
-      group: editGroup
-    });
-    setIsEditDialogOpen(false);
-  };
 
-  const handleDelete = async () => {
-    if (!id) return;
-    const res = await deleteContact(id);
-    if (!res.success) {
-      setDeleteError(res.reason === 'has_transactions' ? t('contacts.cannotDeleteHasTransactions', 'Cannot delete contact with existing transactions. You can archive it instead.') : t('common.error'));
-    } else {
-      navigate('/contacts');
-    }
-  };
-  
-  const handleArchive = async () => {
-    if (!id) return;
-    if (contact?.archived) {
-      await unarchiveContact(id);
-    } else {
-      await archiveContact(id);
-    }
-    navigate('/contacts');
-  };
 
 
   return (
@@ -277,95 +238,15 @@ export default function ContactDetails() {
       />
 
       {/* Edit Contact Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader>
-            <DialogTitle className="text-center">{t('contacts.editContact', 'Edit Contact')}</DialogTitle>
-          </DialogHeader>
-
-          <div className="py-2 space-y-5">
-            {/* 無邊界大字體名稱輸入區 */}
-            <div className="flex flex-col items-center justify-center pt-2 pb-1">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-2">
-                {t('contacts.contactName')}
-              </span>
-              <input 
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && editName.trim() && handleUpdate()}
-                placeholder={t('contacts.namePlaceholder')}
-                className="w-full text-center text-3xl font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/40"
-              />
-            </div>
-            
-            {/* Vercel Usage 風格屬性清單卡片 */}
-            <div className="rounded-lg border border-border divide-y divide-border bg-card overflow-hidden">
-              <div className="flex items-center justify-between p-3">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('contacts.category')}
-                </span>
-                <Select value={editGroup} onValueChange={(val) => { if (val) setEditGroup(val); }}>
-                  <SelectTrigger className="!h-auto !py-0 !px-0 !border-none !bg-transparent shadow-none focus-visible:border-none focus-visible:ring-0 text-sm font-medium justify-end gap-1.5 cursor-pointer">
-                    <SelectValue className="flex-none text-right">
-                      {editGroup === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="personal">{t('contacts.groupPersonal')}</SelectItem>
-                    <SelectItem value="organization">{t('contacts.groupOrganization')}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {deleteError && (
-              <div className="text-xs text-destructive bg-destructive/10 p-2.5 rounded-md text-center">
-                {deleteError}
-              </div>
-            )}
-            
-            {/* 幽靈輔助操作（歸檔 · 刪除） */}
-            <div className="flex items-center justify-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={handleArchive}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <ArchiveRestore className="h-3.5 w-3.5" />
-                <span>{contact?.archived ? t('contacts.unarchiveContact') : t('contacts.archiveContact')}</span>
-              </button>
-              
-              <span className="text-border select-none">·</span>
-
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={contactTransactions.length > 0}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>{t('contacts.deleteContact')}</span>
-              </button>
-            </div>
-            
-            {contactTransactions.length > 0 && (
-              <p className="text-[11px] text-muted-foreground text-center leading-normal px-2">
-                {t('contacts.cannotDeleteHasTransactions')}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter className="grid grid-cols-2 gap-2 sm:gap-2 pt-2">
-            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button onClick={handleUpdate} disabled={!editName.trim()} className="cursor-pointer">
-              {t('common.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ContactFormDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        mode="edit"
+        contact={contact}
+        hasTransactions={contactTransactions.length > 0}
+        onDeleted={() => navigate('/contacts')}
+        onArchived={() => navigate('/contacts')}
+      />
     </div>
   );
 }

@@ -629,32 +629,123 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [transactionId, navigateUp, navigateDown, navigateLeft, navigateRight]);
 
-  // 觸控手勢
-  const touchStartX = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
+  // 導航邊界判定（用於邊界彈性阻尼反饋）
+  const canNavigateLeft = useMemo(() => {
+    if (columnsData.length === 0) return false;
+    const { colIdx, isChild, childIdx } = activeLocation;
+    if (isChild) {
+      if (childIdx > 0) return true;
+      if (colIdx > 0) return true;
+      return false;
+    }
+    return colIdx > 0;
+  }, [columnsData, activeLocation]);
+
+  const canNavigateRight = useMemo(() => {
+    if (columnsData.length === 0) return false;
+    const { colIdx, isChild, childIdx } = activeLocation;
+    const col = columnsData[colIdx];
+    if (isChild) {
+      if (childIdx < col.refunds.length - 1) return true;
+      if (colIdx < columnsData.length - 1) return true;
+      return false;
+    }
+    return colIdx < columnsData.length - 1;
+  }, [columnsData, activeLocation]);
+
+  const canNavigateDown = useMemo(() => {
+    if (columnsData.length === 0) return false;
+    const { colIdx, isChild } = activeLocation;
+    const col = columnsData[colIdx];
+    return !isChild && col.refunds.length > 0;
+  }, [columnsData, activeLocation]);
+
+  const canNavigateUp = useMemo(() => {
+    if (columnsData.length === 0) return false;
+    const { isChild } = activeLocation;
+    return isChild;
+  }, [columnsData, activeLocation]);
+
+  // 全螢幕手勢觸控與實時跟手物理拖曳
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartXRef = useRef<number>(0);
+  const touchStartYRef = useRef<number>(0);
+  const hasMovedRef = useRef<boolean>(false);
+
+  const applyDamping = (delta: number, canMove: boolean) => {
+    if (canMove) return delta;
+    return delta * 0.3;
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
+    if (e.touches.length !== 1) return;
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+    hasMovedRef.current = false;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const rawDiffX = currentX - touchStartXRef.current;
+    const rawDiffY = currentY - touchStartYRef.current;
+
+    if (Math.hypot(rawDiffX, rawDiffY) > 8) {
+      hasMovedRef.current = true;
+    }
+
+    let effX = rawDiffX;
+    if (rawDiffX > 0) {
+      effX = applyDamping(rawDiffX, canNavigateLeft);
+    } else {
+      effX = applyDamping(rawDiffX, canNavigateRight);
+    }
+
+    let effY = rawDiffY;
+    if (rawDiffY > 0) {
+      effY = applyDamping(rawDiffY, canNavigateUp);
+    } else {
+      effY = applyDamping(rawDiffY, canNavigateDown);
+    }
+
+    setDragOffset({ x: effX, y: effY });
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    const diffX = e.changedTouches[0].clientX - touchStartX.current;
-    const diffY = e.changedTouches[0].clientY - touchStartY.current;
+    if (!isDragging) return;
+    setIsDragging(false);
 
-    if (Math.abs(diffY) >= Math.abs(diffX) && Math.abs(diffY) > 35) {
-      if (diffY < -35) {
+    const finalDiffX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const finalDiffY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    setDragOffset({ x: 0, y: 0 });
+
+    const SWIPE_THRESHOLD = 40;
+    const absX = Math.abs(finalDiffX);
+    const absY = Math.abs(finalDiffY);
+
+    if (absY >= absX && absY > SWIPE_THRESHOLD) {
+      if (finalDiffY < -SWIPE_THRESHOLD) {
         navigateDown();
-      } else if (diffY > 35) {
+      } else if (finalDiffY > SWIPE_THRESHOLD) {
         navigateUp();
       }
-    } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 35) {
-      if (diffX < -35) {
+    } else if (absX > absY && absX > SWIPE_THRESHOLD) {
+      if (finalDiffX < -SWIPE_THRESHOLD) {
         navigateRight();
-      } else if (diffX > 35) {
+      } else if (finalDiffX > SWIPE_THRESHOLD) {
         navigateLeft();
       }
     }
+  };
+
+  const handleTouchCancel = () => {
+    setIsDragging(false);
+    setDragOffset({ x: 0, y: 0 });
+    hasMovedRef.current = false;
   };
 
   // 滑鼠滾輪（支援 Shift 水平滑動與原生水平/垂直滾動）
@@ -938,6 +1029,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         key={tx.id}
         onClick={(e) => {
           e.stopPropagation();
+          if (hasMovedRef.current) {
+            hasMovedRef.current = false;
+            return;
+          }
           if (!isActive) {
             setActiveTxId(tx.id);
           }
@@ -1241,29 +1336,43 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           )}
         >
           
-          {/* Scrollable / Centered 2D Stage (佔滿全螢幕高度，杜絕上下邊界裁切) */}
+          {/* Scrollable / Centered 2D Stage (佔滿全螢幕高度，全螢幕手勢觸發與防誤觸) */}
           <div
             ref={stageRef}
             className="absolute inset-0 w-full h-full overflow-hidden pointer-events-auto select-none touch-none"
             onWheel={handleWheel}
-            onClick={onClose}
+            onClick={() => {
+              if (hasMovedRef.current) {
+                hasMovedRef.current = false;
+                return;
+              }
+              onClose();
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchCancel}
           >
             <div
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
               className={cn(
                 "absolute left-0 top-0 cursor-default will-change-transform touch-none",
-                isTransitionReady
+                !isDragging && isTransitionReady
                   ? "transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
                   : "transition-none"
               )}
               style={{
-                transform: `translate3d(${currentTranslateX}px, ${currentTranslateY}px, 0)`,
+                transform: `translate3d(${currentTranslateX + dragOffset.x}px, ${currentTranslateY + dragOffset.y}px, 0)`,
                 width: `${totalCanvasWidth}px`,
                 height: `${parentHeight + CONNECTOR_HEIGHT + childrenHeight}px`,
               }}
               onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
+                if (e.target === e.currentTarget) {
+                  if (hasMovedRef.current) {
+                    hasMovedRef.current = false;
+                    return;
+                  }
+                  onClose();
+                }
               }}
             >
               {/* 1. 中間樹狀分支連接線 */}
@@ -1306,6 +1415,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                   className="card-parent-slot flex items-end justify-center shrink-0 cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (hasMovedRef.current) {
+                      hasMovedRef.current = false;
+                      return;
+                    }
                     setActiveTxId(col.rootTx.id);
                   }}
                 >
@@ -1329,6 +1442,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                     className="card-child-slot flex items-end justify-center shrink-0 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (hasMovedRef.current) {
+                        hasMovedRef.current = false;
+                        return;
+                      }
                       setActiveTxId(refTx.id);
                     }}
                   >

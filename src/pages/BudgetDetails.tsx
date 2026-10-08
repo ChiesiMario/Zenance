@@ -20,7 +20,6 @@ import { useBudgets, formatBudgetDisplayRange, getBudgetDaysInfo } from '@/hooks
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { useLedgers } from '@/hooks/useLedgers';
-import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
@@ -37,8 +36,8 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { cn, sortTransactionsDesc, formatTransactionDateHeader } from '@/lib/utils';
+import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
+import { cn, sortTransactionsDesc } from '@/lib/utils';
 import { type Budget } from '@/services/db/db';
 
 export default function BudgetDetails() {
@@ -55,13 +54,9 @@ export default function BudgetDetails() {
   }, [allCategories]);
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
-  const { wallets } = useAccounts();
 
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const budget = budgets?.find(b => b.id === id);
-
-  // Selected Transaction for Dialog
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
   // Edit Budget Dialog States
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -140,6 +135,24 @@ export default function BudgetDetails() {
       // If explicitly bound to another budget, exclude
       if (tx.budgetId && tx.budgetId !== 'auto') return false;
 
+      // 退款子交易：若其父交易計入了此預算，則納入此預算的交易中
+      if (tx.parentId) {
+        const parentTx = transactions.find(t => t.id === tx.parentId);
+        if (parentTx && !parentTx.deleted) {
+          const parentIsExplicit = parentTx.budgetId === budget.id;
+          const parentIsAuto =
+            (!parentTx.budgetId || parentTx.budgetId === 'auto') &&
+            categorySet.size > 0 &&
+            categorySet.has(parentTx.category) &&
+            parentTx.date >= startDate &&
+            (!effectiveEndDate || parentTx.date <= effectiveEndDate);
+
+          if (parentIsExplicit || parentIsAuto) {
+            return true;
+          }
+        }
+      }
+
       // Auto-match for expenses: within date range and matching categories
       return (
         tx.type === 'expense' &&
@@ -173,39 +186,6 @@ export default function BudgetDetails() {
     totalSpent !== undefined && effectiveAmount !== undefined
       ? Math.max(0, effectiveAmount - totalSpent)
       : undefined;
-
-  // Grouped transactions by date (newest first)
-  const groupedTransactions = useMemo(() => {
-    const groups: Record<string, typeof periodTransactions> = {};
-    periodTransactions.forEach(tx => {
-      if (!groups[tx.date]) {
-        groups[tx.date] = [];
-      }
-      groups[tx.date].push(tx);
-    });
-
-    return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a))
-      .map(dateStr => {
-        const dayTxs = sortTransactionsDesc(groups[dateStr]);
-        const dayTotal = dayTxs.reduce((acc, t) => {
-          if (t.type === 'income') {
-            return acc - t.amount;
-          }
-          return acc + t.amount;
-        }, 0);
-        return {
-          date: dateStr,
-          transactions: dayTxs,
-          dayTotal,
-        };
-      });
-  }, [periodTransactions]);
-
-  // Date header formatting
-  const formatDateHeader = (dateStr: string) => {
-    return formatTransactionDateHeader(dateStr, t, i18n.language);
-  };
 
   // Monitored categories resolution
   const monitoredCategoryList = useMemo(() => {
@@ -506,121 +486,55 @@ export default function BudgetDetails() {
 
         {!budgets || !transactions ? (
           <div className="border border-border rounded-lg h-36 bg-card/40 flex items-center justify-center text-xs font-mono text-muted-foreground/60" />
-        ) : groupedTransactions.length === 0 ? (
-          <div className="border border-border rounded-lg p-10 text-center bg-card space-y-3">
-            <div className="size-10 rounded-full border border-border bg-muted/30 flex items-center justify-center mx-auto text-muted-foreground/60">
-              {monitoredCategoryList.length > 0 ? (
-                <ReceiptText className="size-5" />
-              ) : (
-                <Tag className="size-5" />
-              )}
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                {t('budgets.noTransactions', '此期間尚無任何支出交易')}
-              </p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                {monitoredCategoryList.length > 0
-                  ? t('budgets.noTransactionsWithCategoriesDesc', '設定的監控分類在該期間內尚未產生任何支出紀錄。')
-                  : t('budgets.noTransactionsNoCategoriesDesc', '此預算未設定監控分類，您可以編輯預算加入分類自動統計，或於記帳時手動指定歸屬此預算。')}
-              </p>
-            </div>
-            {monitoredCategoryList.length === 0 && (
-              <div className="pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!budget}
-                  onClick={() => budget && handleOpenEdit(budget)}
-                  className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground disabled:opacity-30"
-                >
-                  <Pencil className="size-3.5" />
-                  <span>{t('budgets.configureMonitoredCategories', '設定監控分類')}</span>
-                </Button>
-              </div>
-            )}
-          </div>
         ) : (
-            <div className="space-y-4">
-              {groupedTransactions.map(group => (
-                <div
-                  key={group.date}
-                  className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground flex flex-col"
-                >
-                  {/* Date Sticky Header */}
-                  <div className="sticky top-0 z-10 px-4 py-2.5 bg-background/80 backdrop-blur-md border-b border-border text-xs uppercase tracking-widest text-muted-foreground flex justify-between items-center">
-                    <span>{formatDateHeader(group.date)}</span>
-                    <div className="font-mono text-muted-foreground/80">
-                      <AmountDisplay
-                        amount={group.dayTotal}
-                        baseCurrency={activeLedger?.baseCurrency}
-                        type="neutral"
-                        className="font-normal"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Day Transactions */}
-                  <div className="divide-y divide-border">
-                    {group.transactions.map(tx => {
-                      const category = allCategories?.find(c => c.id === tx.category);
-                      return (
-                        <button
-                          key={tx.id}
-                          onClick={() => setSelectedTransactionId(tx.id)}
-                          className="w-full h-16 flex items-center justify-between px-4 transition-colors hover:bg-muted/10 group cursor-pointer text-left bg-card"
-                        >
-                          <div className="flex flex-col justify-center min-w-0 pr-4 overflow-hidden">
-                            <div className="h-5 flex items-center gap-1.5 min-w-0">
-                              <span className="text-sm font-medium leading-none truncate">
-                                {category?.name && (category.name.includes('差額吸收') || category.name.includes('差额吸收') || category.name === '抹零')
-                                  ? t('reimbursements.writeOffCategory', '抹零')
-                                  : (category?.name || t('common.uncategorized'))}
-                              </span>
-                            </div>
-                            {tx.note && (
-                              <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
-                                {tx.note}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end justify-center shrink-0">
-                            <div className="h-5 flex items-center justify-end">
-                              <AmountDisplay
-                                amount={tx.amount}
-                                originalCurrency={tx.originalCurrency}
-                                baseCurrency={activeLedger?.baseCurrency}
-                                type={tx.type === 'income' ? 'income' : 'expense'}
-                                className="text-sm font-mono leading-none"
-                              />
-                            </div>
-                            {(() => {
-                              const wallet = wallets?.find(w => w.id === tx.accountId) || wallets?.find(w => w.id === tx.toAccountId);
-                              if (!wallet?.name) return null;
-                              return (
-                                <div className="h-4 flex items-center justify-end text-xs text-muted-foreground truncate mt-1 max-w-[120px]">
-                                  {wallet.name}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+          <GroupedTransactionList
+            transactions={periodTransactions}
+            calcDailyBalance={(dayTxs) => {
+              return dayTxs.reduce((acc, t) => {
+                if (t.type === 'income') {
+                  return acc - t.amount;
+                }
+                return acc + t.amount;
+              }, 0);
+            }}
+            emptyState={
+              <div className="border border-border rounded-lg p-10 text-center bg-card space-y-3">
+                <div className="size-10 rounded-full border border-border bg-muted/30 flex items-center justify-center mx-auto text-muted-foreground/60">
+                  {monitoredCategoryList.length > 0 ? (
+                    <ReceiptText className="size-5" />
+                  ) : (
+                    <Tag className="size-5" />
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-      {/* Transaction Details Dialog */}
-      {selectedTransactionId && (
-        <TransactionDetailsDialog
-          transactionId={selectedTransactionId}
-          onClose={() => setSelectedTransactionId(null)}
-        />
-      )}
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {t('budgets.noTransactions', '此期間尚無任何支出交易')}
+                  </p>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                    {monitoredCategoryList.length > 0
+                      ? t('budgets.noTransactionsWithCategoriesDesc', '設定的監控分類在該期間內尚未產生任何支出紀錄。')
+                      : t('budgets.noTransactionsNoCategoriesDesc', '此預算未設定監控分類，您可以編輯預算加入分類自動統計，或於記帳時手動指定歸屬此預算。')}
+                  </p>
+                </div>
+                {monitoredCategoryList.length === 0 && (
+                  <div className="pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!budget}
+                      onClick={() => budget && handleOpenEdit(budget)}
+                      className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground disabled:opacity-30"
+                    >
+                      <Pencil className="size-3.5" />
+                      <span>{t('budgets.configureMonitoredCategories', '設定監控分類')}</span>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            }
+          />
+        )}
+      </div>
 
       {/* Edit Budget Primary Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

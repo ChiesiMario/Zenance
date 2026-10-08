@@ -20,6 +20,14 @@ import { startInitialSync } from '@/services/sync/initialSyncManager';
 import { useAppStore } from '@/store/useAppStore';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
+// 模組級單例守衛：確保應用冷啟動同步全域只執行一次，次級頁面（如設置、詳情頁）掛載或返回時不重複觸發
+let hasInitialMountSyncExecuted = false;
+
+// 視窗聚焦與分頁可見性切回：全域 30 秒冷卻防護時間戳與離開標記
+const FOCUS_COOLDOWN_MS = 30 * 1000; // 30 秒冷卻防護
+let lastGlobalFocusCheckTime = Date.now();
+let hasBlurredOrHidden = false;
+
 export function useDropboxSync() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(isDropboxConnected());
   const [syncState, setSyncState] = useState<SyncEngineStatus>(getSyncEngineStatus);
@@ -67,32 +75,56 @@ export function useDropboxSync() {
 
   // 應用啟動與切回視窗時主動檢查遠端是否有更新 (感應用戶在其他設備的變更)
   useEffect(() => {
-    if (isDropboxConnected() && isOnline) {
-      scheduleAutoSync(1500);
+    // 1. 全應用冷啟動同步：僅首次加載時執行一次，次級頁面進出（如打開設置與返回）不重複執行
+    if (!hasInitialMountSyncExecuted) {
+      hasInitialMountSyncExecuted = true;
+      if (isDropboxConnected() && isOnline) {
+        scheduleAutoSync(1500);
+      }
     }
 
-    let lastCheckTime = Date.now();
-    const handleFocus = () => {
+    // 2. 視窗失焦與分頁隱藏記錄 (標記用戶確實離開過當前視窗，排除 SPA 內部路由導航與 DOM 焦點轉移)
+    const handleBlur = () => {
+      hasBlurredOrHidden = true;
+    };
+
+    const checkAndTriggerFocusSync = () => {
       const now = Date.now();
-      if (now - lastCheckTime > 8000 && isDropboxConnected() && isOnline) {
-        lastCheckTime = now;
+      // 只有當用戶確實離開過本視窗/分頁，且冷卻時間超過 30 秒時才觸發
+      if (
+        hasBlurredOrHidden &&
+        now - lastGlobalFocusCheckTime > FOCUS_COOLDOWN_MS &&
+        isDropboxConnected() &&
+        isOnline
+      ) {
+        lastGlobalFocusCheckTime = now;
+        hasBlurredOrHidden = false;
         scheduleAutoSync(1000);
       }
     };
 
-    window.addEventListener('focus', handleFocus);
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        handleFocus();
+      if (document.visibilityState === 'hidden') {
+        hasBlurredOrHidden = true;
+      } else if (document.visibilityState === 'visible') {
+        checkAndTriggerFocusSync();
       }
     };
+
+    const handleFocus = () => {
+      checkAndTriggerFocusSync();
+    };
+
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
+      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, []);
+  }, [isOnline]);
 
   // 網路恢復時自動補發同步
   useEffect(() => {

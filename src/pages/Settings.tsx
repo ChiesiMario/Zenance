@@ -890,14 +890,6 @@ export default function Settings() {
                   )}
                 </div>
               )}
-              {lastSyncTime && (
-                <>
-                  <span className="text-muted-foreground/40">·</span>
-                  <span className="text-muted-foreground">
-                    {format24Time(lastSyncTime)}
-                  </span>
-                </>
-              )}
               <ChevronRight className="size-3.5 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
             </div>
           </div>

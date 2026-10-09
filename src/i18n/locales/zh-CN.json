@@ -605,6 +605,8 @@
       "categoryOverview": "分类总览",
       "activeAndArchived": "{{active}} 个活跃 · {{archived}} 个已归档",
       "manageCategories": "管理收支分类",
+      "hidePwaInstallPrompt": "隐藏 PWA 安装按钮",
+      "hidePwaInstallPromptDesc": "在首页顶部隐藏 PWA 安装引导按钮",
       "archived": "已归档",
       "unarchive": "取消归档",
       "noArchivedCategories": "暂无已归档分类",
@@ -1040,7 +1042,8 @@
       "desktopStep1": "点击浏览器地址栏右侧的“安装”图标",
       "desktopStep2": "或点击浏览器菜单中的“安装 Zenance...”",
       "desktopStep3": "确认后即可在独立窗口中像原生桌面软件一样运行",
-      "note": "提示：Zenance 采用纯本地存储架构，安装后完全支持离线使用。"
+      "note": "提示：Zenance 采用纯本地存储架构，安装后完全支持离线使用。",
+      "browserPreferenceHint": "若习惯始终在浏览器中使用，可前往“设置”开启“隐藏 PWA 安装按钮”，保持首页纯净简洁。"
     }
   }
 }

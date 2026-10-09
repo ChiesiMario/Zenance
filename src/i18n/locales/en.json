@@ -605,6 +605,8 @@
       "categoryOverview": "Category Overview",
       "activeAndArchived": "{{active}} Active · {{archived}} Archived",
       "manageCategories": "Manage Categories",
+      "hidePwaInstallPrompt": "Hide PWA Install Button",
+      "hidePwaInstallPromptDesc": "Hide the PWA install guide button on the home screen",
       "archived": "Archived",
       "unarchive": "Unarchive",
       "noArchivedCategories": "No archived categories",
@@ -1040,7 +1042,8 @@
       "desktopStep1": "Click the \"Install\" icon in the browser address bar",
       "desktopStep2": "Or open the browser menu and select \"Install Zenance...\"",
       "desktopStep3": "Launch and run in a standalone native desktop window",
-      "note": "Note: Zenance uses pure local storage and fully supports offline use."
+      "note": "Note: Zenance uses pure local storage and fully supports offline use.",
+      "browserPreferenceHint": "Prefer using Zenance in your browser? You can enable \"Hide PWA Install Button\" in Settings to keep the home screen minimal."
     }
   }
 }

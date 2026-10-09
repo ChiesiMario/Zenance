@@ -85,7 +85,7 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const confirm = useConfirm();
   const { categories, archivedCategories } = useCategories();
-  const { activeLedgerId, setActiveLedgerId } = useAppStore();
+  const { activeLedgerId, setActiveLedgerId, hidePwaInstallPrompt, setHidePwaInstallPrompt } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Restore Modal State
@@ -892,6 +892,15 @@ export default function Settings() {
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
           </Link>
+
+          {/* 隱藏 PWA 安裝按鈕 */}
+          <div className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors">
+            <span className="text-sm font-normal text-foreground">{t('settings.hidePwaInstallPrompt')}</span>
+            <Switch
+              checked={hidePwaInstallPrompt}
+              onCheckedChange={setHidePwaInstallPrompt}
+            />
+          </div>
         </div>
       </div>
 

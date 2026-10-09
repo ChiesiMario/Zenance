@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { useAppStore } from '@/store/useAppStore';
 import { PwaInstallGuideDialog } from './PwaInstallGuideDialog';
 import { cn } from '@/lib/utils';
 
@@ -12,10 +13,11 @@ export interface PwaInstallButtonProps {
 export function PwaInstallButton({ className }: PwaInstallButtonProps) {
   const { t } = useTranslation();
   const { isStandalone } = usePwaInstall();
+  const hidePwaInstallPrompt = useAppStore((state) => state.hidePwaInstallPrompt);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
-  // 若已處於獨立 PWA 模式 (Standalone) 運行，完全不渲染
-  if (isStandalone) {
+  // 若已處於獨立 PWA 模式 (Standalone) 運行，或使用者手動隱藏提示，完全不渲染
+  if (isStandalone || hidePwaInstallPrompt) {
     return null;
   }
 

@@ -22,6 +22,8 @@ interface AppState {
   addModalInitialAccountId?: string | null;
   addModalInitialCategoryId?: string | null;
   addModalInitialNote?: string | null;
+  hidePwaInstallPrompt: boolean;
+  setHidePwaInstallPrompt: (hide: boolean) => void;
   openAddModal: (
     type?: 'expense' | 'income' | 'transfer' | 'loan',
     loanType?: 'borrow' | 'lend',
@@ -52,8 +54,10 @@ export const useAppStore = create<AppState>()(
       addModalInitialAccountId: null,
       addModalInitialCategoryId: null,
       addModalInitialNote: null,
+      hidePwaInstallPrompt: false,
       setSyncing: (isSyncing) => set({ isSyncing }),
       setLastSyncTime: (time) => set({ lastSyncTime: time }),
+      setHidePwaInstallPrompt: (hide) => set({ hidePwaInstallPrompt: hide }),
       setActiveLedgerId: (id) =>
         set((state) => {
           if (state.activeLedgerId !== id) {
@@ -87,7 +91,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'zenance-app-storage',
-      partialize: (state) => ({ activeLedgerId: state.activeLedgerId, lastSyncTime: state.lastSyncTime }),
+      partialize: (state) => ({
+        activeLedgerId: state.activeLedgerId,
+        lastSyncTime: state.lastSyncTime,
+        hidePwaInstallPrompt: state.hidePwaInstallPrompt,
+      }),
     }
   )
 );

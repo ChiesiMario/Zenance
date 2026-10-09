@@ -236,10 +236,11 @@ export function PwaInstallGuideDialog({
           )}
         </div>
 
-        {/* 底部說明 */}
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          {t('pwa.note')}
-        </p>
+        {/* 底部說明與偏好提示 */}
+        <div className="space-y-1.5 text-[11px] text-muted-foreground leading-relaxed">
+          <p>{t('pwa.note')}</p>
+          <p className="text-muted-foreground/80">{t('pwa.browserPreferenceHint')}</p>
+        </div>
 
         <DialogFooter className="flex flex-row items-center justify-end sm:justify-end">
           <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer text-xs h-9 px-4" />}>

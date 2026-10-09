@@ -605,6 +605,8 @@
       "categoryOverview": "分類總覽",
       "activeAndArchived": "{{active}} 個活躍 · {{archived}} 個已歸檔",
       "manageCategories": "管理收支分類",
+      "hidePwaInstallPrompt": "隱藏 PWA 安裝按鈕",
+      "hidePwaInstallPromptDesc": "在首頁頂部隱藏 PWA 安裝引導按鈕",
       "archived": "已歸檔",
       "unarchive": "取消歸檔",
       "noArchivedCategories": "暫無已歸檔分類",
@@ -1040,7 +1042,8 @@
       "desktopStep1": "點擊瀏覽器網址列右側的「安裝」圖示",
       "desktopStep2": "或點擊瀏覽器選單中的「安裝 Zenance...」",
       "desktopStep3": "確認後即可在獨立視窗中像原生桌面軟體一樣運行",
-      "note": "提示：Zenance 採用純本地儲存架構，安裝後完全支援離線使用。"
+      "note": "提示：Zenance 採用純本地儲存架構，安裝後完全支援離線使用。",
+      "browserPreferenceHint": "若習慣始終在瀏覽器中使用，可前往「設定」開啟「隱藏 PWA 安裝按鈕」，保持首頁純淨簡潔。"
     }
   }
 }

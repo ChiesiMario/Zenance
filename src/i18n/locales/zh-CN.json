@@ -1021,6 +1021,26 @@
       "noResults": "未找到匹配的货币",
       "cancel": "取消",
       "confirm": "确认"
+    },
+    "pwa": {
+      "install": "安装",
+      "installApp": "安装 Zenance",
+      "installGuideTitle": "安装 Zenance 应用程序",
+      "installGuideSubtitle": "安装为 PWA 后可享受全屏运行、极速加载与完全离线记账体验。",
+      "installNow": "立即安装",
+      "iosTab": "iOS (Safari)",
+      "androidTab": "Android",
+      "desktopTab": "电脑桌面端",
+      "iosStep1": "点击 Safari 底部工具栏的“分享”按钮",
+      "iosStep2": "在菜单中向上滑动，点击“添加到主屏幕”",
+      "iosStep3": "点击右上角的“添加”即可完成安装",
+      "androidStep1": "点击浏览器右上角的“更多菜单 (⋮)”",
+      "androidStep2": "点击“安装应用”或“添加到主屏幕”",
+      "androidStep3": "在系统弹窗中确认“安装”即可",
+      "desktopStep1": "点击浏览器地址栏右侧的“安装”图标",
+      "desktopStep2": "或点击浏览器菜单中的“安装 Zenance...”",
+      "desktopStep3": "确认后即可在独立窗口中像原生桌面软件一样运行",
+      "note": "提示：Zenance 采用纯本地存储架构，安装后完全支持离线使用。"
     }
   }
 }

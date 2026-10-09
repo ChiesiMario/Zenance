@@ -1021,6 +1021,26 @@
       "noResults": "No currencies found",
       "cancel": "Cancel",
       "confirm": "Confirm"
+    },
+    "pwa": {
+      "install": "Install",
+      "installApp": "Install Zenance",
+      "installGuideTitle": "Install Zenance App",
+      "installGuideSubtitle": "Install as a PWA to enjoy full-screen display, lightning-fast loads, and offline finance tracking.",
+      "installNow": "Install Now",
+      "iosTab": "iOS (Safari)",
+      "androidTab": "Android",
+      "desktopTab": "Desktop",
+      "iosStep1": "Tap the \"Share\" button at the bottom of Safari",
+      "iosStep2": "Scroll down and tap \"Add to Home Screen\"",
+      "iosStep3": "Tap \"Add\" in the top right corner to complete installation",
+      "androidStep1": "Tap the browser menu \"More (⋮)\" in top right",
+      "androidStep2": "Tap \"Install app\" or \"Add to Home screen\"",
+      "androidStep3": "Confirm \"Install\" in the system prompt",
+      "desktopStep1": "Click the \"Install\" icon in the browser address bar",
+      "desktopStep2": "Or open the browser menu and select \"Install Zenance...\"",
+      "desktopStep3": "Launch and run in a standalone native desktop window",
+      "note": "Note: Zenance uses pure local storage and fully supports offline use."
     }
   }
 }

@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ManageLedgersDialog, CreateLedgerDialog } from '@/components/ledgers/ManageLedgersDialog';
+import { PwaInstallButton } from '@/components/pwa/PwaInstallButton';
 import { useNavigate, Link } from 'react-router-dom';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { useMonthTransactions } from '@/hooks/useMonthTransactions';
@@ -120,9 +121,9 @@ export default function Dashboard() {
   
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between gap-4 mb-2">
+      <div className="relative flex items-center justify-between gap-4 mb-2">
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[250px]">
+          <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[130px] sm:max-w-[200px]">
             <span className="truncate">
               {activeLedger?.name || t('dashboard.overview')}
             </span>
@@ -162,6 +163,11 @@ export default function Dashboard() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* 頂部居中安裝按鈕 (若已安裝為 PWA 自動不顯示) */}
+        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto">
+          <PwaInstallButton />
+        </div>
 
         <ManageLedgersDialog
           open={isManageLedgersOpen}

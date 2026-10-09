@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCategories } from '@/hooks/useCategories';
 import type { Category } from '@/services/db/db';
@@ -66,7 +65,6 @@ export function BudgetCategoryPicker({
                     : 'border-border bg-card text-card-foreground hover:bg-muted'
                 )}
               >
-                {isSelected && <Check className="h-3 w-3" />}
                 <span>{cat.name}</span>
               </button>
             );

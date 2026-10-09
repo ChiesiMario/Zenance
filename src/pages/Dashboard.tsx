@@ -3,11 +3,10 @@ import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, BarChart3, Check } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, BarChart3, Check } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { type Ledger } from '@/services/db/db';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
@@ -20,10 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { CurrencyTrigger } from '@/components/currency/CurrencyTrigger';
-import { CurrencySelectDialog } from '@/components/currency/CurrencySelectDialog';
+import { ManageLedgersDialog, CreateLedgerDialog } from '@/components/ledgers/ManageLedgersDialog';
 import { useNavigate, Link } from 'react-router-dom';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { useMonthTransactions } from '@/hooks/useMonthTransactions';
@@ -33,22 +29,12 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { allCategories } = useCategories();
   const { getActiveBudgetsForMonth } = useBudgets();
-  const { ledgers, addLedger, updateLedger, deleteLedger } = useLedgers();
+  const { ledgers } = useLedgers();
   const { activeLedgerId, setActiveLedgerId } = useAppStore();
   const { t, i18n } = useTranslation();
 
   const [isManageLedgersOpen, setIsManageLedgersOpen] = useState(false);
   const [isCreateLedgerOpen, setIsCreateLedgerOpen] = useState(false);
-  const [newLedgerName, setNewLedgerName] = useState('');
-  const [newLedgerCurrency, setNewLedgerCurrency] = useState(i18n.language === 'zh-TW' ? 'TWD' : i18n.language === 'zh-CN' ? 'CNY' : 'USD');
-  const [isCurrencyDialogOpen, setIsCurrencyDialogOpen] = useState(false);
-  
-  const [editingLedgerId, setEditingLedgerId] = useState<string | null>(null);
-  const [editingLedgerName, setEditingLedgerName] = useState('');
-  
-  const [ledgerToDelete, setLedgerToDelete] = useState<Ledger | null>(null);
-  const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
-
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -62,35 +48,6 @@ export default function Dashboard() {
       setActiveLedgerId(defaultLedger.id);
     }
   }, [ledgers, activeLedgerId, setActiveLedgerId]);
-
-  const handleAddLedger = async () => {
-    if (!newLedgerName.trim()) return;
-    const newLedger = await addLedger(newLedgerName.trim(), newLedgerCurrency);
-    setActiveLedgerId(newLedger.id);
-    setNewLedgerName('');
-    setIsCreateLedgerOpen(false);
-  };
-
-  const handleUpdateLedgerName = async (id: string) => {
-    if (editingLedgerName.trim()) {
-      await updateLedger(id, { name: editingLedgerName.trim() });
-    }
-    setEditingLedgerId(null);
-  };
-
-  const handleDeleteLedger = async () => {
-    if (!ledgerToDelete || deleteConfirmationName !== ledgerToDelete.name) return;
-    await deleteLedger(ledgerToDelete.id);
-    
-    // Switch to another ledger if active one is deleted
-    if (activeLedgerId === ledgerToDelete.id && ledgers && ledgers.length > 1) {
-      const anotherLedger = ledgers.find(l => l.id !== ledgerToDelete.id);
-      if (anotherLedger) setActiveLedgerId(anotherLedger.id);
-    }
-    
-    setLedgerToDelete(null);
-    setDeleteConfirmationName('');
-  };
 
   const currentMonthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
   const { transactions: monthTransactions } = useMonthTransactions(currentMonthPrefix);
@@ -206,158 +163,15 @@ export default function Dashboard() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Dialog open={isManageLedgersOpen} onOpenChange={setIsManageLedgersOpen}>
-          <DialogContent className="sm:max-w-[350px]">
-            <DialogHeader>
-              <DialogTitle>{t('dashboard.manageLedgers')}</DialogTitle>
-            </DialogHeader>
-            <div className="py-2 space-y-6">
-              
-              <div className="space-y-3">
-                <div className="border border-border rounded-md divide-y divide-border">
-                  {ledgers?.map(ledger => (
-                    <div key={ledger.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 min-h-12 md:min-h-10 items-center px-4 md:px-3 py-2 text-sm hover:bg-muted/30 transition-colors w-full">
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        {editingLedgerId === ledger.id ? (
-                          <Input
-                            value={editingLedgerName}
-                            onChange={(e) => setEditingLedgerName(e.target.value)}
-                            onBlur={() => handleUpdateLedgerName(ledger.id)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateLedgerName(ledger.id)}
-                            className="h-7 w-32 px-2 text-sm shrink-0"
-                          />
-                        ) : (
-                          <span className="font-medium truncate block">{ledger.name}</span>
-                        )}
-                        <span className="text-[10px] font-mono uppercase tracking-widest bg-foreground !text-background px-1.5 py-0.5 rounded-sm shrink-0">{ledger.baseCurrency || 'CNY'}</span>
-                        {ledger.id === activeLedgerId && <span className="text-[10px] uppercase tracking-widest bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm shrink-0">Active</span>}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                          onClick={() => {
-                            setEditingLedgerId(ledger.id);
-                            setEditingLedgerName(ledger.name);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-30 disabled:hover:text-muted-foreground" 
-                          disabled={(ledgers?.length || 0) <= 1}
-                          onClick={() => {
-                            setLedgerToDelete(ledger);
-                            setDeleteConfirmationName('');
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-            <DialogFooter className="flex-row justify-between items-center sm:justify-between">
-              <Button 
-                variant="outline" 
-                type="button" 
-                onClick={() => {
-                  setIsCreateLedgerOpen(true);
-                }}
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                {t('ledgers.add')}
-              </Button>
-              <DialogClose render={<Button variant="default" type="button" />}>
-                {t('common.confirm')}
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isCreateLedgerOpen} onOpenChange={setIsCreateLedgerOpen}>
-          <DialogContent className="sm:max-w-[300px] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle className="text-center">{t('dashboard.createLedger')}</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-6">
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">{t('ledgers.ledgerName')}</label>
-                <Input 
-                  placeholder={t('dashboard.newLedgerName')} 
-                  value={newLedgerName}
-                  onChange={(e) => setNewLedgerName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddLedger()}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="block text-sm font-medium">{t('ledgers.baseCurrency')}</label>
-                <CurrencyTrigger
-                  currency={newLedgerCurrency}
-                  onClick={() => setIsCurrencyDialogOpen(true)}
-                  className="w-full justify-between"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" type="button" />}>
-                {t('ledgers.cancel')}
-              </DialogClose>
-              <Button 
-                onClick={handleAddLedger} 
-                disabled={!newLedgerName.trim()}
-              >
-                {t('ledgers.add')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* 平級 Sibling 貨幣選擇彈窗，防 Portal 巢狀吞噬遮罩 */}
-        <CurrencySelectDialog
-          open={isCurrencyDialogOpen}
-          onOpenChange={setIsCurrencyDialogOpen}
-          selectedCurrency={newLedgerCurrency}
-          onSelectCurrency={setNewLedgerCurrency}
+        <ManageLedgersDialog
+          open={isManageLedgersOpen}
+          onOpenChange={setIsManageLedgersOpen}
         />
 
-        <Dialog open={!!ledgerToDelete} onOpenChange={(open) => !open && setLedgerToDelete(null)}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{t('ledgers.deleteLedger')}</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {t('ledgers.deleteWarning')}
-                <br /><br />
-                {t('ledgers.typeToConfirm')} <span className="font-mono text-foreground font-semibold">{ledgerToDelete?.name}</span>
-              </p>
-              <Input 
-                placeholder={t('ledgers.ledgerName')} 
-                value={deleteConfirmationName}
-                onChange={(e) => setDeleteConfirmationName(e.target.value)}
-              />
-            </div>
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" type="button" />}>
-                {t('ledgers.cancel')}
-              </DialogClose>
-              <Button 
-                variant="destructive" 
-                onClick={handleDeleteLedger} 
-                disabled={deleteConfirmationName !== ledgerToDelete?.name}
-              >
-                {t('ledgers.delete')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <CreateLedgerDialog
+          open={isCreateLedgerOpen}
+          onOpenChange={setIsCreateLedgerOpen}
+        />
 
         <div className="flex items-center gap-1.5 -mr-2 shrink-0">
           <SyncStatusPill />

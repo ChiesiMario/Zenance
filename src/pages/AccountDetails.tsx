@@ -2,16 +2,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useLedgers } from '@/hooks/useLedgers';
-import { useCategories } from '@/hooks/useCategories';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { AmountInput } from '@/components/ui/AmountInput';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AccountFormDialog } from '@/components/accounts/AccountFormDialog';
+import { AdjustBalanceDialog } from '@/components/accounts/AdjustBalanceDialog';
 import { ChevronLeft, Edit, Scale, CreditCard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useMemo, useState, useEffect, useRef } from 'react';
-import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber, getLocalDateString } from '@/lib/utils';
+import { useMemo, useState } from 'react';
+import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
@@ -26,8 +24,7 @@ export default function AccountDetails() {
   const { getRate } = useExchangeRates();
   
   const { allAccounts } = useAccounts();
-  const { transactions, addTransaction } = useTransactions();
-  const { getOrCreateSystemBalanceAdjustmentCategory } = useCategories();
+  const { transactions } = useTransactions();
   const { activeLedgerId, openAddModal } = useAppStore();
   const { ledgers } = useLedgers();
   
@@ -40,8 +37,6 @@ export default function AccountDetails() {
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAdjustBalanceDialogOpen, setIsAdjustBalanceDialogOpen] = useState(false);
-  const [newBalanceStr, setNewBalanceStr] = useState('');
-  const adjustInputRef = useRef<HTMLInputElement>(null);
 
   const accountTransactions = useMemo(() => {
     const list = transactions?.filter(tx => tx.accountId === id || tx.toAccountId === id) || [];
@@ -84,13 +79,6 @@ export default function AccountDetails() {
   const availableCredit = hasCreditLimit && balance !== undefined ? Math.max(0, account!.creditLimit! - currentDebt) : 0;
   const usagePercent = hasCreditLimit && balance !== undefined ? Math.min(100, Math.round((currentDebt / account!.creditLimit!) * 100)) : 0;
 
-  useEffect(() => {
-    if (isAdjustBalanceDialogOpen) {
-      const initialStr = (balance ?? 0).toString();
-      setNewBalanceStr(initialStr);
-    }
-  }, [isAdjustBalanceDialogOpen, balance]);
-
   if (allAccounts !== undefined && !account) {
     return (
       <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-4">
@@ -99,35 +87,6 @@ export default function AccountDetails() {
       </div>
     );
   }
-
-  const parsedNewBalance = parseFloat(newBalanceStr) || 0;
-  const balanceDiff = parsedNewBalance - (balance ?? 0);
-
-  const handleAdjustBalance = async () => {
-    if (!id || balanceDiff === 0 || !newBalanceStr.trim()) {
-      setIsAdjustBalanceDialogOpen(false);
-      return;
-    }
-    
-    const diffType = balanceDiff > 0 ? 'income' : 'expense';
-    const catName = t('accounts.balanceAdjustment');
-    
-    const category = await getOrCreateSystemBalanceAdjustmentCategory(diffType, catName);
-    if (category) {
-      await addTransaction({
-        amount: Math.abs(balanceDiff),
-        originalAmount: Math.abs(balanceDiff),
-        originalCurrency: currency,
-        exchangeRate: 1,
-        type: diffType,
-        category: category.id,
-        accountId: id,
-        date: getLocalDateString(),
-        note: ''
-      });
-    }
-    setIsAdjustBalanceDialogOpen(false);
-  };
 
 
 
@@ -332,84 +291,14 @@ export default function AccountDetails() {
         onArchived={() => navigate('/accounts')}
       />
       
-      <Dialog open={isAdjustBalanceDialogOpen} onOpenChange={setIsAdjustBalanceDialogOpen}>
-        <DialogContent className="sm:max-w-[380px]">
-          <DialogHeader>
-            <DialogTitle className="text-center">{t('accounts.adjustBalance')}</DialogTitle>
-          </DialogHeader>
-          
-          <div className="py-2 space-y-6">
-            {/* 無邊界大字體金額輸入區 */}
-            <div className="flex flex-col items-center justify-center pt-2 pb-1">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
-                {t('accounts.newAmount')}
-              </span>
-              <div className="inline-flex items-baseline justify-center gap-1.5 max-w-full">
-                <span className="text-2xl sm:text-3xl font-mono font-medium text-muted-foreground select-none">
-                  {currencySymbol}
-                </span>
-                <AmountInput
-                  ref={adjustInputRef}
-                  value={newBalanceStr}
-                  onValueChange={setNewBalanceStr}
-                  allowNegative
-                  unstyled
-                  currencySymbol={currencySymbol}
-                  style={{ width: `${Math.max(1, newBalanceStr.length)}ch` }}
-                  className="min-w-[1ch] max-w-[220px] text-left text-4xl sm:text-5xl font-mono font-bold tracking-tight bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-foreground p-0"
-                  placeholder="0"
-                  onSubmitAmount={() => balanceDiff !== 0 && handleAdjustBalance()}
-                />
-              </div>
-            </div>
-
-            {/* Vercel Usage 風格對比清單卡片 */}
-            <div className="rounded-lg border border-border divide-y divide-border bg-card overflow-hidden">
-              <div className="flex items-center justify-between p-3">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('accounts.currentAmount')}
-                </span>
-                <span className="text-sm font-mono text-foreground font-medium">
-                  <AmountDisplay amount={balance} baseCurrency={currency} type="neutral" />
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                  {t('accounts.difference')}
-                </span>
-                <div className="flex items-center">
-                  {balanceDiff === 0 ? (
-                    <span className="text-sm font-mono text-muted-foreground">
-                      {t('accounts.noDifference')}
-                    </span>
-                  ) : (
-                    <AmountDisplay 
-                      amount={balanceDiff} 
-                      baseCurrency={currency} 
-                      type={balanceDiff > 0 ? 'income' : 'expense'} 
-                      showSign={true} 
-                      className={cn("text-sm", balanceDiff < 0 && "text-destructive")}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
-            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
-              {t('common.cancel')}
-            </DialogClose>
-            <Button 
-              onClick={handleAdjustBalance}
-              disabled={balanceDiff === 0 || !newBalanceStr.trim()}
-              className="cursor-pointer"
-            >
-              {t('accounts.confirmAdjust')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* 調整餘額彈窗 (平級兄弟節點聲明) */}
+      <AdjustBalanceDialog
+        open={isAdjustBalanceDialogOpen}
+        onOpenChange={setIsAdjustBalanceDialogOpen}
+        accountId={id!}
+        currentBalance={balance ?? 0}
+        currency={currency}
+      />
     </div>
   );
 }

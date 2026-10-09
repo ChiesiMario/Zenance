@@ -6,10 +6,10 @@ import {
   ChevronRight,
   Cloud,
   RefreshCw,
-  Download,
   GitMerge,
   AlertTriangle,
   ShieldCheck,
+  ShieldAlert,
   Fingerprint,
   KeyRound,
   Copy,
@@ -719,12 +719,61 @@ export default function Settings() {
   };
 
   /**
-   * Execute Factory Reset: Wipe all IndexedDB data and localStorage completely
+   * Initiate Clear Process:
+   * 1. Force generate and download full backup (.zip)
+   * 2. Close modal and prompt final destructive confirmation dialog
+   * 3. Wipe IndexedDB & localStorage if confirmed
    */
-  const handleExecuteClear = async () => {
+  const handleInitiateClear = async () => {
     if (clearConfirmationInput.trim() !== requiredClearPhrase || isClearing) return;
     setIsClearing(true);
 
+    // 1. 強制自動生成並下載備份
+    try {
+      const blob = await generateBackupZipBlob();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zenance-backup-${dateStr}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.show(t('settings.autoBackupSuccess'));
+    } catch (error) {
+      console.error('Forced backup error:', error);
+      toast.show(t('settings.backupFailedAborted'));
+      setIsClearing(false);
+      return; // 強制卡控：備份若失敗，絕不進行清空
+    }
+
+    // 2. 備份成功，關閉第一階段輸入彈窗並清空輸入框
+    setIsClearModalOpen(false);
+    setClearConfirmationInput('');
+
+    // 3. 呼出最後確認刪除的終極高危確認視窗 (useConfirm)
+    const finalConfirmed = await confirm({
+      title: t('settings.finalClearConfirmTitle'),
+      description: t('settings.finalClearConfirmDesc'),
+      confirmText: t('settings.confirmClearFinal'),
+      cancelText: t('common.cancel'),
+      variant: 'destructive',
+    });
+
+    if (!finalConfirmed) {
+      setIsClearing(false);
+      return;
+    }
+
+    // 4. 終極確認後執行物理清空
+    await handleExecuteClear();
+  };
+
+  /**
+   * Execute Factory Reset: Wipe all IndexedDB data and localStorage completely
+   */
+  const handleExecuteClear = async () => {
     try {
       await db.transaction(
         'rw',
@@ -1900,21 +1949,12 @@ export default function Settings() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Defensive Backup Shortcut */}
-          <div className="p-3 rounded-lg border border-border bg-muted/20 flex flex-col gap-2">
-            <span className="text-xs text-muted-foreground">
-              {t('settings.clearBackupPrompt')}
+          {/* Forced Auto-Backup Notice */}
+          <div className="p-3 rounded-lg border border-border bg-muted/20 flex items-start gap-2.5">
+            <ShieldAlert className="size-4 text-primary shrink-0 mt-0.5" />
+            <span className="text-xs text-muted-foreground leading-relaxed">
+              {t('settings.clearAutoBackupNotice')}
             </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              className="w-full cursor-pointer h-8 text-xs font-medium"
-            >
-              <Download className="mr-2 size-3.5" />
-              {t('settings.downloadBackupBeforeClear')}
-            </Button>
           </div>
 
           {/* Phrase Verification Input */}
@@ -1932,8 +1972,8 @@ export default function Settings() {
               placeholder={requiredClearPhrase}
               className="font-mono"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && clearConfirmationInput.trim() === requiredClearPhrase) {
-                  handleExecuteClear();
+                if (e.key === 'Enter' && clearConfirmationInput.trim() === requiredClearPhrase && !isClearing) {
+                  handleInitiateClear();
                 }
               }}
             />
@@ -1952,11 +1992,11 @@ export default function Settings() {
             <Button
               type="button"
               variant="destructive"
-              onClick={handleExecuteClear}
+              onClick={handleInitiateClear}
               disabled={clearConfirmationInput.trim() !== requiredClearPhrase || isClearing}
               className="cursor-pointer"
             >
-              {t('settings.confirmClearButton')}
+              {t('settings.proceedClearWithBackup')}
             </Button>
           </div>
         </DialogContent>

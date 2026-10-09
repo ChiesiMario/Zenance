@@ -8,7 +8,6 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AmountInput } from '@/components/ui/AmountInput';
-import { DatePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -31,12 +30,12 @@ import {
   ChevronDown,
   ChevronRight,
   Archive,
-  Infinity as InfinityIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getCurrencySymbol } from '@/lib/utils';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
 import { BudgetCategoryPicker } from '@/components/budgets/BudgetCategoryPicker';
+import { BudgetFormDialog } from '@/components/budgets/BudgetFormDialog';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { type Budget, type BudgetRule } from '@/services/db/db';
 
@@ -50,7 +49,6 @@ export default function Budgets() {
     budgets,
     budgetRules,
     getBudgetSpent,
-    addBudget,
     deleteBudget,
     addBudgetRule,
     updateBudgetRule,
@@ -66,6 +64,8 @@ export default function Budgets() {
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
+  const baseCurrency = activeLedger?.baseCurrency || 'CNY';
+  const currencySymbol = useMemo(() => getCurrencySymbol(baseCurrency), [baseCurrency]);
 
   // Active Tab & Filter State derived directly from URL searchParams
   const queryTab = searchParams.get('tab');
@@ -237,86 +237,9 @@ export default function Budgets() {
   // Budget Modal States (Add Manual Budget)
   // ----------------------------------------------------
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
-  const [formBudgetName, setFormBudgetName] = useState('');
-  const [formBudgetAmount, setFormBudgetAmount] = useState('');
-  const [formBudgetStartDate, setFormBudgetStartDate] = useState('');
-  const [formBudgetEndDate, setFormBudgetEndDate] = useState('');
-  const [formBudgetCategoryIds, setFormBudgetCategoryIds] = useState<string[]>([]);
-  const [isUnlimited, setIsUnlimited] = useState(false);
-  const [activePreset, setActivePreset] = useState<'month' | 'year' | 'next30' | 'unlimited' | null>('month');
-
-  const applyDatePreset = (preset: 'month' | 'year' | 'next30' | 'unlimited') => {
-    setActivePreset(preset);
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    const d = now.getDate();
-
-    if (preset === 'unlimited') {
-      setIsUnlimited(true);
-      const start = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      setFormBudgetStartDate(start);
-      setFormBudgetEndDate('');
-    } else if (preset === 'month') {
-      setIsUnlimited(false);
-      const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-      const lastDay = new Date(y, m + 1, 0).getDate();
-      const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-      setFormBudgetStartDate(first);
-      setFormBudgetEndDate(last);
-    } else if (preset === 'year') {
-      setIsUnlimited(false);
-      setFormBudgetStartDate(`${y}-01-01`);
-      setFormBudgetEndDate(`${y}-12-31`);
-    } else if (preset === 'next30') {
-      setIsUnlimited(false);
-      const start = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const end = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, '0')}-${String(future.getDate()).padStart(2, '0')}`;
-      setFormBudgetStartDate(start);
-      setFormBudgetEndDate(end);
-    }
-  };
 
   const handleOpenAddBudget = () => {
-    setFormBudgetName('');
-    setFormBudgetAmount('');
-    setFormBudgetCategoryIds([]);
-    setIsUnlimited(false);
-    applyDatePreset('month');
     setIsBudgetModalOpen(true);
-  };
-
-  const handleToggleUnlimited = (checked: boolean) => {
-    setIsUnlimited(checked);
-    if (checked) {
-      setActivePreset('unlimited');
-      setFormBudgetEndDate('');
-    } else {
-      setActivePreset(null);
-      if (!formBudgetEndDate) {
-        applyDatePreset('month');
-      }
-    }
-  };
-
-  const handleSaveBudget = async () => {
-    if (!formBudgetName.trim() || !formBudgetAmount || parseFloat(formBudgetAmount) <= 0) return;
-    if (!formBudgetStartDate) return;
-    if (!isUnlimited && (!formBudgetEndDate || formBudgetStartDate > formBudgetEndDate)) return;
-    const amountNum = parseFloat(formBudgetAmount);
-
-    await addBudget({
-      name: formBudgetName.trim(),
-      amount: amountNum,
-      periodType: isUnlimited ? 'unlimited' : 'custom',
-      startDate: formBudgetStartDate,
-      endDate: isUnlimited ? '' : formBudgetEndDate,
-      categoryIds: formBudgetCategoryIds,
-      isEnded: false,
-    });
-
-    setIsBudgetModalOpen(false);
   };
 
   // ----------------------------------------------------
@@ -875,152 +798,22 @@ export default function Budgets() {
       {/* -------------------------------------------------- */}
       {/* Modal 1: Add / Edit Fixed-Period Budget Instance   */}
       {/* -------------------------------------------------- */}
-      <Dialog open={isBudgetModalOpen} onOpenChange={setIsBudgetModalOpen}>
-        <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.addBudget')}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-1 overflow-y-auto overflow-x-hidden pr-1 overscroll-contain">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('budgets.name')}
-              </label>
-              <Input
-                placeholder={t('budgets.namePlaceholder')}
-                value={formBudgetName}
-                onChange={e => setFormBudgetName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('budgets.targetAmount')}
-              </label>
-              <AmountInput
-                placeholder={t('budgets.targetAmount')}
-                value={formBudgetAmount}
-                onValueChange={setFormBudgetAmount}
-              />
-            </div>
-
-            {/* Quick Presets */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('budgets.quickPresets')}
-              </label>
-              <div className="flex gap-1.5 flex-wrap">
-                <Button
-                  type="button"
-                  variant={activePreset === 'month' && !isUnlimited ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => applyDatePreset('month')}
-                  className="text-xs h-7 px-2.5 cursor-pointer font-medium"
-                >
-                  {t('budgets.presetThisMonth')}
-                </Button>
-                <Button
-                  type="button"
-                  variant={activePreset === 'year' && !isUnlimited ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => applyDatePreset('year')}
-                  className="text-xs h-7 px-2.5 cursor-pointer font-medium"
-                >
-                  {t('budgets.presetThisYear')}
-                </Button>
-                <Button
-                  type="button"
-                  variant={activePreset === 'next30' && !isUnlimited ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => applyDatePreset('next30')}
-                  className="text-xs h-7 px-2.5 cursor-pointer font-medium"
-                >
-                  {t('budgets.presetNext30Days')}
-                </Button>
-                <Button
-                  type="button"
-                  variant={isUnlimited ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => applyDatePreset('unlimited')}
-                  className="text-xs h-7 px-2.5 cursor-pointer flex items-center gap-1 font-medium"
-                >
-                  <InfinityIcon className="size-3" />
-                  <span>{t('budgets.presetUnlimited')}</span>
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.startDate')}</label>
-                <DatePicker
-                  value={formBudgetStartDate}
-                  onChange={val => {
-                    setFormBudgetStartDate(val);
-                    if (activePreset !== 'unlimited') setActivePreset(null);
-                  }}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">{t('budgets.endDate')}</label>
-                {isUnlimited ? (
-                  <button
-                    type="button"
-                    onClick={() => handleToggleUnlimited(false)}
-                    className="w-full h-10 px-3 rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground flex items-center justify-between text-sm font-mono transition-colors cursor-pointer select-none"
-                  >
-                    <span className="italic">{t('budgets.manualEnd')}</span>
-                    <InfinityIcon className="size-4 opacity-60" />
-                  </button>
-                ) : (
-                  <DatePicker
-                    value={formBudgetEndDate}
-                    onChange={val => {
-                      setFormBudgetEndDate(val);
-                      setIsUnlimited(false);
-                      setActivePreset(null);
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Category Monitoring Selection */}
-            <BudgetCategoryPicker
-              selectedCategoryIds={formBudgetCategoryIds}
-              onChange={setFormBudgetCategoryIds}
-              expenseCategories={expenseCategories}
-            />
-          </div>
-
-          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
-            <DialogClose render={<Button variant="ghost" type="button" />}>
-              {t('budgets.cancel')}
-            </DialogClose>
-            <Button
-              onClick={handleSaveBudget}
-              disabled={
-                !formBudgetName.trim() ||
-                !formBudgetAmount ||
-                parseFloat(formBudgetAmount) <= 0 ||
-                !formBudgetStartDate ||
-                (!isUnlimited && (!formBudgetEndDate || formBudgetStartDate > formBudgetEndDate))
-              }
-              className="cursor-pointer"
-            >
-              {t('budgets.add')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BudgetFormDialog
+        open={isBudgetModalOpen}
+        onOpenChange={setIsBudgetModalOpen}
+        mode="create"
+      />
 
       {/* -------------------------------------------------- */}
       {/* Modal 2: Add / Edit Recurring Rule                 */}
       {/* -------------------------------------------------- */}
       <Dialog open={isRuleModalOpen} onOpenChange={setIsRuleModalOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-[300px] max-w-[300px]">
           <DialogHeader>
-            <DialogTitle>{editingRule ? t('budgets.editRule') : t('budgets.addRule')}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="size-5 text-primary" />
+              <span>{editingRule ? t('budgets.editRule') : t('budgets.addRule')}</span>
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-1 overflow-y-auto overflow-x-hidden pr-1 overscroll-contain">
@@ -1064,11 +857,20 @@ export default function Budgets() {
               <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 {t('budgets.ruleDefaultAmount')}
               </label>
-              <AmountInput
-                placeholder={t('budgets.ruleDefaultAmount')}
-                value={formRuleAmount}
-                onValueChange={setFormRuleAmount}
-              />
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-sm font-mono font-medium text-muted-foreground pointer-events-none select-none">
+                  {currencySymbol}
+                </span>
+                <AmountInput
+                  placeholder="0.00"
+                  value={formRuleAmount}
+                  onValueChange={setFormRuleAmount}
+                  currencySymbol={currencySymbol}
+                  style={{
+                    paddingLeft: `${Math.max(2.2, 0.75 + currencySymbol.length * 0.6)}rem`,
+                  }}
+                />
+              </div>
             </div>
 
             {/* Category Monitoring Selection */}

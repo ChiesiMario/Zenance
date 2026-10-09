@@ -10,18 +10,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
-import { User } from 'lucide-react';
+import { User, Building2 } from 'lucide-react';
 import type { Contact } from '@/services/db/db';
 
 export interface ContactFormDialogProps {
@@ -131,7 +124,7 @@ export function ContactFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[340px] max-w-[340px] p-5 gap-4">
+      <DialogContent className="sm:max-w-[300px] max-w-[300px] p-5 gap-4">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
             <User className="size-5 text-primary" />
@@ -140,6 +133,41 @@ export function ContactFormDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          {/* 對象類型 */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {t('contacts.type')}
+            </label>
+            <div className="rounded-lg border border-border grid grid-cols-2 divide-x divide-border bg-card overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setGroup('personal')}
+                className={cn(
+                  'h-10 flex items-center justify-center gap-2 text-xs font-medium transition-colors cursor-pointer select-none px-2 text-center',
+                  group === 'personal'
+                    ? 'bg-foreground text-background font-semibold'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30 active:bg-muted/50'
+                )}
+              >
+                <User className="size-3.5 shrink-0" />
+                <span>{t('contacts.groupPersonal')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGroup('organization')}
+                className={cn(
+                  'h-10 flex items-center justify-center gap-2 text-xs font-medium transition-colors cursor-pointer select-none px-2 text-center',
+                  group === 'organization'
+                    ? 'bg-foreground text-background font-semibold'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30 active:bg-muted/50'
+                )}
+              >
+                <Building2 className="size-3.5 shrink-0" />
+                <span>{t('contacts.groupOrganization')}</span>
+              </button>
+            </div>
+          </div>
+
           {/* 對象名稱 */}
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -154,31 +182,13 @@ export function ContactFormDialog({
             />
           </div>
 
-          {/* 對象類型 */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {t('contacts.type')}
-            </label>
-            <Select value={group} onValueChange={(val) => val && setGroup(val)}>
-              <SelectTrigger className="w-full h-10 text-sm">
-                <SelectValue>
-                  {group === 'organization' ? t('contacts.groupOrganization') : t('contacts.groupPersonal')}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="personal">{t('contacts.groupPersonal')}</SelectItem>
-                <SelectItem value="organization">{t('contacts.groupOrganization')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* 對象管理動作（僅編輯模式展示：歸檔 / 刪除） */}
+          {/* 對象管理動作（僅編輯模式展示：封存 / 刪除，以更淡的顏色呈現） */}
           {mode === 'edit' && contact && (
             <div className="rounded-lg border border-border grid grid-cols-2 divide-x divide-border bg-card overflow-hidden">
               <button
                 type="button"
                 onClick={handleArchiveToggle}
-                className="h-10 flex items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 active:bg-muted/50 transition-colors cursor-pointer select-none px-2 text-center"
+                className="h-10 flex items-center justify-center text-xs font-medium text-muted-foreground opacity-60 hover:opacity-100 hover:text-foreground hover:bg-muted/30 active:bg-muted/50 transition-all cursor-pointer select-none px-2 text-center"
               >
                 <span>
                   {contact.archived ? t('contacts.unarchiveContact') : t('contacts.archiveContact')}
@@ -189,10 +199,10 @@ export function ContactFormDialog({
                 type="button"
                 onClick={handleDelete}
                 className={cn(
-                  "h-10 flex items-center justify-center text-xs font-medium transition-colors cursor-pointer select-none px-2 text-center",
+                  "h-10 flex items-center justify-center text-xs font-medium transition-all cursor-pointer select-none px-2 text-center",
                   hasTransactions
-                    ? "opacity-50 text-muted-foreground hover:bg-muted/20"
-                    : "text-muted-foreground hover:text-destructive hover:bg-muted/30 active:bg-muted/50"
+                    ? "opacity-30 text-muted-foreground hover:bg-muted/20"
+                    : "text-muted-foreground opacity-60 hover:opacity-100 hover:text-destructive hover:bg-muted/30 active:bg-muted/50"
                 )}
               >
                 <span>{t('contacts.deleteContact')}</span>

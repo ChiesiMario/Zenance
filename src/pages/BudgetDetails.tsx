@@ -8,7 +8,6 @@ import {
   Zap,
   CircleStop,
   RotateCcw,
-  Infinity as InfinityIcon,
   ReceiptText,
   Tag,
   Calendar,
@@ -22,24 +21,12 @@ import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { BudgetProgressBar } from '@/components/budgets/BudgetProgressBar';
-import { BudgetCategoryPicker } from '@/components/budgets/BudgetCategoryPicker';
+import { BudgetFormDialog } from '@/components/budgets/BudgetFormDialog';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { AmountInput } from '@/components/ui/AmountInput';
-import { DatePicker } from '@/components/ui/date-picker';
 import { toast } from '@/components/ui/toast';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
 import { GroupedTransactionList } from '@/components/transactions/GroupedTransactionList';
 import { cn, sortTransactionsDesc } from '@/lib/utils';
-import { type Budget } from '@/services/db/db';
 
 export default function BudgetDetails() {
   const { id } = useParams<{ id: string }>();
@@ -51,23 +38,14 @@ export default function BudgetDetails() {
   const { transactions, isLoading: isTxLoading } = useTransactions();
   const isLoading = isBudgetsLoading || isTxLoading;
   const { allCategories } = useCategories();
-  const expenseCategories = useMemo(() => {
-    return allCategories?.filter(c => c.type === 'expense') || [];
-  }, [allCategories]);
   const { activeLedgerId } = useAppStore();
   const { ledgers } = useLedgers();
 
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const budget = budgets?.find(b => b.id === id);
 
-  // Edit Budget Dialog States
+  // Edit Budget Dialog State
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [formName, setFormName] = useState('');
-  const [formAmount, setFormAmount] = useState('');
-  const [formStartDate, setFormStartDate] = useState('');
-  const [formEndDate, setFormEndDate] = useState('');
-  const [formCategoryIds, setFormCategoryIds] = useState<string[]>([]);
-  const [isUnlimited, setIsUnlimited] = useState(false);
 
   const todayStr = useMemo(() => {
     const today = new Date();
@@ -190,35 +168,8 @@ export default function BudgetDetails() {
   }, [budget?.categoryIds, allCategories]);
 
   // Edit Budget Handlers
-  const handleOpenEdit = (b: Budget) => {
-    setFormName(b.name);
-    setFormAmount(String(b.amount));
-    setFormStartDate(b.startDate || '');
-    setFormEndDate(b.endDate || '');
-    setIsUnlimited(b.periodType === 'unlimited' || !b.endDate);
-    setFormCategoryIds(b.categoryIds || []);
+  const handleOpenEdit = () => {
     setIsEditDialogOpen(true);
-  };
-
-  const handleSaveBudget = async () => {
-    if (!budget || !formName.trim() || !formAmount || parseFloat(formAmount) <= 0) return;
-    const newAmountNum = parseFloat(formAmount);
-
-    const isCustomOrUnlimited = budget.periodType === 'custom' || budget.periodType === 'unlimited';
-    const targetPeriodType = isCustomOrUnlimited
-      ? (isUnlimited ? 'unlimited' : 'custom')
-      : budget.periodType;
-
-    await updateBudget(budget.id, {
-      name: formName.trim(),
-      amount: newAmountNum,
-      periodType: targetPeriodType,
-      startDate: isCustomOrUnlimited ? formStartDate : budget.startDate,
-      endDate: isCustomOrUnlimited ? (isUnlimited ? '' : formEndDate) : budget.endDate,
-      categoryIds: formCategoryIds,
-    });
-
-    setIsEditDialogOpen(false);
   };
 
   const handleDeleteBudget = async () => {
@@ -341,7 +292,7 @@ export default function BudgetDetails() {
               variant="outline"
               size="icon"
               disabled={!budget}
-              onClick={() => budget && handleOpenEdit(budget)}
+              onClick={handleOpenEdit}
               title={t('budgets.editBudget')}
               aria-label={t('budgets.editBudget')}
               className="size-8 text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:opacity-30"
@@ -534,7 +485,7 @@ export default function BudgetDetails() {
                       variant="outline"
                       size="sm"
                       disabled={!budget}
-                      onClick={() => budget && handleOpenEdit(budget)}
+                      onClick={handleOpenEdit}
                       className="gap-1.5 text-xs cursor-pointer text-muted-foreground hover:text-foreground disabled:opacity-30"
                     >
                       <Pencil className="size-3.5" />
@@ -549,122 +500,12 @@ export default function BudgetDetails() {
       </div>
 
       {/* Edit Budget Primary Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[350px]">
-          <DialogHeader>
-            <DialogTitle>{t('budgets.editBudget')}</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4 overflow-y-auto overflow-x-hidden px-1 overscroll-contain">
-            {/* Budget Name */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('budgets.name')}
-              </label>
-              <Input
-                placeholder={t('budgets.namePlaceholder')}
-                value={formName}
-                onChange={e => setFormName(e.target.value)}
-              />
-            </div>
-
-            {/* Target Amount */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t('budgets.targetAmount')}
-              </label>
-              <AmountInput
-                placeholder={t('budgets.targetAmount')}
-                value={formAmount}
-                onValueChange={setFormAmount}
-              />
-            </div>
-
-            {/* Custom or Unlimited Range Date Controls */}
-            {(budget?.periodType === 'custom' || budget?.periodType === 'unlimited') && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">{t('budgets.startDate')}</label>
-                  <DatePicker
-                    value={formStartDate}
-                    onChange={setFormStartDate}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">{t('budgets.endDate')}</label>
-                  {isUnlimited ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsUnlimited(false);
-                        if (!formEndDate) setFormEndDate(todayStr);
-                      }}
-                      className="w-full h-10 px-3 rounded-lg border border-dashed border-border bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:text-foreground flex items-center justify-between text-sm font-mono transition-colors cursor-pointer select-none"
-                    >
-                      <span className="italic">{t('budgets.manualEnd')}</span>
-                      <InfinityIcon className="size-4 opacity-60" />
-                    </button>
-                  ) : (
-                    <DatePicker
-                      value={formEndDate}
-                      onChange={val => {
-                        setFormEndDate(val);
-                        setIsUnlimited(false);
-                      }}
-                    />
-                  )}
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant={isUnlimited ? "default" : "outline"}
-                    onClick={() => {
-                      const next = !isUnlimited;
-                      setIsUnlimited(next);
-                      if (next) {
-                        setFormEndDate('');
-                      } else if (!formEndDate) {
-                        setFormEndDate(todayStr);
-                      }
-                    }}
-                    className="w-full h-7 text-xs gap-1.5 cursor-pointer font-normal"
-                  >
-                    <InfinityIcon className="size-3.5" />
-                    <span>{t('budgets.noEndDate')}</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Category Monitoring Selection */}
-            <BudgetCategoryPicker
-              selectedCategoryIds={formCategoryIds}
-              onChange={setFormCategoryIds}
-              expenseCategories={expenseCategories}
-            />
-          </div>
-
-          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3">
-            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
-              {t('budgets.cancel')}
-            </DialogClose>
-            <Button
-              onClick={handleSaveBudget}
-              disabled={
-                !formName.trim() ||
-                !formAmount ||
-                parseFloat(formAmount) <= 0 ||
-                ((budget?.periodType === 'custom' || budget?.periodType === 'unlimited') && (
-                  !formStartDate ||
-                  (!isUnlimited && (!formEndDate || formStartDate > formEndDate))
-                ))
-              }
-              className="cursor-pointer"
-            >
-              {t('budgets.save')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BudgetFormDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        mode="edit"
+        budget={budget}
+      />
     </div>
   );
 }

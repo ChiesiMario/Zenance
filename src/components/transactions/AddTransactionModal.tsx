@@ -18,7 +18,9 @@ import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useBudgets } from '@/hooks/useBudgets';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useNoteSuggestions, type NoteSuggestionItem } from '@/hooks/useNoteSuggestions';
 import { NumericKeypad } from './NumericKeypad';
+import { NoteSuggestionsMenu } from './NoteSuggestionsMenu';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
@@ -540,6 +542,82 @@ export function AddTransactionModal({
     }
     return list.slice(0, 6);
   }, [frequentCategories, predictedResult, selectedCategoryId, filteredCategories]);
+
+  // 智慧歷史備註與分類聯想
+  const [isNoteFocused, setIsNoteFocused] = useState(false);
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+  const [hasDismissedSuggestions, setHasDismissedSuggestions] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+
+  const noteSuggestions = useNoteSuggestions({
+    query: currentNote,
+    type,
+    transactions: transactions || [],
+    categories: allCategories || categories || [],
+    maxSuggestions: 5,
+  });
+
+  useEffect(() => {
+    setActiveSuggestionIndex(-1);
+  }, [noteSuggestions]);
+
+  useEffect(() => {
+    if (isNoteFocused && currentNote.trim() && noteSuggestions.length > 0 && !hasDismissedSuggestions) {
+      setIsSuggestionsOpen(true);
+    } else {
+      setIsSuggestionsOpen(false);
+    }
+  }, [isNoteFocused, currentNote, noteSuggestions.length, hasDismissedSuggestions]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsNoteFocused(false);
+      setIsSuggestionsOpen(false);
+      setHasDismissedSuggestions(false);
+      setActiveSuggestionIndex(-1);
+    }
+  }, [isOpen]);
+
+  const handleSelectSuggestion = (item: NoteSuggestionItem) => {
+    triggerHaptic('light');
+    setValue('note', item.note, { shouldDirty: true });
+    if (item.categoryId) {
+      setValue('categoryId', item.categoryId, { shouldValidate: true });
+      setIsUserSelectedCat(true);
+      setIsCategoryWarning(false);
+    }
+    setIsSuggestionsOpen(false);
+    setHasDismissedSuggestions(true);
+    setActiveSuggestionIndex(-1);
+  };
+
+  const handleNoteKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isSuggestionsOpen || noteSuggestions.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveSuggestionIndex(prev => {
+        const next = prev + 1;
+        return next >= noteSuggestions.length ? 0 : next;
+      });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveSuggestionIndex(prev => {
+        const next = prev - 1;
+        return next < 0 ? noteSuggestions.length - 1 : next;
+      });
+    } else if (e.key === 'Enter') {
+      if (activeSuggestionIndex >= 0 && activeSuggestionIndex < noteSuggestions.length) {
+        e.preventDefault();
+        handleSelectSuggestion(noteSuggestions[activeSuggestionIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsSuggestionsOpen(false);
+      setHasDismissedSuggestions(true);
+      setActiveSuggestionIndex(-1);
+    }
+  };
 
   const handleSwapTransferAccounts = () => {
     const currentFrom = watch('fromAccountId');
@@ -1660,14 +1738,42 @@ export function AddTransactionModal({
             </div>
           )}
 
-          {/* Inline Note Input */}
-          <div className="w-full">
+          {/* Inline Note Input with Autocomplete Suggestions */}
+          <div className="relative w-full">
+            <NoteSuggestionsMenu
+              isOpen={isSuggestionsOpen}
+              suggestions={noteSuggestions}
+              currentCategoryId={selectedCategoryId}
+              activeIndex={activeSuggestionIndex}
+              onHoverIndex={setActiveSuggestionIndex}
+              onSelect={handleSelectSuggestion}
+              onClose={() => {
+                setIsSuggestionsOpen(false);
+                setHasDismissedSuggestions(true);
+                setActiveSuggestionIndex(-1);
+              }}
+            />
+
             <input 
               id="note" 
               type="text" 
               placeholder={t('add.note', '填寫備註...')} 
-              value={watch('note') || ''} 
-              onChange={(e) => setValue('note', e.target.value, { shouldDirty: true })} 
+              value={currentNote} 
+              onFocus={() => {
+                setIsNoteFocused(true);
+                setHasDismissedSuggestions(false);
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  setIsNoteFocused(false);
+                }, 200);
+              }}
+              onKeyDown={handleNoteKeyDown}
+              onChange={(e) => {
+                setValue('note', e.target.value, { shouldDirty: true });
+                setIsNoteFocused(true);
+                setHasDismissedSuggestions(false);
+              }} 
               className="w-full h-10 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-muted/60 border border-border text-sm sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
             />
           </div>

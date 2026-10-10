@@ -147,6 +147,8 @@
       "transactionDate": "交易時間",
       "today": "今天",
       "note": "備註",
+      "suggestionsTitle": "歷史備註與分類建議",
+      "suggestionUsageCount": "{{count}} 次",
       "optional": "選填",
       "saving": "儲存中...",
       "saveTransaction": "儲存紀錄",

@@ -25,7 +25,7 @@ import { AutoMarquee } from '@/components/ui/AutoMarquee';
 import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
 import { db, type Account } from '@/services/db/db';
-import type { SplitItem } from './SplitAdvanceDialog';
+import { SplitAdvanceDialog, type SplitItem } from './SplitAdvanceDialog';
 import { v4 as uuidv4 } from 'uuid';
 
 const roundToTwo = (val: number): number => Math.round(val * 100) / 100;
@@ -78,6 +78,7 @@ export function AddTransactionModal({
   const [newCatName, setNewCatName] = useState('');
   const [isCatDialogOpen, setIsCatDialogOpen] = useState(false);
   const [isCatPickerOpen, setIsCatPickerOpen] = useState(false);
+  const [isSplitDialogOpen, setIsSplitDialogOpen] = useState(false);
   const [displayAmount, setDisplayAmount] = useState('');
   const [displayAmountIn, setDisplayAmountIn] = useState('');
   const [displayFeeAmount, setDisplayFeeAmount] = useState('');
@@ -575,6 +576,7 @@ export function AddTransactionModal({
       setIsSuggestionsOpen(false);
       setHasDismissedSuggestions(false);
       setActiveSuggestionIndex(-1);
+      setIsSplitDialogOpen(false);
     }
   }, [isOpen]);
 
@@ -1809,6 +1811,7 @@ export function AddTransactionModal({
             onSplitsChange={(newSplits) => {
               setSplits(newSplits);
             }}
+            onOpenSplitDialog={() => setIsSplitDialogOpen(true)}
             currencySymbol={getCurrencySymbol(fromCurrency)}
             contacts={contacts}
             feeAmount={type === 'transfer' ? parsedFeeAmount : 0}
@@ -1950,6 +1953,19 @@ export function AddTransactionModal({
           onSelectAccount={(acc) => {
             accountSelectConfig.onSelect(acc);
           }}
+        />
+
+        {/* 代付分攤彈窗 (平級 Sibling Portal 宣告) */}
+        <SplitAdvanceDialog
+          open={isSplitDialogOpen}
+          onOpenChange={setIsSplitDialogOpen}
+          totalAmount={parseFloat(displayAmount) || 0}
+          currencySymbol={currencySymbol}
+          splits={splits}
+          onConfirm={(newSplits) => {
+            setSplits(newSplits);
+          }}
+          contacts={contacts}
         />
       </>
     );

@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AmountInput } from '@/components/ui/AmountInput';
-import { Plus, Users, UserCheck, RotateCcw, Search, X, Check } from 'lucide-react';
+import { Plus, Users, UserCheck, RotateCcw, X, Receipt } from 'lucide-react';
 import { cn, sanitizeAmountInput, formatAmountNumber } from '@/lib/utils';
 import { ContactAvatar } from '@/components/contacts/ContactAvatar';
+import { AccountSelectDialog } from '@/components/accounts/AccountSelectDialog';
+import { toast } from '@/components/ui/toast';
 import type { Contact } from '@/services/db/db';
 
 export interface SplitItem {
@@ -24,195 +25,7 @@ interface SplitAdvanceDialogProps {
   contacts?: Contact[];
 }
 
-interface SelectContactsModalProps {
-  open: boolean;
-  onClose: () => void;
-  availableContacts: Contact[];
-  onConfirmAdd: (selectedContactIds: string[]) => void;
-}
 
-/** 獨立彈出的選擇對象次級視窗 */
-function SelectContactsModal({
-  open,
-  onClose,
-  availableContacts,
-  onConfirmAdd,
-}: SelectContactsModalProps) {
-  const { t } = useTranslation();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // 每次打開時重設選取狀態與搜尋
-  useEffect(() => {
-    if (open) {
-      setSelectedIds(new Set());
-      setSearchQuery('');
-    }
-  }, [open]);
-
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return availableContacts;
-    return availableContacts.filter(c => c.name.toLowerCase().includes(q));
-  }, [availableContacts, searchQuery]);
-
-  const toggleContact = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleConfirm = () => {
-    if (selectedIds.size === 0) return;
-    onConfirmAdd(Array.from(selectedIds));
-    onClose();
-  };
-
-  if (!open || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-      {/* 背景遮罩 */}
-      <div
-        className="absolute inset-0 bg-overlay backdrop-blur-[2px]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* 獨立 Modal 窗口 */}
-      <div
-        className="relative z-10 w-full max-w-[300px] bg-card border border-border rounded-xl shadow-none flex flex-col max-h-[82vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-4 border-b border-border flex items-start justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              {t('add.selectContactsTitle', '選擇代付對象')}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t('add.selectContactsDesc', '勾選要加入本次分攤的對象')}
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="size-7 -mr-1 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-          >
-            <X className="size-4" />
-          </Button>
-        </div>
-
-        {/* 搜尋工具列（修復圖示重疊，刪除全選按鈕） */}
-        <div className="p-3 border-b border-border bg-muted/10">
-          <div className="flex items-center w-full h-9 rounded-lg border border-border bg-background px-3 gap-2 focus-within:border-foreground transition-colors">
-            <Search className="size-3.5 text-muted-foreground shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('add.searchToAdd', '搜尋要添加的對象...')}
-              className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none border-none p-0"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
-              >
-                <X className="size-3" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 候選對象列表 */}
-        <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-border">
-          {filtered.length > 0 ? (
-            filtered.map(c => {
-              const isSelected = selectedIds.has(c.id);
-              const isOrg = c.group === 'organization';
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => toggleContact(c.id)}
-                  className={cn(
-                    "flex items-center gap-3 p-3 text-left transition-colors cursor-pointer select-none",
-                    isSelected ? "bg-muted/30" : "hover:bg-muted/10"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "size-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                      isSelected
-                        ? "bg-foreground text-background border-foreground"
-                        : "border-border hover:border-foreground/50"
-                    )}
-                  >
-                    {isSelected && <Check className="size-3 stroke-[3]" />}
-                  </div>
-
-                  {/* 頭像（🏢/👤） */}
-                  <ContactAvatar 
-                    group={c.group} 
-                    className="size-7" 
-                    iconClassName="size-3.5 text-muted-foreground" 
-                    title={c.name} 
-                  />
-
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-medium text-foreground truncate">
-                      {c.name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {isOrg ? t('add.contactTypeOrganization', '組織') : t('add.contactTypePersonal', '個人')}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="py-8 text-center text-xs text-muted-foreground px-4">
-              {availableContacts.length === 0
-                ? t('add.allContactsAlreadyAdded', '所有對象皆已加入分攤')
-                : t('add.noContactsAvailable', '暫無可添加的對象')}
-            </div>
-          )}
-        </div>
-
-        {/* 底部按鈕欄 */}
-        <div className="p-3 border-t border-border bg-card flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="text-xs h-8 cursor-pointer"
-          >
-            {t('common.cancel', '取消')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleConfirm}
-            disabled={selectedIds.size === 0}
-            className="text-xs h-8 font-medium cursor-pointer"
-          >
-            {selectedIds.size > 0
-              ? t('add.confirmAddWithCount', { count: selectedIds.size, defaultValue: `確認添加 (${selectedIds.size} 人)` })
-              : t('add.confirmAdd', '確認添加')}
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
 
 export function SplitAdvanceDialog({
   open,
@@ -247,11 +60,6 @@ export function SplitAdvanceDialog({
   const selectedContactIds = useMemo(() => {
     return Object.keys(allocatedAmounts);
   }, [allocatedAmounts]);
-
-  // 尚未添加的候選對象（自動過濾已加入者）
-  const availableContacts = useMemo(() => {
-    return contacts.filter(c => !c.deleted && allocatedAmounts[c.id] === undefined);
-  }, [contacts, allocatedAmounts]);
 
   // 各人代付總額
   const totalAdvance = useMemo(() => {
@@ -352,7 +160,10 @@ export function SplitAdvanceDialog({
 
   // 確認送出
   const handleConfirm = () => {
-    if (isOverAllocated) return;
+    if (isOverAllocated) {
+      toast(t('add.exceedTotalError', '代付總額不可超過消費總額。'));
+      return;
+    }
 
     let result: SplitItem[] = [];
     Object.entries(allocatedAmounts).forEach(([contactId, strVal]) => {
@@ -390,19 +201,20 @@ export function SplitAdvanceDialog({
         disablePointerDismissal
       >
         <DialogContent
-          overlayClassName="z-[70] bg-overlay backdrop-blur-[2px]"
-          className="z-[70] max-w-[360px] sm:max-w-[360px] max-h-[92vh] flex flex-col p-0 gap-0 overflow-hidden border border-border shadow-none"
+          overlayClassName="z-[70]"
+          className="z-[70] sm:max-w-[350px] max-w-[350px] p-5 gap-4"
         >
-          {/* Header */}
-          <DialogHeader className="p-4 border-b border-border text-left">
-            <DialogTitle className="text-base font-semibold">
-              {t('add.splitAdvanceTitle', '代付')}
+          {/* Header (1:1 復刻 AccountFormDialog / BudgetFormDialog) */}
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
+              <Receipt className="size-5 text-primary" />
+              <span>{t('add.splitAdvanceTitle', '代付')}</span>
             </DialogTitle>
           </DialogHeader>
 
-          {/* Scrollable Body */}
-          <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
-            {/* 金額概覽面板 (Flat Design) */}
+          {/* Body (1:1 復刻 AccountFormDialog / BudgetFormDialog) */}
+          <div className="space-y-4 py-1 overflow-y-auto max-h-[70vh] pr-0.5 overscroll-contain">
+            {/* 1. 金額概覽面板 (Flat Design) */}
             <div className="grid grid-cols-2 gap-px bg-border rounded-lg border border-border overflow-hidden">
               <div className="bg-card p-3 flex flex-col">
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
@@ -418,21 +230,14 @@ export function SplitAdvanceDialog({
                 </span>
                 <span className={cn(
                   "text-base font-mono font-semibold tracking-tight truncate mt-1",
-                  isOverAllocated ? "text-destructive" : totalAdvance > 0 ? "text-amber-500" : "text-muted-foreground"
+                  isOverAllocated ? "text-rose-500" : totalAdvance > 0 ? "text-foreground" : "text-muted-foreground"
                 )}>
                   {currencySymbol}{formatAmountNumber(totalAdvance)}
                 </span>
               </div>
             </div>
 
-            {/* 超額提示 */}
-            {isOverAllocated && (
-              <p className="text-xs text-destructive font-medium px-1">
-                {t('add.exceedTotalError', '代付總額不可超過消費總額')}
-              </p>
-            )}
-
-            {/* 快捷平分按鈕列 */}
+            {/* 2. 快捷平分按鈕列 */}
             <div className="flex items-center gap-1.5 flex-wrap">
               <Button
                 type="button"
@@ -465,12 +270,12 @@ export function SplitAdvanceDialog({
                   className="text-xs h-8 px-2 rounded-lg text-muted-foreground hover:text-foreground ml-auto cursor-pointer"
                 >
                   <RotateCcw className="size-3.5 mr-1" />
-                  {t('add.resetSplit', '重設自費')}
+                  {t('add.resetSplit', '重設')}
                 </Button>
               )}
             </div>
 
-            {/* 對象分配清單區域 */}
+            {/* 3. 對象分配清單區域 */}
             <div className="space-y-2.5">
               <div className="border border-border rounded-lg bg-card divide-y divide-border overflow-hidden">
                 {/* 固定第一項：我（自費支出，自動連動） */}
@@ -493,11 +298,11 @@ export function SplitAdvanceDialog({
 
                   {/* 右側：金額（唯讀自動連動計算，對齊下方輸入框） */}
                   <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-24 text-right">
+                    <div className="w-28 text-right pr-2">
                       <span
                         className={cn(
                           "font-mono text-xs font-semibold",
-                          selfExpense < 0 ? "text-destructive" : "text-foreground"
+                          selfExpense < 0 ? "text-rose-500" : "text-foreground"
                         )}
                       >
                         {currencySymbol}{formatAmountNumber(selfExpense)}
@@ -538,15 +343,21 @@ export function SplitAdvanceDialog({
                         </div>
                       </div>
 
-                      {/* 右側：金額輸入框與移出按鈕 */}
+                      {/* 右側：金額輸入框與移出按鈕（1:1 對齊新增預算金額輸入框設計標準） */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground font-mono">{currencySymbol}</span>
+                        <div className="relative flex items-center">
+                          <span className="absolute left-2.5 text-xs font-mono font-medium text-muted-foreground pointer-events-none select-none">
+                            {currencySymbol}
+                          </span>
                           <AmountInput
+                            placeholder="0.00"
                             value={currentAmountStr}
                             onValueChange={(val) => handleAmountChange(cId, val)}
-                            placeholder="0.00"
-                            className="w-24 h-8 text-right text-xs font-mono font-medium border-border bg-background focus-visible:ring-1"
+                            currencySymbol={currencySymbol}
+                            className="w-28 h-8 text-xs font-mono font-medium border-border bg-background focus-visible:ring-1"
+                            style={{
+                              paddingLeft: `${Math.max(1.75, 0.75 + currencySymbol.length * 0.5)}rem`,
+                            }}
                           />
                         </div>
 
@@ -580,17 +391,15 @@ export function SplitAdvanceDialog({
             </div>
           </div>
 
-          {/* Footer */}
-          <DialogFooter className="p-3 bg-card flex flex-row items-center justify-end gap-2 sm:justify-end">
-            <DialogClose render={<Button variant="outline" size="sm" type="button" />}>
+          {/* Footer (1:1 復刻 AccountFormDialog / BudgetFormDialog) */}
+          <DialogFooter className="flex flex-row items-center justify-between gap-3 sm:gap-3 pt-1">
+            <DialogClose render={<Button variant="outline" type="button" className="cursor-pointer" />}>
               {t('common.cancel', '取消')}
             </DialogClose>
             <Button
               type="button"
-              size="sm"
               onClick={handleConfirm}
-              disabled={isOverAllocated}
-              className="font-medium cursor-pointer"
+              className="cursor-pointer"
             >
               {t('common.confirm', '確定')}
             </Button>
@@ -598,12 +407,20 @@ export function SplitAdvanceDialog({
         </DialogContent>
       </Dialog>
 
-      {/* 獨立彈出的選擇對象視窗 */}
-      <SelectContactsModal
+      {/* 獨立彈出的對象選擇視窗 (沿用全站標準 AccountSelectDialog) */}
+      <AccountSelectDialog
         open={isSelectModalOpen}
-        onClose={() => setIsSelectModalOpen(false)}
-        availableContacts={availableContacts}
-        onConfirmAdd={handleBatchAddContacts}
+        onOpenChange={setIsSelectModalOpen}
+        title={t('add.selectContactsTitle', '選擇代付對象')}
+        filterType="contact"
+        overlayClassName="z-[80]"
+        className="z-[80]"
+        disabledAccountIds={selectedContactIds}
+        disabledReason={t('add.alreadyAddedToSplit', '已在名單中')}
+        onSelectAccount={(account) => {
+          handleBatchAddContacts([account.id]);
+          setIsSelectModalOpen(false);
+        }}
       />
     </>
   );

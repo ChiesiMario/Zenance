@@ -20,7 +20,7 @@ import { triggerHaptic } from '@/lib/haptics';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
 import { toast } from '@/components/ui/toast';
-import { SplitAdvanceDialog, type SplitItem } from './SplitAdvanceDialog';
+import type { SplitItem } from './SplitAdvanceDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +44,7 @@ interface Props {
   budgets?: Budget[];
   splits?: SplitItem[];
   onSplitsChange?: (splits: SplitItem[]) => void;
+  onOpenSplitDialog?: () => void;
   currencySymbol?: string;
   contacts?: Contact[];
   onFeeClick?: () => void;
@@ -114,6 +115,7 @@ export function NumericKeypad({
   budgets = [],
   splits,
   onSplitsChange,
+  onOpenSplitDialog,
   currencySymbol = '¥',
   contacts = [],
   onFeeClick,
@@ -130,7 +132,6 @@ export function NumericKeypad({
 }: Props) {
   const { t } = useTranslation();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isSplitDialogOpen, setIsSplitDialogOpen] = useState(false);
 
   const isExpression = useMemo(() => {
     return /[+\-*/]/.test(value) && !/^[+-]?\d+(\.\d+)?$/.test(value);
@@ -642,48 +643,34 @@ export function NumericKeypad({
           const isAmountValid = currentTotalAmount > 0;
 
           return (
-            <div className="relative w-full h-full">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isAmountValid) {
-                    toast.show(t('alerts.enterAmountFirstForAdvance'));
-                    return;
-                  }
-                  setIsSplitDialogOpen(true);
-                }}
-                className={cn(
-                  "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl sm:rounded-lg transition-all outline-none border",
-                  !isAmountValid
-                    ? "bg-muted/30 text-muted-foreground/40 opacity-40 cursor-not-allowed border-border/20"
-                    : isSplitActive
-                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer"
-                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40 cursor-pointer"
-                )}
-              >
-                {currentSplits.length > 1 ? (
-                  <Users className={cn("size-4 sm:size-3.5 shrink-0", !isAmountValid ? "text-muted-foreground/40" : "text-amber-500")} />
-                ) : (
-                  <Receipt className={cn("size-3.5 shrink-0 transition-colors", !isAmountValid ? "text-muted-foreground/40" : isSplitActive ? "text-amber-500" : "text-muted-foreground group-hover:text-foreground")} />
-                )}
-                <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[65px]">
-                  {reimburseDisplayLabel}
-                </span>
-                <ChevronDown className="size-3 opacity-60 shrink-0" />
-              </button>
-
-              <SplitAdvanceDialog
-                open={isSplitDialogOpen}
-                onOpenChange={setIsSplitDialogOpen}
-                totalAmount={currentTotalAmount}
-                currencySymbol={currencySymbol}
-                splits={currentSplits}
-                onConfirm={(newSplits) => {
-                  onSplitsChange?.(newSplits);
-                }}
-                contacts={contacts}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isAmountValid) {
+                  toast.show(t('alerts.enterAmountFirstForAdvance'));
+                  return;
+                }
+                onOpenSplitDialog?.();
+              }}
+              className={cn(
+                "w-full h-full flex gap-1 items-center justify-center px-1.5 py-0 rounded-xl sm:rounded-lg transition-all outline-none border",
+                !isAmountValid
+                  ? "bg-muted/30 text-muted-foreground/40 opacity-40 cursor-not-allowed border-border/20"
+                  : isSplitActive
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border-border/40 cursor-pointer"
+              )}
+            >
+              {currentSplits.length > 1 ? (
+                <Users className={cn("size-4 sm:size-3.5 shrink-0", !isAmountValid ? "text-muted-foreground/40" : "text-amber-500")} />
+              ) : (
+                <Receipt className={cn("size-3.5 shrink-0 transition-colors", !isAmountValid ? "text-muted-foreground/40" : isSplitActive ? "text-amber-500" : "text-muted-foreground group-hover:text-foreground")} />
+              )}
+              <span className="text-xs uppercase tracking-wider font-medium truncate max-w-[65px]">
+                {reimburseDisplayLabel}
+              </span>
+              <ChevronDown className="size-3 opacity-60 shrink-0" />
+            </button>
           );
         })()}
       </div>

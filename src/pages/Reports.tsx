@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,58 +37,15 @@ import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SpringNumber } from '@/components/ui/SpringNumber';
 import { MagnitudeBadge } from '@/components/ui/MagnitudeBadge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog';
-import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
-import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { AutoMarquee } from '@/components/ui/AutoMarquee';
-import { cn, getCurrencySymbol, sortTransactionsDesc, formatAmountNumber } from '@/lib/utils';
+import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
+import { ReportTrendChart, type TrendPoint } from '@/components/reports/ReportTrendChart';
+import { ReportBreakdownSection, type CategoryGroup, type CategoryBreakdownItem } from '@/components/reports/ReportBreakdownSection';
+import { ReportBudgetSection } from '@/components/reports/ReportBudgetSection';
+import { cn, getCurrencySymbol, formatAmountNumber } from '@/lib/utils';
 import type { Transaction } from '@/services/db/db';
 
-type PeriodType = 'week' | 'month' | 'quarter' | 'year';
-
-interface CategoryGroup {
-  categoryId: string;
-  name: string;
-  amount: number;
-  percentage: number;
-  transactions: Transaction[];
-}
-
-
-function getNiceMax(val: number): number {
-  if (val <= 50) return 50;
-  if (val <= 100) return 100;
-  if (val <= 500) return Math.ceil(val / 50) * 50;
-  if (val <= 2000) return Math.ceil(val / 200) * 200;
-  if (val <= 10000) return Math.ceil(val / 1000) * 1000;
-  return Math.ceil(val / 5000) * 5000;
-}
-
-function getSmoothPath(pts: { x: number; y: number }[]): string {
-  if (pts.length === 0) return '';
-  if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i === 0 ? i : i - 1];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
-
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-  }
-  return d;
-}
+export type PeriodType = 'week' | 'month' | 'quarter' | 'year';
 
 export default function Reports() {
   const { t, i18n } = useTranslation();
@@ -107,12 +64,9 @@ export default function Reports() {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [breakdownType, setBreakdownType] = useState<'expense' | 'income'>('expense');
   const [activeBucketIdx, setActiveBucketIdx] = useState<number | null>(null);
-
-  // Drilldown Modal states
-  const [inspectCategory, setInspectCategory] = useState<CategoryGroup | null>(null);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
 
-  // Calculate Start and End of period
+  // 計算時段開始與結束日期及標題
   const { startDate, endDate, periodLabel } = useMemo(() => {
     let start: Date;
     let end: Date;
@@ -144,7 +98,7 @@ export default function Reports() {
     return { startDate: start, endDate: end, periodLabel: label };
   }, [periodType, currentDate, t, i18n.language]);
 
-  // Navigate periods
+  // 前後週期導航
   const handlePrev = () => {
     if (periodType === 'week') setCurrentDate(prev => addWeeks(prev, -1));
     else if (periodType === 'month') setCurrentDate(prev => addMonths(prev, -1));
@@ -164,50 +118,43 @@ export default function Reports() {
   const startStr = useMemo(() => format(startDate, 'yyyy-MM-dd'), [startDate]);
   const endStr = useMemo(() => format(endDate, 'yyyy-MM-dd'), [endDate]);
   const reportPeriodKey = useMemo(() => `${periodType}-${startStr}-${endStr}`, [periodType, startStr, endStr]);
+
   const { transactions: rangeTransactions } = useDateRangeTransactions(startStr, endStr);
   const { transactions: allTransactions } = useTransactions();
 
-  // 建立 parentId -> 累計退款總額 索引表 (支援跨期退款完整扣除)
+  // 跨期退款索引表
   const refundsByParentId = useMemo(() => {
     const map = new Map<string, number>();
     const source = allTransactions || rangeTransactions || [];
-    for (const t of source) {
-      if (!t.deleted && t.parentId) {
-        const prev = map.get(t.parentId) || 0;
-        map.set(t.parentId, prev + t.amount);
+    for (const tx of source) {
+      if (!tx.deleted && tx.parentId) {
+        const prev = map.get(tx.parentId) || 0;
+        map.set(tx.parentId, prev + tx.amount);
       }
     }
     return map;
   }, [allTransactions, rangeTransactions]);
 
-  // Filter transactions in this period
+  // 當期有效交易
   const periodTransactions = useMemo(() => {
     if (!rangeTransactions) return [];
-
     return rangeTransactions.filter(tx => {
-      // Exclude regular balance adjustments, but keep refund sub-transactions
       if (tx.parentId) return true;
       const cat = allCategories?.find(c => c.id === tx.category);
       if (cat?.isSystem) return false;
-
       return true;
     });
   }, [rangeTransactions, allCategories]);
 
-  // Key Totals (with refund contra-accounting; undefined during loading)
+  // 核心合計金額（扣除關聯退款）
   const { totalExpense, totalIncome, netBalance } = useMemo(() => {
     if (rangeTransactions === undefined) {
-      return {
-        totalExpense: undefined,
-        totalIncome: undefined,
-        netBalance: undefined,
-      };
+      return { totalExpense: undefined, totalIncome: undefined, netBalance: undefined };
     }
     let exp = 0;
     let inc = 0;
     periodTransactions.forEach(tx => {
       if (tx.parentId) {
-        // 支出退款直接扣除支出，收入退款直接扣除收入
         if (tx.type === 'income') exp -= tx.amount;
         else if (tx.type === 'expense') inc -= tx.amount;
         return;
@@ -222,10 +169,9 @@ export default function Reports() {
     };
   }, [periodTransactions, rangeTransactions]);
 
-  // Calculate Period Days and Daily Average
+  // 週期天數與日均/月均支出
   const periodDays = useMemo(() => {
-    const diff = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-    return diff;
+    return Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   }, [startDate, endDate]);
 
   const dailyAverage = useMemo(() => {
@@ -233,58 +179,57 @@ export default function Reports() {
     return totalExpense / periodDays;
   }, [totalExpense, periodDays]);
 
+  const monthlyAverage = useMemo(() => {
+    if (totalExpense === undefined) return undefined;
+    return totalExpense / 12;
+  }, [totalExpense]);
+
+  const benchmarkAverage = periodType === 'year' ? monthlyAverage : dailyAverage;
+
   const savingsRate = useMemo(() => {
     if (totalIncome === undefined || netBalance === undefined || totalIncome <= 0) return null;
     return (netBalance / totalIncome) * 100;
   }, [netBalance, totalIncome]);
 
-  // 單筆最高支出（排除轉入、轉賬、轉出、借貸、退款子交易及系統分類，並扣除關聯退款）
+  // 單筆最高支出
   const peakExpenseItem = useMemo(() => {
     const validExpenses = periodTransactions.filter(tx => {
-      if (tx.parentId) return false;
-      if (tx.type !== 'expense') return false;
+      if (tx.parentId || tx.type !== 'expense') return false;
       const cat = allCategories?.find(c => c.id === tx.category);
-      if (cat?.isSystem) return false;
-      return true;
+      return !cat?.isSystem;
     });
 
     let maxItem: { tx: Transaction; netAmount: number } | null = null;
     for (const tx of validExpenses) {
       const totalRefunded = refundsByParentId.get(tx.id) || 0;
       const netAmount = Math.max(0, tx.amount - totalRefunded);
-      if (netAmount > 0) {
-        if (!maxItem || netAmount > maxItem.netAmount) {
-          maxItem = { tx, netAmount };
-        }
+      if (netAmount > 0 && (!maxItem || netAmount > maxItem.netAmount)) {
+        maxItem = { tx, netAmount };
       }
     }
     return maxItem;
   }, [periodTransactions, allCategories, refundsByParentId]);
 
-  // 單筆最高收入（排除轉入、轉賬、轉出、借貸、退款子交易及系統分類，並扣除關聯退款）
+  // 單筆最高收入
   const peakIncomeItem = useMemo(() => {
     const validIncomes = periodTransactions.filter(tx => {
-      if (tx.parentId) return false;
-      if (tx.type !== 'income') return false;
+      if (tx.parentId || tx.type !== 'income') return false;
       const cat = allCategories?.find(c => c.id === tx.category);
-      if (cat?.isSystem) return false;
-      return true;
+      return !cat?.isSystem;
     });
 
     let maxItem: { tx: Transaction; netAmount: number } | null = null;
     for (const tx of validIncomes) {
       const totalRefunded = refundsByParentId.get(tx.id) || 0;
       const netAmount = Math.max(0, tx.amount - totalRefunded);
-      if (netAmount > 0) {
-        if (!maxItem || netAmount > maxItem.netAmount) {
-          maxItem = { tx, netAmount };
-        }
+      if (netAmount > 0 && (!maxItem || netAmount > maxItem.netAmount)) {
+        maxItem = { tx, netAmount };
       }
     }
     return maxItem;
   }, [periodTransactions, allCategories, refundsByParentId]);
 
-  // Category breakdown generator (with contra-accounting deduction)
+  // 收支結構拆解生成器
   const getCategoryBreakdown = useMemo(() => {
     return (type: 'expense' | 'income'): CategoryGroup[] => {
       const mainList = periodTransactions.filter(tx => tx.type === type && !tx.parentId);
@@ -293,7 +238,16 @@ export default function Reports() {
       );
       const total = (type === 'expense' ? totalExpense : totalIncome) ?? 0;
 
-      const grouped: Record<string, { categoryId: string; name: string; amount: number; transactions: Transaction[] }> = {};
+      const grouped: Record<
+        string,
+        {
+          categoryId: string;
+          name: string;
+          amount: number;
+          itemMap: Map<string, CategoryBreakdownItem>;
+          orphanRefunds: CategoryBreakdownItem[];
+        }
+      > = {};
 
       mainList.forEach(tx => {
         const catId = tx.category || 'unknown';
@@ -303,52 +257,93 @@ export default function Reports() {
             categoryId: catId,
             name: cat?.name || t('common.unknown', '未分類'),
             amount: 0,
-            transactions: [],
+            itemMap: new Map(),
+            orphanRefunds: [],
           };
         }
         grouped[catId].amount += tx.amount;
-        grouped[catId].transactions.push(tx);
+        grouped[catId].itemMap.set(tx.id, {
+          id: tx.id,
+          tx,
+          netAmount: tx.amount,
+          originalAmount: tx.amount,
+          refundedAmount: 0,
+          refundTransactions: [],
+        });
       });
 
-      // 沖抵扣減對應主交易分類金額
+      // 沖抵退款
       refundList.forEach(refTx => {
-        const parentTx = rangeTransactions?.find(t => t.id === refTx.parentId);
+        const parentTx =
+          rangeTransactions?.find(t => t.id === refTx.parentId) ||
+          allTransactions?.find(t => t.id === refTx.parentId);
         const targetCatId = parentTx?.category || refTx.category || 'unknown';
-        if (grouped[targetCatId]) {
-          grouped[targetCatId].amount = Math.max(0, grouped[targetCatId].amount - refTx.amount);
-          grouped[targetCatId].transactions.push(refTx);
+        if (!grouped[targetCatId]) {
+          const cat = allCategories?.find(c => c.id === targetCatId);
+          grouped[targetCatId] = {
+            categoryId: targetCatId,
+            name: cat?.name || t('common.unknown', '未分類'),
+            amount: 0,
+            itemMap: new Map(),
+            orphanRefunds: [],
+          };
+        }
+
+        grouped[targetCatId].amount = Math.max(
+          0,
+          Math.round((grouped[targetCatId].amount - refTx.amount) * 100) / 100
+        );
+
+        if (refTx.parentId && grouped[targetCatId].itemMap.has(refTx.parentId)) {
+          const parentItem = grouped[targetCatId].itemMap.get(refTx.parentId)!;
+          parentItem.refundedAmount = Math.round((parentItem.refundedAmount + refTx.amount) * 100) / 100;
+          parentItem.netAmount = Math.max(
+            0,
+            Math.round((parentItem.originalAmount - parentItem.refundedAmount) * 100) / 100
+          );
+          parentItem.refundTransactions.push(refTx);
+        } else {
+          // 跨期退款或未匹配到當期主交易的孤立退款
+          grouped[targetCatId].orphanRefunds.push({
+            id: refTx.id,
+            tx: refTx,
+            netAmount: -refTx.amount,
+            originalAmount: refTx.amount,
+            refundedAmount: refTx.amount,
+            refundTransactions: [refTx],
+            isRefund: true,
+          });
         }
       });
 
       return Object.values(grouped)
-        .filter(item => item.amount > 0 || item.transactions.length > 0)
-        .map(item => ({
-          ...item,
-          percentage: total > 0 ? Math.min(100, Math.max(0, (item.amount / total) * 100)) : 0,
-          transactions: sortTransactionsDesc(item.transactions),
-        }))
+        .filter(item => item.amount > 0 || item.itemMap.size > 0 || item.orphanRefunds.length > 0)
+        .map(item => {
+          const items = [...item.itemMap.values(), ...item.orphanRefunds];
+          const allTxs = items.map(i => i.tx);
+          return {
+            categoryId: item.categoryId,
+            name: item.name,
+            amount: item.amount,
+            percentage: total > 0 ? Math.min(100, Math.max(0, (item.amount / total) * 100)) : 0,
+            items,
+            transactions: allTxs,
+          };
+        })
         .sort((a, b) => b.amount - a.amount);
     };
-  }, [periodTransactions, rangeTransactions, totalExpense, totalIncome, allCategories, t]);
+  }, [periodTransactions, rangeTransactions, allTransactions, totalExpense, totalIncome, allCategories, t]);
 
   const expenseBreakdown = useMemo(() => getCategoryBreakdown('expense'), [getCategoryBreakdown]);
   const incomeBreakdown = useMemo(() => getCategoryBreakdown('income'), [getCategoryBreakdown]);
   const currentBreakdown = breakdownType === 'expense' ? expenseBreakdown : incomeBreakdown;
   const currentTotal = breakdownType === 'expense' ? totalExpense : totalIncome;
 
-  // Trend data generator (with contra-accounting per day/month)
-  const trendData = useMemo(() => {
-    interface TrendPoint {
-      label: string;
-      fullLabel: string;
-      expense: number;
-      income: number;
-      dateKey: string;
-    }
-
+  // 走勢數據產生器
+  const trendPoints = useMemo((): TrendPoint[] => {
     const points: TrendPoint[] = [];
 
-    const calculateDayTotals = (txList: Transaction[]) => {
+    const calculateTotals = (txList: Transaction[]) => {
       let exp = 0;
       let inc = 0;
       txList.forEach(tx => {
@@ -370,7 +365,7 @@ export default function Reports() {
         currentDay.setDate(startDate.getDate() + i);
         const dayStr = format(currentDay, 'yyyy-MM-dd');
         const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
-        const { expense, income } = calculateDayTotals(dayTxs);
+        const { expense, income } = calculateTotals(dayTxs);
         const isZh = i18n.language.startsWith('zh');
         points.push({
           label: isZh ? `週${days[i]}` : format(currentDay, 'EEE'),
@@ -388,10 +383,10 @@ export default function Reports() {
         currentDay.setDate(day);
         const dayStr = format(currentDay, 'yyyy-MM-dd');
         const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
-        const { expense, income } = calculateDayTotals(dayTxs);
+        const { expense, income } = calculateTotals(dayTxs);
         points.push({
           label: isZh ? `${day}日` : `${day}`,
-          fullLabel: `${format(currentDay, 'yyyy/MM/dd')}`,
+          fullLabel: format(currentDay, 'yyyy/MM/dd'),
           expense,
           income,
           dateKey: dayStr,
@@ -406,7 +401,7 @@ export default function Reports() {
           const dateObj = parseISO(tx.date);
           return dateObj.getMonth() === m;
         });
-        const { expense, income } = calculateDayTotals(monthTxs);
+        const { expense, income } = calculateTotals(monthTxs);
         points.push({
           label: isZh ? `${m + 1}月` : format(new Date(2000, m, 1), 'MMM'),
           fullLabel: isZh ? `${getYear(currentDate)} 年 ${m + 1} 月` : format(new Date(getYear(currentDate), m, 1), 'MMMM yyyy'),
@@ -422,7 +417,7 @@ export default function Reports() {
           const dateObj = parseISO(tx.date);
           return dateObj.getMonth() === m;
         });
-        const { expense, income } = calculateDayTotals(monthTxs);
+        const { expense, income } = calculateTotals(monthTxs);
         points.push({
           label: isZh ? `${m + 1}月` : format(new Date(2000, m, 1), 'MMM'),
           fullLabel: isZh ? `${getYear(currentDate)} 年 ${m + 1} 月` : format(new Date(getYear(currentDate), m, 1), 'MMMM yyyy'),
@@ -433,82 +428,12 @@ export default function Reports() {
       }
     }
 
-    const rawMax = Math.max(
-      ...points.map(p => Math.max(p.expense, p.income)),
-      0
-    );
-    const niceMax = getNiceMax(rawMax);
-
-    const svgWidth = 1000;
-    const svgHeight = 240;
-    const plotTop = 20;
-    const plotBottom = 215;
-    const plotHeight = plotBottom - plotTop;
-
-    const n = points.length;
-    const expensePts = points.map((p, i) => {
-      const x = n > 1 ? (i / (n - 1)) * svgWidth : svgWidth / 2;
-      const y = plotBottom - (niceMax > 0 ? (p.expense / niceMax) * plotHeight : 0);
-      return { x, y };
-    });
-
-    const incomePts = points.map((p, i) => {
-      const x = n > 1 ? (i / (n - 1)) * svgWidth : svgWidth / 2;
-      const y = plotBottom - (niceMax > 0 ? (p.income / niceMax) * plotHeight : 0);
-      return { x, y };
-    });
-
-    const expensePath = getSmoothPath(expensePts);
-    const incomePath = getSmoothPath(incomePts);
-
-    const expenseArea = n > 1 && expensePath ? `${expensePath} L ${svgWidth} ${plotBottom} L 0 ${plotBottom} Z` : '';
-    const incomeArea = n > 1 && incomePath ? `${incomePath} L ${svgWidth} ${plotBottom} L 0 ${plotBottom} Z` : '';
-
-    return {
-      points,
-      rawMax,
-      niceMax,
-      expensePts,
-      incomePts,
-      expensePath,
-      incomePath,
-      expenseArea,
-      incomeArea,
-      plotBottom,
-      svgWidth,
-      svgHeight,
-    };
+    return points;
   }, [periodTransactions, periodType, startDate, endDate, i18n.language, currentDate]);
 
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-
-  const handlePointerMove = (clientX: number) => {
-    if (!chartContainerRef.current || trendData.points.length === 0) return;
-    const rect = chartContainerRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
-    const pct = rect.width > 0 ? x / rect.width : 0;
-    const n = trendData.points.length;
-    const idx = Math.min(n - 1, Math.max(0, Math.round(pct * (n - 1))));
-    setActiveBucketIdx(idx);
-  };
-
-  const xTicks = useMemo(() => {
-    const n = trendData.points.length;
-    if (n <= 1) return trendData.points.map((p, i) => ({ label: p.label, idx: i }));
-    if (n <= 7) return trendData.points.map((p, i) => ({ label: p.label, idx: i }));
-    const step = (n - 1) / 4;
-    const indices = [0, Math.round(step), Math.round(step * 2), Math.round(step * 3), n - 1];
-    const uniqueIndices = Array.from(new Set(indices));
-    return uniqueIndices.map(idx => ({ label: trendData.points[idx].label, idx }));
-  }, [trendData.points]);
-
-  const activePoint = activeBucketIdx !== null && activeBucketIdx < trendData.points.length
-    ? trendData.points[activeBucketIdx]
-    : null;
-
   return (
-    <div className="w-full space-y-4">
-      {/* Top Header */}
+    <div className="w-full space-y-4 pb-12">
+      {/* 頂部導航列 */}
       <div className="flex items-center justify-between">
         <Button
           variant="ghost"
@@ -518,13 +443,13 @@ export default function Reports() {
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-xl font-semibold tracking-tight truncate px-2">
+        <h2 className="text-xl font-semibold tracking-tight truncate px-2 text-foreground">
           {t('reports.title')}
         </h2>
         <div className="w-8" />
       </div>
 
-      {/* Period Selector & Navigation Bar */}
+      {/* 週期切換與日期導航 */}
       <div className="border border-border rounded-xl p-3 bg-card flex flex-col gap-3 shadow-none">
         <SegmentedControl<PeriodType>
           value={periodType}
@@ -564,9 +489,9 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Primary KPI Overview Card (Vercel Metrics Style) */}
+      {/* 1. 核心 KPI 總覽卡片 */}
       <div className="border border-border rounded-xl overflow-hidden bg-card text-card-foreground shadow-none">
-        {/* Net Balance Centerpiece */}
+        {/* 淨結餘 (Centerpiece) */}
         <div className="p-6 border-b border-border flex flex-col items-center justify-center text-center min-w-0 overflow-hidden">
           <div className="relative flex items-center justify-center h-5 mb-1.5 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground font-mono leading-none">
@@ -596,9 +521,9 @@ export default function Reports() {
           </AutoMarquee>
         </div>
 
-        {/* 4-Indicator Grid (2x2 Symmetric Matrix Layout across all viewports) */}
+        {/* 2x2 對稱指標矩陣 */}
         <div className="grid grid-cols-2 gap-px bg-border">
-          {/* Indicator 1: Total Expense & Daily Avg */}
+          {/* 指標 1: 總支出與日均 */}
           <div className="bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden">
             <div className="flex items-center justify-between h-5 min-w-0">
               <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none shrink-0">
@@ -638,7 +563,7 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Indicator 2: Peak Single Expense */}
+          {/* 指標 2: 單筆最高支出 */}
           <div
             onClick={() => {
               if (peakExpenseItem) {
@@ -646,8 +571,8 @@ export default function Reports() {
               }
             }}
             className={cn(
-              "bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden transition-colors",
-              peakExpenseItem && "cursor-pointer hover:bg-muted/30 group"
+              'bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden transition-colors',
+              peakExpenseItem && 'cursor-pointer hover:bg-muted/30 group'
             )}
           >
             <div className="flex items-center justify-between h-5 min-w-0">
@@ -698,7 +623,7 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Indicator 3: Total Income & Savings Rate */}
+          {/* 指標 3: 總收入與結餘率 */}
           <div className="bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden">
             <div className="flex items-center justify-between h-5 min-w-0">
               <span className="text-xs uppercase tracking-widest text-muted-foreground font-mono inline-flex items-center gap-1.5 leading-none shrink-0">
@@ -728,7 +653,9 @@ export default function Reports() {
                     )}
                   >
                     {t('reports.savingsRate', '結餘率')}: {savingsRate >= 0 ? '+' : ''}
-                    {savingsRate.toFixed(1)}%
+                    {Math.abs(savingsRate) > 9999
+                      ? (savingsRate > 0 ? '> 9999%' : '< -9999%')
+                      : `${savingsRate.toFixed(1)}%`}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">{t('reports.savingsRate', '結餘率')}: --</span>
@@ -737,7 +664,7 @@ export default function Reports() {
             </div>
           </div>
 
-          {/* Indicator 4: Peak Single Income */}
+          {/* 指標 4: 單筆最高收入 */}
           <div
             onClick={() => {
               if (peakIncomeItem) {
@@ -745,8 +672,8 @@ export default function Reports() {
               }
             }}
             className={cn(
-              "bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden transition-colors",
-              peakIncomeItem && "cursor-pointer hover:bg-muted/30 group"
+              'bg-card p-4 flex flex-col justify-between gap-2 min-w-0 overflow-hidden transition-colors',
+              peakIncomeItem && 'cursor-pointer hover:bg-muted/30 group'
             )}
           >
             <div className="flex items-center justify-between h-5 min-w-0">
@@ -799,519 +726,38 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Trend Section (Proposal 1: Immersive Smooth Dual-Curve Area Scrubber) */}
-      <div className="border border-border rounded-xl p-5 bg-card text-card-foreground shadow-none space-y-4">
-        {/* Card Header & Legend */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight font-mono uppercase text-foreground">
-              {t('reports.trendTitle', '收支走勢')}
-            </h3>
-            <p className="text-xs font-mono text-muted-foreground/70 mt-0.5">
-              {t('reports.hoverHint', '滑動或點擊圖表檢視每日明細')}
-            </p>
-          </div>
+      {/* 2. 全新收支走勢圖 (方案 B 一鏡到底) */}
+      <ReportTrendChart
+        periodType={periodType}
+        points={trendPoints}
+        currencySymbol={currencySymbol}
+        averageValue={benchmarkAverage}
+        activeBucketIdx={activeBucketIdx}
+        onSelectBucket={setActiveBucketIdx}
+      />
 
-          {/* Clean Legend */}
-          <div className="flex items-center gap-4 text-xs font-mono shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-1 rounded-sm bg-foreground" />
-              <span className="text-muted-foreground">{t('reports.expenseTrend', '支出走勢')}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-0.5 border-b border-dashed border-emerald-500" />
-              <span className="text-muted-foreground">{t('reports.incomeTrend', '收入走勢')}</span>
-            </div>
-          </div>
-        </div>
+      {/* 3. 全新預算報表模組 (方案 B 一鏡到底) */}
+      <ReportBudgetSection
+        periodType={periodType}
+        startDate={startDate}
+        endDate={endDate}
+        currencySymbol={currencySymbol}
+      />
 
-        {/* Live Inspector Bar */}
-        {(() => {
-          const inspectedPoint = activePoint || (trendData.points.length > 0 ? trendData.points[trendData.points.length - 1] : null);
-          const expVal = inspectedPoint ? inspectedPoint.expense : 0;
-          const incVal = inspectedPoint ? inspectedPoint.income : 0;
-          const netVal = incVal - expVal;
+      {/* 4. 全新收支結構拆解 (方案 B 一鏡到底) */}
+      <ReportBreakdownSection
+        breakdownType={breakdownType}
+        onBreakdownTypeChange={setBreakdownType}
+        currentBreakdown={currentBreakdown}
+        currentTotal={currentTotal}
+        currencySymbol={currencySymbol}
+        periodLabel={periodLabel}
+        baseCurrency={baseCurrency}
+        wallets={wallets}
+        onSelectTransaction={setSelectedTransactionId}
+      />
 
-          return (
-            <div className="bg-muted/20 border border-border/60 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 font-mono">
-              <div className="text-xs">
-                <span className="text-muted-foreground">{t('reports.selectedPoint', '選定時點')}：</span>
-                <span className="font-bold text-foreground">
-                  {inspectedPoint ? inspectedPoint.fullLabel : '--'}
-                </span>
-              </div>
-              <div className="flex items-center gap-4 text-xs">
-                <div>
-                  <span className="text-muted-foreground">{t('reports.expense', '支出')}：</span>
-                  <span className="font-bold text-foreground">
-                    {currencySymbol}
-                    {formatAmountNumber(expVal)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t('reports.income', '收入')}：</span>
-                  <span className="font-bold text-emerald-500">
-                    {currencySymbol}
-                    {formatAmountNumber(incVal)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">{t('reports.netBalance', '結餘')}：</span>
-                  <span
-                    className={cn(
-                      'font-bold',
-                      netVal > 0
-                        ? 'text-emerald-500'
-                        : netVal < 0
-                          ? 'text-destructive'
-                          : 'text-muted-foreground'
-                    )}
-                  >
-                    {netVal < 0 ? '-' : netVal > 0 ? '+' : ''}
-                    {currencySymbol}
-                    {formatAmountNumber(Math.abs(netVal))}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Big Expanded Canvas (Height = 256px ~ 288px) */}
-        <div
-          ref={chartContainerRef}
-          className="relative w-full h-64 sm:h-72 border border-border/40 rounded-lg bg-card/40 overflow-hidden cursor-crosshair select-none touch-none"
-          onPointerDown={e => {
-            try {
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-            } catch {
-              // ignore
-            }
-            handlePointerMove(e.clientX);
-          }}
-          onPointerMove={e => {
-            if (e.buttons > 0 || e.pointerType === 'mouse') {
-              handlePointerMove(e.clientX);
-            }
-          }}
-          onPointerUp={e => {
-            try {
-              (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-            } catch {
-              // ignore
-            }
-          }}
-          onMouseLeave={() => setActiveBucketIdx(null)}
-        >
-          {/* Background Gridlines with Absolute Value Ticks */}
-          <div className="absolute inset-0 flex flex-col justify-between p-4 pointer-events-none text-[10px] font-mono text-muted-foreground/60 z-0">
-            <div className="flex items-center justify-between border-b border-border/40 border-dashed pb-0.5">
-              <span>
-                {currencySymbol}
-                {trendData.niceMax.toLocaleString()}
-              </span>
-              <span className="text-[9px] uppercase tracking-wider">{t('reports.peakScale', '最高峰 Peak')}</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-border/30 border-dashed pb-0.5">
-              <span>
-                {currencySymbol}
-                {(trendData.niceMax / 2).toLocaleString()}
-              </span>
-              <span className="text-[9px] uppercase tracking-wider">{t('reports.midScale', '中位基準')}</span>
-            </div>
-            <div className="flex items-center justify-between border-b border-border pb-0.5">
-              <span>{currencySymbol}0</span>
-              <span className="text-[9px] uppercase tracking-wider">{t('reports.baseScale', '基線 Base')}</span>
-            </div>
-          </div>
-
-          {/* Empty State Banner if no transactions */}
-          {periodTransactions.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-              <span className="text-xs font-mono text-muted-foreground/70 bg-card/90 px-3 py-1.5 rounded-full border border-border/60">
-                {t('reports.noTransactions', '此期間尚無任何交易紀錄')}
-              </span>
-            </div>
-          )}
-
-          {/* SVG Smooth Area Paths */}
-          <svg
-            className="absolute inset-0 w-full h-full p-4 pointer-events-none z-10 overflow-visible"
-            viewBox={`0 0 ${trendData.svgWidth} ${trendData.svgHeight}`}
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id="reports-expense-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="currentColor" stopOpacity="0.32" className="text-foreground" />
-                <stop offset="100%" stopColor="currentColor" stopOpacity="0.0" className="text-foreground" />
-              </linearGradient>
-              <linearGradient id="reports-income-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-
-            {/* Income Area Fill */}
-            {trendData.incomeArea && (
-              <path d={trendData.incomeArea} fill="url(#reports-income-grad)" />
-            )}
-
-            {/* Income Line Stroke (Emerald Dashed) */}
-            {trendData.incomePath && (
-              <path
-                d={trendData.incomePath}
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="2"
-                strokeDasharray="4 3"
-              />
-            )}
-
-            {/* Expense Area Fill */}
-            {trendData.expenseArea && (
-              <path d={trendData.expenseArea} fill="url(#reports-expense-grad)" />
-            )}
-
-            {/* Expense Line Stroke (Foreground Solid) */}
-            {trendData.expensePath && (
-              <path
-                d={trendData.expensePath}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className="text-foreground"
-              />
-            )}
-
-            {/* Scrubber Crosshair Indicator Line & Dots */}
-            {activeBucketIdx !== null && trendData.expensePts[activeBucketIdx] && (
-              <g>
-                {/* Vertical Scrubber Line */}
-                <line
-                  x1={trendData.expensePts[activeBucketIdx].x}
-                  y1={0}
-                  x2={trendData.expensePts[activeBucketIdx].x}
-                  y2={trendData.plotBottom}
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                  className="text-foreground/50"
-                />
-                {/* Expense Node Dot */}
-                {trendData.points[activeBucketIdx]?.expense > 0 && (
-                  <circle
-                    cx={trendData.expensePts[activeBucketIdx].x}
-                    cy={trendData.expensePts[activeBucketIdx].y}
-                    r={5}
-                    className="fill-foreground stroke-background stroke-2"
-                  />
-                )}
-                {/* Income Node Dot */}
-                {trendData.points[activeBucketIdx]?.income > 0 && (
-                  <circle
-                    cx={trendData.incomePts[activeBucketIdx].x}
-                    cy={trendData.incomePts[activeBucketIdx].y}
-                    r={5}
-                    className="fill-emerald-500 stroke-background stroke-2"
-                  />
-                )}
-              </g>
-            )}
-          </svg>
-
-          {/* Interactive Vertical Scrubber Floating Date Badge */}
-          {activeBucketIdx !== null && trendData.points[activeBucketIdx] && (
-            <div
-              className="absolute top-2 -translate-x-1/2 bg-foreground text-background text-[10px] font-mono px-2 py-0.5 rounded font-semibold pointer-events-none z-20 shadow-none"
-              style={{
-                left: `${
-                  trendData.points.length > 1
-                    ? (activeBucketIdx / (trendData.points.length - 1)) * 100
-                    : 50
-                }%`,
-              }}
-            >
-              {trendData.points[activeBucketIdx].label}
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Timeline Axis */}
-        <div className="relative w-full h-4 text-[10px] font-mono text-muted-foreground px-4">
-          {xTicks.map(tick => {
-            const leftPct =
-              trendData.points.length > 1
-                ? (tick.idx / (trendData.points.length - 1)) * 100
-                : 50;
-            return (
-              <span
-                key={tick.idx}
-                className={cn(
-                  'absolute -translate-x-1/2 transition-colors select-none',
-                  activeBucketIdx === tick.idx ? 'text-foreground font-bold' : 'text-muted-foreground'
-                )}
-                style={{ left: `${leftPct}%` }}
-              >
-                {tick.label}
-              </span>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Composition Breakdown (Monochrome Stack & Clean Hierarchy) */}
-      <div className="border border-border rounded-xl bg-card text-card-foreground shadow-none overflow-hidden space-y-4 p-5">
-        {/* Header & Segmented Dimension Switcher */}
-        <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight font-mono uppercase text-foreground">
-              {breakdownType === 'expense'
-                ? t('reports.expenseBreakdown', '支出結構拆解')
-                : t('reports.incomeBreakdown', '收入結構拆解')}
-            </h3>
-            <p className="text-xs font-mono text-muted-foreground/70 mt-0.5">
-              {t('reports.breakdownSubtitle', {
-                count: currentBreakdown.reduce((sum, c) => sum + c.transactions.length, 0),
-              })}
-            </p>
-          </div>
-
-          <SegmentedControl<'expense' | 'income'>
-            value={breakdownType}
-            onChange={val => setBreakdownType(val)}
-            options={[
-              { value: 'expense', label: t('reports.expense', '支出') },
-              { value: 'income', label: t('reports.income', '收入') },
-            ]}
-          />
-        </div>
-
-        {currentBreakdown.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground font-mono">
-            {breakdownType === 'expense'
-              ? t('reports.noExpenses', '此期間無任何支出紀錄')
-              : t('reports.noIncomes', '此期間無任何收入紀錄')}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Chunky Treemap Stack Bar (Height = 28px) */}
-            <div className="space-y-1.5">
-              {/* Top-Right Total Amount above Progress Bar */}
-              <div className="flex items-baseline justify-between text-xs font-mono">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                  {breakdownType === 'expense'
-                    ? t('reports.expense', '支出')
-                    : t('reports.income', '收入')} · 100%
-                </span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    {t('reports.total', '合計')}
-                  </span>
-                  <span className="text-sm font-bold text-foreground">
-                    {currencySymbol}
-                    {currentTotal !== undefined ? formatAmountNumber(currentTotal) : '--'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="w-full h-7 rounded-lg bg-muted/40 overflow-hidden flex gap-0.5 p-0.5 border border-border">
-                {currentBreakdown.map((cat, idx) => {
-                  const isTop = idx === 0;
-                  return (
-                    <div
-                      key={cat.categoryId}
-                      onClick={() => setInspectCategory(cat)}
-                      style={{ width: `${cat.percentage}%` }}
-                      className={cn(
-                        'h-full rounded-sm transition-all cursor-pointer flex items-center justify-between px-2 font-mono text-[10px] font-bold select-none min-w-[8px]',
-                        breakdownType === 'expense'
-                          ? isTop
-                            ? 'bg-foreground text-background'
-                            : idx === 1
-                              ? 'bg-zinc-600 text-white'
-                              : idx === 2
-                                ? 'bg-zinc-500 text-white'
-                                : idx === 3
-                                  ? 'bg-zinc-400 text-black'
-                                  : 'bg-zinc-300 text-black'
-                          : isTop
-                            ? 'bg-emerald-500 text-white'
-                            : idx === 1
-                              ? 'bg-emerald-600 text-white'
-                              : idx === 2
-                                ? 'bg-emerald-700 text-white'
-                                : 'bg-emerald-800 text-white'
-                      )}
-                      title={`${cat.name}: ${cat.percentage.toFixed(1)}% (${currencySymbol}${formatAmountNumber(cat.amount)})`}
-                    >
-                      {cat.percentage >= 14 && (
-                        <span className="truncate mr-1">{cat.name}</span>
-                      )}
-                      {cat.percentage >= 9 && (
-                        <span className="shrink-0 ml-auto">{cat.percentage.toFixed(1)}%</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="flex justify-between text-[10px] font-mono text-muted-foreground/60 px-1 select-none">
-                <span>0%</span>
-                <span>25%</span>
-                <span>50%</span>
-                <span>75%</span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            {/* 2-Column Split Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {currentBreakdown.map((cat, idx) => {
-                const isTop = idx === 0;
-                return (
-                  <div
-                    key={cat.categoryId}
-                    onClick={() => setInspectCategory(cat)}
-                    className="border border-border rounded-xl p-4 bg-card hover:border-foreground/40 transition-colors cursor-pointer space-y-3 group"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={cn(
-                            'size-2.5 rounded-full shrink-0',
-                            breakdownType === 'expense'
-                              ? isTop
-                                ? 'bg-foreground'
-                                : idx === 1
-                                  ? 'bg-zinc-600'
-                                  : idx === 2
-                                    ? 'bg-zinc-500'
-                                    : 'bg-zinc-400'
-                              : isTop
-                                ? 'bg-emerald-500'
-                                : idx === 1
-                                  ? 'bg-emerald-600'
-                                  : 'bg-emerald-700'
-                          )}
-                        />
-                        <span className="font-semibold text-sm truncate text-foreground group-hover:underline underline-offset-4">
-                          {cat.name}
-                        </span>
-                      </div>
-
-                      <span
-                        className={cn(
-                          'text-xs font-mono font-bold px-2 py-0.5 rounded shrink-0',
-                          isTop
-                            ? 'bg-foreground text-background'
-                            : 'bg-muted text-foreground border border-border'
-                        )}
-                      >
-                        {cat.percentage.toFixed(1)}%
-                      </span>
-                    </div>
-
-                    <div className="flex items-baseline justify-between font-mono">
-                      <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                        {currencySymbol}
-                        {formatAmountNumber(cat.amount)}
-                      </span>
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {t('reports.transactionCount', { count: cat.transactions.length })}
-                      </span>
-                    </div>
-
-                    {/* Progress Mini Bar */}
-                    <div className="w-full h-1.5 rounded-full bg-muted/60 overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-500',
-                          breakdownType === 'expense'
-                            ? isTop
-                              ? 'bg-foreground'
-                              : idx === 1
-                                ? 'bg-zinc-600'
-                                : idx === 2
-                                  ? 'bg-zinc-500'
-                                  : 'bg-zinc-400'
-                            : isTop
-                              ? 'bg-emerald-500'
-                              : idx === 1
-                                ? 'bg-emerald-600'
-                                : 'bg-emerald-700'
-                        )}
-                        style={{ width: `${Math.max(cat.percentage, 2)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Category Transactions Drilldown Dialog */}
-      <Dialog open={!!inspectCategory} onOpenChange={open => !open && setInspectCategory(null)}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col p-5">
-          <DialogHeader className="pr-10">
-            <DialogTitle className="flex items-baseline justify-between gap-3 min-w-0">
-              <span className="truncate">{inspectCategory?.name}</span>
-              <span className="text-sm font-mono font-bold text-foreground shrink-0">
-                {currencySymbol}
-                {inspectCategory ? formatAmountNumber(inspectCategory.amount) : ''}
-              </span>
-            </DialogTitle>
-            <DialogDescription className="text-xs font-mono text-muted-foreground">
-              {periodLabel} •{' '}
-              {t('reports.transactionCount', {
-                count: inspectCategory?.transactions.length || 0,
-              })}{' '}
-              • {t('reports.percentage')}: {inspectCategory?.percentage.toFixed(1)}%
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto divide-y divide-border -mx-5 px-5 pt-2">
-            {inspectCategory?.transactions.length === 0 ? (
-              <div className="p-8 text-center text-xs text-muted-foreground font-mono">
-                {t('reports.noTransactions')}
-              </div>
-            ) : (
-              inspectCategory?.transactions.map(tx => {
-                const wallet = wallets?.find(w => w.id === tx.accountId);
-                return (
-                  <button
-                    key={tx.id}
-                    type="button"
-                    onClick={() => setSelectedTransactionId(tx.id)}
-                    className="w-full flex items-center justify-between py-2.5 hover:bg-muted/40 transition-colors text-left group cursor-pointer"
-                  >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs text-foreground font-medium truncate select-text">
-                          {tx.note || inspectCategory.name}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {tx.date} • {wallet?.name || ''}
-                      </span>
-                    </div>
-
-                    <AmountDisplay
-                      amount={tx.amount}
-                      originalCurrency={tx.originalCurrency}
-                      baseCurrency={baseCurrency}
-                      type={breakdownType === 'expense' ? 'expense' : 'income'}
-                      className="text-xs font-mono font-medium shrink-0"
-                    />
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Transaction Details Inspector Modal */}
+      {/* 交易詳情檢視彈窗 (平級 Sibling Portal 宣告) */}
       {selectedTransactionId && (
         <TransactionDetailsDialog
           transactionId={selectedTransactionId}

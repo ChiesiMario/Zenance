@@ -687,6 +687,7 @@ export function useBudgets() {
     getYearlyBudgetSpent,
     getCustomBudgetSpent,
     getBudgetSpent,
+    calculateSpent,
     getEffectiveBudgetAmount,
     isBudgetActiveInMonth,
     isBudgetActiveInYear,

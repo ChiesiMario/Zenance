@@ -422,27 +422,6 @@ export function AddTransactionModal({
   const selectedToCurrency = toCurrency;
 
   const filteredCategories = useMemo(() => categories?.filter(c => c.type === type) || [], [categories, type]);
-  
-  const categoryMonthlyTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    if (!transactions) return totals;
-    
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    transactions.forEach(t => {
-      const d = new Date(t.date);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear && !t.deleted) {
-        if (t.category) {
-          totals[t.category] = (totals[t.category] || 0) + t.amount;
-        }
-      }
-    });
-    return totals;
-  }, [transactions]);
-  
-  const compactFormatter = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 0 });
 
   const parsedFeeAmount = (type === 'transfer' && displayFeeAmount) ? (parseFloat(displayFeeAmount) || 0) : 0;
   const parsedAmount = parseFloat(displayAmount) || 0;
@@ -541,7 +520,7 @@ export function AddTransactionModal({
     if (targetCat) {
       list = [targetCat, ...list.filter(c => c.id !== targetCat.id)];
     }
-    return list.slice(0, 6);
+    return list.slice(0, 4);
   }, [frequentCategories, predictedResult, selectedCategoryId, filteredCategories]);
 
   // 智慧歷史備註與分類聯想
@@ -577,6 +556,8 @@ export function AddTransactionModal({
       setHasDismissedSuggestions(false);
       setActiveSuggestionIndex(-1);
       setIsSplitDialogOpen(false);
+      setIsCatPickerOpen(false);
+      setIsCatDialogOpen(false);
     }
   }, [isOpen]);
 
@@ -945,9 +926,11 @@ export function AddTransactionModal({
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
     const newCat = await addCategory(newCatName.trim(), type as 'expense'|'income');
-    setValue('categoryId', newCat.id);
+    setValue('categoryId', newCat.id, { shouldValidate: true });
+    setIsUserSelectedCat(true);
     setNewCatName('');
     setIsCatDialogOpen(false);
+    setIsCatPickerOpen(false);
   };
 
   const handleKeypadSubmit = () => {
@@ -1666,38 +1649,40 @@ export function AddTransactionModal({
         <div className="w-full flex flex-col gap-2 shrink-0 mt-auto">
           {/* Category Pills (for expense / income) */}
           {(type === 'expense' || type === 'income') && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full">
+            <div className="flex items-center gap-1.5 w-full">
               {filteredCategories.length > 0 ? (
                 <>
-                  {displayedPills.map(cat => {
-                    const isSelected = selectedCategoryId === cat.id;
-                    const isPredicted = predictedResult?.category.id === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic('selection');
-                          setIsUserSelectedCat(true);
-                          setValue('categoryId', cat.id, { shouldValidate: true });
-                          setIsCategoryWarning(false);
-                        }}
-                        className={cn(
-                          "px-3.5 sm:px-3 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
-                          isSelected
-                            ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
-                            : isCategoryWarning
-                              ? "bg-muted/80 border-destructive/80 text-foreground hover:border-foreground/40"
-                              : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                        )}
-                      >
-                        {isPredicted && (
-                          <Sparkles className={cn("w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
-                        )}
-                        <span>{cat.name}</span>
-                      </button>
-                    );
-                  })}
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    {displayedPills.map(cat => {
+                      const isSelected = selectedCategoryId === cat.id;
+                      const isPredicted = predictedResult?.category.id === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('selection');
+                            setIsUserSelectedCat(true);
+                            setValue('categoryId', cat.id, { shouldValidate: true });
+                            setIsCategoryWarning(false);
+                          }}
+                          className={cn(
+                            "px-3.5 sm:px-3 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
+                              : isCategoryWarning
+                                ? "bg-muted/80 border-destructive/80 text-foreground hover:border-foreground/40"
+                                : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                          )}
+                        >
+                          {isPredicted && (
+                            <Sparkles className={cn("w-3.5 h-3.5 sm:w-3 sm:h-3 shrink-0", isSelected ? "text-primary-foreground" : "text-amber-500 animate-pulse")} />
+                          )}
+                          <span>{cat.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
@@ -1705,7 +1690,7 @@ export function AddTransactionModal({
                       setIsCategoryWarning(false);
                     }}
                     className={cn(
-                      "px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1",
+                      "px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium border border-dashed shrink-0 transition-colors duration-500 cursor-pointer flex items-center gap-1 ml-auto",
                       isCategoryWarning
                         ? "border-destructive/80 text-foreground hover:border-foreground/50"
                         : "border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
@@ -1845,22 +1830,21 @@ export function AddTransactionModal({
         <Dialog open={isCatPickerOpen} onOpenChange={setIsCatPickerOpen}>
           <DialogContent
             overlayClassName="z-[70]"
-            className="z-[70] sm:max-w-[380px] bg-card border border-border text-card-foreground p-4"
+            className="z-[70] w-[300px] max-w-[calc(100vw-32px)] sm:w-[300px] sm:max-w-[300px] bg-card border border-border text-card-foreground p-4"
           >
             <DialogHeader>
               <DialogTitle className="text-card-foreground text-base font-semibold">
                 {type === 'expense' ? t('add.expenseCategories', '支出分類') : t('add.incomeCategories', '收入分類')}
               </DialogTitle>
             </DialogHeader>
-            <div className="grid grid-cols-4 gap-2 max-h-[300px] overflow-y-auto no-scrollbar py-2">
+            <div className="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto no-scrollbar py-2">
               {filteredCategories.length === 0 && (
-                <div className="col-span-4 py-4 text-center text-xs text-muted-foreground">
+                <div className="w-full py-4 text-center text-xs text-muted-foreground">
                   {t('add.noCategoriesAvailable')}
                 </div>
               )}
               {frequentCategories.map(cat => {
                 const isSelected = selectedCategoryId === cat.id;
-                const total = categoryMonthlyTotals[cat.id] || 0;
                 return (
                   <button
                     key={cat.id}
@@ -1868,33 +1852,29 @@ export function AddTransactionModal({
                     onClick={() => {
                       triggerHaptic('selection');
                       setIsUserSelectedCat(true);
-                      setValue('categoryId', cat.id);
+                      setValue('categoryId', cat.id, { shouldValidate: true });
                       setIsCatPickerOpen(false);
                     }}
                     className={cn(
-                      "flex flex-col items-center justify-center gap-1 h-14 p-1.5 rounded-xl border text-center transition-all cursor-pointer",
+                      "px-3.5 sm:px-3 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium shrink-0 transition-colors duration-500 cursor-pointer border flex items-center gap-1",
                       isSelected
-                        ? "bg-primary text-primary-foreground border-primary font-semibold"
-                        : "bg-muted/60 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-none"
+                        : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
                     )}
                   >
-                    <span className="text-xs truncate w-full">{cat.name}</span>
-                    <span className="text-[9px] font-mono opacity-60 truncate">
-                      {total > 0 ? `${currencySymbol}${compactFormatter.format(total)}` : '-'}
-                    </span>
+                    <span>{cat.name}</span>
                   </button>
                 );
               })}
               <button
                 type="button"
                 onClick={() => {
-                  setIsCatPickerOpen(false);
                   setIsCatDialogOpen(true);
                 }}
-                className="flex flex-col items-center justify-center gap-1 h-14 p-1.5 rounded-xl border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-all cursor-pointer"
+                className="px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors duration-500 cursor-pointer flex items-center gap-1 shrink-0"
               >
-                <Plus className="w-4 h-4" />
-                <span className="text-[10px]">{t('add.addCategory')}</span>
+                <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                <span className="text-xs sm:text-[11px]">{t('add.addCategory', '新增分類')}</span>
               </button>
             </div>
           </DialogContent>
@@ -1903,8 +1883,8 @@ export function AddTransactionModal({
         {/* Add Custom Category Dialog */}
         <Dialog open={isCatDialogOpen} onOpenChange={setIsCatDialogOpen}>
           <DialogContent
-            overlayClassName="z-[70]"
-            className="z-[70] sm:max-w-[320px] bg-card border border-border text-card-foreground p-4"
+            overlayClassName="z-[80]"
+            className="z-[80] sm:max-w-[320px] bg-card border border-border text-card-foreground p-4"
           >
             <DialogHeader>
               <DialogTitle className="text-card-foreground text-base">

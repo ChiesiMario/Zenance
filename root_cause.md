@@ -1,63 +1,48 @@
-# Root Cause 分析報告：群組交易詳情刪除交易後介面陷入空白
+# Root Cause 分析報告：交易詳情頁點擊膠囊跳轉詳情頁過程動畫不順暢
 
 ## 1. 現象描述
-- 在群組交易詳情（`TransactionDetailsDialog`）中，用戶點擊底部 Dock Bar 的「刪除」按鈕刪除了當前聚焦的交易（例如點擊進入詳情時的初始交易）。
-- 刪除確認後，彈窗並未正常顯示剩餘的群組交易卡片，舞台中央的卡片瞬間全部消失，背後的毛玻璃 Backdrop 遮罩依然覆蓋整個螢幕，底部殘留 4 欄 Dock Bar（刪除、退款、編輯、關閉），介面徹底陷入空白與不可操作狀態。
+在交易詳情頁（憑證卡片彈窗 `TransactionDetailsDialog`）中，用戶點擊頂部「分類一欄」（包括分類、轉帳帳戶、往來對象）或下方的「標籤膠囊」跳轉到對應詳情頁時，跳轉過程缺乏流暢的原生過渡感，出現視覺閃爍、卡頓與畫面生硬切換的現象。
 
 ---
 
 ## 2. 根本原因定位 (Root Cause)
 
-### 根本原因一：數據錨點僵化綁定於外部 Props（Rigid Anchor to External `transactionId`）
-- 在 [src/components/transactions/TransactionDetailsDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/TransactionDetailsDialog.tsx#L217-L225) 中，組件將外部傳入的 `transactionId`（點擊打開彈窗時的初始交易 ID）作為錨定整個群組的唯一依據：
+### 根本原因一：彈窗組件被直接粗暴銷毀，缺乏退場動畫（Instant Dialog Unmounting Flash）
+- 在 [src/components/transactions/TransactionDetailsDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/TransactionDetailsDialog.tsx) 的點擊處理邏輯中：
   ```tsx
-  const initialRootTx = useMemo(() => {
-    if (!transactionId || !transactions) return null;
-    const clicked = transactions.find((t) => t.id === transactionId);
-    if (!clicked) return null;
-    if (clicked.parentId) {
-      return transactions.find((t) => t.id === clicked.parentId) || clicked;
-    }
-    return clicked;
-  }, [transactionId, transactions]);
-  ```
-- 當同群組內的多筆主交易需要被載入時，完全仰賴 `initialRootTx.splitGroupId` 來查詢整組交易：
-  ```tsx
-  const relatedRootTransactions = useMemo(() => {
-    if (!initialRootTx || !transactions) return [];
-    if (initialRootTx.splitGroupId) {
-      const list = transactions.filter(
-        (t) => !t.deleted && !t.parentId && t.splitGroupId === initialRootTx.splitGroupId
-      );
-      return sortTransactionsDesc(list);
-    }
-    return [initialRootTx];
-  }, [initialRootTx, transactions]);
-  ```
-- 父組件（如 `GroupedTransactionList` 或 `AppLayout`）在打開彈窗時將 `transactionId` 傳入。當彈窗內部執行刪除時，父組件並不會同步將 `transactionId` 改為群組中的其他交易 ID。
-
----
-
-### 根本原因二：響應式更新引發的級聯歸零連鎖崩潰（Reactive Cascade Collapse）
-1. 用戶在彈窗中點擊「刪除」該筆交易時，調用 `deleteTransaction(activeTxId)`，該交易在本地資料庫（Dexie）中被更新為 `deleted: true`。
-2. `useLiveQuery` 監聽到資料庫變更，向組件推送最新過濾後的 `transactions` 陣列（已排除剛刪除的交易）。
-3. 組件重新渲染時重新計算 `initialRootTx`：由於外部傳入的 Props `transactionId` 依舊是剛剛被刪除的交易 ID，在新的 `transactions` 陣列中執行 `find(t => t.id === transactionId)` 必然返回 `undefined`，導致 **`initialRootTx` 瞬間變為 `null`**。
-4. 由於 `initialRootTx` 變為 `null`，`relatedRootTransactions` 無法取得 `splitGroupId`，直接退化返回 **空陣列 `[]`**。
-5. 負責繪製畫布所有卡片的 `columnsData`（依賴 `relatedRootTransactions`）因此跟著連鎖變為 **空陣列 `[]`**。
-
----
-
-### 根本原因三：內部切換無法挽救數據源且視圖與遮罩狀態脫節
-- 雖然在 [src/components/transactions/TransactionDetailsDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/TransactionDetailsDialog.tsx#L890-L895) 的刪除回調中，程式碼嘗試透過 `remainingCols` 找出群組中的下一筆交易並調用 `setActiveTxId(remainingCols[0].rootTx.id)`：
-  ```tsx
-  await deleteTransaction(activeTxId);
-  const remainingCols = columnsData.filter((c) => c.rootTx.id !== activeTxId);
-  if (remainingCols.length > 0) {
-    setActiveTxId(remainingCols[0].rootTx.id);
-  } else {
+  onClick={(e) => {
+    e.stopPropagation();
     onClose();
-  }
+    navigate(`/settings/tags/${tag.id}`);
+  }}
   ```
-- 但因為底層數據構建鏈（`initialRootTx -> relatedRootTransactions -> columnsData`）死鎖在已被刪除的外部 `props.transactionId` 上，即使更新了 `activeTxId`，`columnsData` 依然為 `[]`。
-- 中央卡片舞台依賴 `columnsData.map(...)` 渲染，陣列為空導致舞台中央所有主卡片與退款卡片全數卸載蒸發。
-- 與此同時，懸浮於底部的 4 欄 Dock Bar（刪除、退款、編輯、關閉）不依賴 `columnsData`，因此依然渲染在底部；外層 `<Dialog open={!!transactionId}>` 亦未被觸發關閉，導致整個頁面被凍結在毛玻璃 Backdrop 遮罩下，中央空無一物。
+- 父層組件（如 [src/components/transactions/GroupedTransactionList.tsx](file:///d:/GitHub/Zenance/src/components/transactions/GroupedTransactionList.tsx#L1129-L1134) 與 [src/components/layout/AppLayout.tsx](file:///d:/GitHub/Zenance/src/components/layout/AppLayout.tsx#L462-L465)）採用條件掛載模式：
+  ```tsx
+  {!onTransactionClick && selectedTransactionId && (
+    <TransactionDetailsDialog
+      transactionId={selectedTransactionId}
+      onClose={() => setSelectedTransactionId(null)}
+    />
+  )}
+  ```
+- 當點擊膠囊觸發 `onClose()` 時，父層的 `selectedTransactionId` / `viewingTransactionId` 在第 0 毫秒立即變為 `null`，React 在同一個微任務中**直接將整棵 `TransactionDetailsDialog` DOM 樹硬生生從頁面上銷毀卸載（Unmount）**。
+- 這導致 Base UI Dialog 的毛玻璃遮罩（Backdrop）和全螢幕彈窗容器**完全沒有經歷任何退出動畫或淡出過渡**，暗色毛玻璃在瞬間突然蒸發，造成強烈的「被直接拔掉」的視覺閃斷感。
+
+---
+
+### 根本原因二：彈窗銷毀、微任務重排與路由載入在同幀碰撞引發主執行緒卡頓（Main-Thread Long Task Collision）
+- 點擊回調中，`onClose()` 與 `navigate(...)` 是同步串聯調用的。
+- 瀏覽器在同一個 Event Loop 幀中同時被迫處理多重重負載任務：
+  1. **舊彈窗深度卸載**：銷毀掛載於 `document.body` 的 Base UI Portal、多張憑證 DOM 樹以及釋放 body 滾動鎖定（`overflow: hidden` 與 padding 補償）。
+  2. **視圖重排**：Base UI 清理 body 滾動條樣式時觸發整頁的**強制同步重排（Forced Synchronous Reflow）**。
+  3. **新路由掛載與重型查詢**：React Router 切換當前路由，掛載目標詳情頁（如 `TagDetails`、`CategoryDetails`、`AccountDetails`、`ContactDetails`）。新頁面掛載時立即執行 Dexie 資料庫查詢訂閱、重新計算聚合數據，並同步渲染整組 `GroupedTransactionList` 大量交易 DOM 節點。
+- 這些高耗時任務全部擠在同一個渲染幀中執行，造成主執行緒耗時超過 50ms（Long Task），直接引發掉幀（Dropped Frames）與停頓。
+
+---
+
+### 根本原因三：三段式視覺突兀閃跳（Triple Visual Flash）
+- 由於彈窗直接瞬間消失、而新路由頁面需要執行渲染，在微觀時間軸上形成了三段式脫節：
+  1. **第一階段（T=0ms）**：點擊膠囊，暗色毛玻璃遮罩和彈窗卡片瞬間消失；
+  2. **第二階段（T=16ms）**：新頁面尚未完成佈局，底層的原頁面（例如首頁 Dashboard）毫無遮擋地裸露出來一瞬間（Flash of Previous Page）；
+  3. **第三階段（T=30~60ms）**：React Router 完成目標詳情頁掛載，新頁面突然覆蓋上來，標頭與交易清單再次刷新閃現。
+- 用戶肉眼所感知的「不順暢、不絲滑」，本質上就是這三段視覺狀態在毫秒級別內的突兀閃跳，缺乏連貫的頁面轉場過渡。

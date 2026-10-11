@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useAppStore } from '@/store/useAppStore';
 import { useLedgers } from '@/hooks/useLedgers';
@@ -180,9 +182,11 @@ interface Props {
 
 export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const confirm = useConfirm();
   const { transactions, deleteTransaction } = useTransactions();
   const { allCategories } = useCategories();
+  const { tags } = useTags();
   const { accounts, wallets, allWallets, contacts, allContacts } = useAccounts();
   const { activeLedgerId, setEditingTransactionId } = useAppStore();
   const { ledgers } = useLedgers();
@@ -190,6 +194,20 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
   // 1. 核心點擊交易與當前聚焦交易
   const [activeTxId, setActiveTxId] = useState<string | null>(transactionId);
   const [activeSplitGroupId, setActiveSplitGroupId] = useState<string | null>(null);
+
+  // 優先路由導航並透過雙 rAF 微時序解耦，確保目標詳情頁已完成掛載與首幀渲染後再關閉彈窗
+  // 徹底杜絕中間原頁面露底閃爍與多重重排同幀碰撞
+  const handleNavigateTo = useCallback(
+    (targetPath: string) => {
+      navigate(targetPath);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          onClose();
+        });
+      });
+    },
+    [navigate, onClose]
+  );
 
   useEffect(() => {
     if (!transactionId) {
@@ -1128,7 +1146,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
           <div className="flex items-center justify-center gap-1.5 mb-1.5 flex-wrap">
             {isChild ? (
               <span className={cn(
-                "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border leading-none shrink-0",
+                "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium border shrink-0",
                 tx.type === 'expense'
                   ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
                   : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
@@ -1141,45 +1159,84 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 const toName = getAccountName(tx.toAccountId || '');
                 return (
                   <div className="inline-flex items-center gap-1.5 shrink-0">
-                    <span
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (tx.accountId) {
+                          handleNavigateTo(`/accounts/${tx.accountId}`);
+                        }
+                      }}
                       title={fromName}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted text-foreground border border-border max-w-[110px] truncate shrink-0 cursor-pointer hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-150 active:scale-95"
                     >
-                      {fromName}
-                    </span>
+                      <span className="truncate">{fromName}</span>
+                    </button>
                     <span className="text-muted-foreground/60 text-xs shrink-0 select-none">→</span>
-                    <span
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (tx.toAccountId) {
+                          handleNavigateTo(`/accounts/${tx.toAccountId}`);
+                        }
+                      }}
                       title={toName}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 max-w-[110px] truncate leading-none shrink-0"
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted text-foreground border border-border max-w-[110px] truncate shrink-0 cursor-pointer hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-150 active:scale-95"
                     >
-                      {toName}
-                    </span>
+                      <span className="truncate">{toName}</span>
+                    </button>
                   </div>
                 );
               })()
             ) : (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 leading-none shrink-0">
-                {categoryTitle}
-              </span>
+              (() => {
+                const categoryObj = allCategories?.find((c) => c.id === tx.category);
+                if (categoryObj) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNavigateTo(`/settings/categories/${categoryObj.id}`);
+                      }}
+                      title={categoryTitle}
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted text-foreground border border-border shrink-0 cursor-pointer hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-150 active:scale-95"
+                    >
+                      {categoryTitle}
+                    </button>
+                  );
+                }
+                return (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted text-foreground border border-border shrink-0">
+                    {categoryTitle}
+                  </span>
+                );
+              })()
             )}
 
             {/* [頭像 對象] 膠囊 */}
             {contactObj && (
-              <span
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNavigateTo(`/contacts/${contactObj.id}`);
+                }}
                 title={contactObj.name}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-muted/60 text-foreground border border-border/80 leading-none shrink-0 max-w-[130px]"
+                className="group/capsule inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted text-foreground border border-border shrink-0 max-w-[130px] cursor-pointer hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-150 active:scale-95"
               >
                 <ContactAvatar
                   group={contactObj.group}
                   className="size-3 border-none bg-transparent p-0"
-                  iconClassName="size-3 text-muted-foreground/70"
+                  iconClassName="size-3 text-muted-foreground/70 group-hover/capsule:text-background transition-colors duration-150"
                 />
                 <span className="truncate">{contactObj.name}</span>
-              </span>
+              </button>
             )}
 
             {tx.isGift && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-medium text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 leading-none shrink-0">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-500/20 shrink-0">
                 {t('add.gift', '贈與')}
               </span>
             )}
@@ -1334,6 +1391,35 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               {formatDateTime(tx.updatedAt)}
             </span>
           </div>
+
+          {/* 標籤展示區塊 */}
+          {tx.tagIds && tx.tagIds.length > 0 && (
+            <div className="pt-2 border-t border-dashed border-border/70 flex flex-col gap-1.5 mt-1">
+              <span className="text-[10px] uppercase text-muted-foreground tracking-wider">
+                {t('tags.title', '標籤')}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {tx.tagIds.map(tagId => {
+                  const tag = tags?.find(t => t.id === tagId);
+                  if (!tag) return null;
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNavigateTo(`/settings/tags/${tag.id}`);
+                      }}
+                      title={tag.name}
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted border border-border text-foreground cursor-pointer hover:bg-foreground hover:text-background hover:border-foreground transition-all duration-150 active:scale-95"
+                    >
+                      #{tag.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 備註留言區塊 */}
           {hasNote && (

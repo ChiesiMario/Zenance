@@ -608,6 +608,11 @@
       "categoryOverview": "分類總覽",
       "activeAndArchived": "{{active}} 個活躍 · {{archived}} 個已歸檔",
       "manageCategories": "管理收支分類",
+      "tags": "標籤管理",
+      "tagsDesc": "自訂交易標籤與標記",
+      "tagsUnit": "個標籤",
+      "tagOverview": "標籤總覽",
+      "manageTags": "管理標籤",
       "hidePwaInstallPrompt": "隱藏 PWA 安裝按鈕",
       "hidePwaInstallPromptDesc": "在首頁頂部隱藏 PWA 安裝引導按鈕",
       "archived": "已歸檔",
@@ -1076,6 +1081,23 @@
       "desktopStep3": "確認後即可在獨立視窗中像原生桌面軟體一樣運行",
       "note": "提示：Zenance 採用純本地儲存架構，安裝後完全支援離線使用。",
       "browserPreferenceHint": "若習慣始終在瀏覽器中使用，可前往「設定」開啟「隱藏 PWA 安裝按鈕」，保持首頁純淨簡潔。"
+    },
+    "tags": {
+      "title": "標籤",
+      "subtitle": "管理與歸檔您的交易標籤",
+      "activeTags": "使用中",
+      "archivedTags": "已歸檔",
+      "addTag": "新增標籤",
+      "selectTags": "選擇標籤",
+      "newTagPlaceholder": "輸入標籤名稱...",
+      "editTagPlaceholder": "輸入標籤名稱...",
+      "noTags": "尚無標籤",
+      "noArchivedTags": "尚無已歸檔標籤",
+      "noTagsAvailable": "暫無標籤",
+      "deleteConfirmTitle": "刪除標籤",
+      "deleteConfirmDesc": "確定要刪除標籤「{{name}}」嗎？相關交易中的此標籤關聯將被移除。",
+      "tagNotFound": "找不到此標籤",
+      "unarchive": "解除歸檔"
     }
   }
 }

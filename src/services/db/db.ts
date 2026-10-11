@@ -30,11 +30,25 @@ export interface Transaction {
   toAccountId?: string; // The "to" account for transfer
   transferInAmount?: number; // The actual amount received in the "to" account (for cross-currency or fees)
   note?: string;
+  tagIds?: string[]; // 關聯的標籤 ID 列表
   date: string; // ISO date string (YYYY-MM-DD)
   createdAt: string; // ISO datetime
   updatedAt: string; // ISO datetime
   deleted: boolean; // Soft delete flag for sync
   rev?: number; // 單調遞增邏輯版本號 (防範多設備系統時鐘偏差)
+}
+
+export interface Tag {
+  id: string;
+  ledgerId: string;
+  name: string;
+  color?: string;
+  isDefault?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deleted: boolean;
+  archived?: boolean;
+  rev?: number;
 }
 
 export interface ExchangeRate {
@@ -148,6 +162,7 @@ export class ZenanceDatabase extends Dexie {
   ledgers!: Table<Ledger>;
   transactions!: Table<Transaction>;
   categories!: Table<Category>;
+  tags!: Table<Tag>;
   accounts!: Table<Wallet>;
   contacts!: Table<Contact>;
   budgets!: Table<Budget>;
@@ -507,6 +522,11 @@ export class ZenanceDatabase extends Dexie {
 
     this.version(23).stores({
       balance_snapshots: 'id, ledgerId, walletId, periodKey, [ledgerId+periodKey], [walletId+periodKey]',
+    });
+
+    this.version(24).stores({
+      tags: 'id, ledgerId, name, archived, updatedAt, deleted, [ledgerId+archived]',
+      transactions: 'id, displayId, ledgerId, category, *tagIds, splitGroupId, budgetId, date, type, accountId, toAccountId, updatedAt, deleted, [ledgerId+date], [ledgerId+type], [ledgerId+category]',
     });
   }
 }

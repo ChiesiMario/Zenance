@@ -4,6 +4,7 @@ import {
   type Wallet,
   type Contact,
   type Category,
+  type Tag,
   type Budget,
   type BudgetRule,
   type Transaction,
@@ -108,6 +109,7 @@ export interface SyncManifestLedgerStats {
   accountsCount: number;
   contactsCount: number;
   categoriesCount: number;
+  tagsCount?: number;
   budgetsCount: number;
   budgetRulesCount: number;
   transactionsCount: number;
@@ -307,10 +309,11 @@ export async function uploadAllLocalLedgers(
   const deletedLedgers = ledgers.filter((l) => l.deleted);
 
   for (const l of activeLedgers) {
-    const [accs, conts, cats, buds, rules, txs] = await Promise.all([
+    const [accs, conts, cats, tags, buds, rules, txs] = await Promise.all([
       db.accounts.where('ledgerId').equals(l.id).toArray(),
       db.contacts.where('ledgerId').equals(l.id).toArray(),
       db.categories.where('ledgerId').equals(l.id).toArray(),
+      db.tags.where('ledgerId').equals(l.id).toArray(),
       db.budgets.where('ledgerId').equals(l.id).toArray(),
       db.budget_rules.where('ledgerId').equals(l.id).toArray(),
       db.transactions.where('ledgerId').equals(l.id).toArray(),
@@ -321,6 +324,7 @@ export async function uploadAllLocalLedgers(
     cachedRevs[`${prefix}/accounts.json`] = await uploadJsonFile(`${prefix}/accounts.json`, accs);
     cachedRevs[`${prefix}/contacts.json`] = await uploadJsonFile(`${prefix}/contacts.json`, conts);
     cachedRevs[`${prefix}/categories.json`] = await uploadJsonFile(`${prefix}/categories.json`, cats);
+    cachedRevs[`${prefix}/tags.json`] = await uploadJsonFile(`${prefix}/tags.json`, tags);
     cachedRevs[`${prefix}/budgets.json`] = await uploadJsonFile(`${prefix}/budgets.json`, buds);
     cachedRevs[`${prefix}/budget_rules.json`] = await uploadJsonFile(`${prefix}/budget_rules.json`, rules);
 
@@ -358,6 +362,7 @@ export async function uploadAllLocalLedgers(
     pushedTimes[`${l.id}_accounts`] = now;
     pushedTimes[`${l.id}_contacts`] = now;
     pushedTimes[`${l.id}_categories`] = now;
+    pushedTimes[`${l.id}_tags`] = now;
     pushedTimes[`${l.id}_budgets`] = now;
     pushedTimes[`${l.id}_budget_rules`] = now;
   }
@@ -374,12 +379,13 @@ export async function uploadAllLocalLedgers(
  * 建立並上傳全域 manifest.json
  */
 export async function uploadManifestFile(cachedRevs: Record<string, string>): Promise<void> {
-  const [ledgers, allAccounts, allContacts, allCategories, allBudgets, allBudgetRules, allTransactions] =
+  const [ledgers, allAccounts, allContacts, allCategories, allTags, allBudgets, allBudgetRules, allTransactions] =
     await Promise.all([
       db.ledgers.toArray(),
       db.accounts.toArray(),
       db.contacts.toArray(),
       db.categories.toArray(),
+      db.tags.toArray(),
       db.budgets.toArray(),
       db.budget_rules.toArray(),
       db.transactions.toArray(),
@@ -397,6 +403,7 @@ export async function uploadManifestFile(cachedRevs: Record<string, string>): Pr
       accountsCount: allAccounts.filter((a) => a.ledgerId === l.id && !a.deleted).length,
       contactsCount: allContacts.filter((c) => c.ledgerId === l.id && !c.deleted).length,
       categoriesCount: allCategories.filter((c) => c.ledgerId === l.id && !c.deleted).length,
+      tagsCount: allTags.filter((t) => t.ledgerId === l.id && !t.deleted).length,
       budgetsCount: allBudgets.filter((b) => b.ledgerId === l.id && !b.deleted).length,
       budgetRulesCount: allBudgetRules.filter((r) => r.ledgerId === l.id && !r.deleted).length,
       transactionsCount: allTransactions.filter((t) => t.ledgerId === l.id && !t.deleted).length,
@@ -641,6 +648,7 @@ export async function executeSync(
       const allAccounts: Wallet[] = [];
       const allContacts: Contact[] = [];
       const allCategories: Category[] = [];
+      const allTags: Tag[] = [];
       const allBudgets: Budget[] = [];
       const allBudgetRules: BudgetRule[] = [];
       const allTransactions: Transaction[] = [];
@@ -651,6 +659,7 @@ export async function executeSync(
         const accs = await downloadJsonFile<Wallet[]>(`${prefix}/accounts.json`);
         const conts = await downloadJsonFile<Contact[]>(`${prefix}/contacts.json`);
         const cats = await downloadJsonFile<Category[]>(`${prefix}/categories.json`);
+        const tags = await downloadJsonFile<Tag[]>(`${prefix}/tags.json`);
         const buds = await downloadJsonFile<Budget[]>(`${prefix}/budgets.json`);
         const rules = await downloadJsonFile<BudgetRule[]>(`${prefix}/budget_rules.json`);
 
@@ -680,6 +689,7 @@ export async function executeSync(
         if (accs?.length) allAccounts.push(...accs);
         if (conts?.length) allContacts.push(...conts);
         if (cats?.length) allCategories.push(...cats);
+        if (tags?.length) allTags.push(...tags);
         if (buds?.length) allBudgets.push(...buds);
         if (rules?.length) allBudgetRules.push(...rules);
         if (txs.length) allTransactions.push(...txs);
@@ -687,12 +697,13 @@ export async function executeSync(
 
       await db.transaction(
         'rw',
-        [db.ledgers, db.transactions, db.categories, db.accounts, db.contacts, db.budgets, db.budget_rules],
+        [db.ledgers, db.transactions, db.categories, db.tags, db.accounts, db.contacts, db.budgets, db.budget_rules],
         async () => {
           await Promise.all([
             db.ledgers.clear(),
             db.transactions.clear(),
             db.categories.clear(),
+            db.tags.clear(),
             db.accounts.clear(),
             db.contacts.clear(),
             db.budgets.clear(),
@@ -703,6 +714,7 @@ export async function executeSync(
           if (allAccounts.length) await db.accounts.bulkPut(allAccounts);
           if (allContacts.length) await db.contacts.bulkPut(allContacts);
           if (allCategories.length) await db.categories.bulkPut(allCategories);
+          if (allTags.length) await db.tags.bulkPut(allTags);
           if (allBudgets.length) await db.budgets.bulkPut(allBudgets);
           if (allBudgetRules.length) await db.budget_rules.bulkPut(allBudgetRules);
           if (allTransactions.length) await db.transactions.bulkPut(allTransactions);
@@ -828,6 +840,23 @@ export async function executeSync(
           hasRemoteModified = true;
         }
         cachedRevs[catPath] = catMeta.rev;
+      }
+
+      // 4.1. 檢查 tags.json
+      const tagPath = `${prefix}/tags.json`;
+      const tagMeta = remoteFileMap.get(tagPath);
+      if (tagMeta && cachedRevs[tagPath] !== tagMeta.rev) {
+        const remoteTags = (await downloadJsonFile<Tag[]>(tagPath)) || [];
+        const localTags = await db.tags.where('ledgerId').equals(ledgerId).toArray();
+        const m = mergeEntities(localTags, remoteTags);
+        if (m.hasLocalChanges) {
+          await db.tags.bulkPut(m.merged);
+          hasLocalModified = true;
+        }
+        if (m.hasRemoteChanges) {
+          hasRemoteModified = true;
+        }
+        cachedRevs[tagPath] = tagMeta.rev;
       }
 
       // 5. 檢查 budgets.json
@@ -1055,6 +1084,18 @@ export async function executeSync(
         const catPath = `${prefix}/categories.json`;
         cachedRevs[catPath] = await uploadJsonFile(catPath, localCats, cachedRevs[catPath]);
         pushedTimes[`${l.id}_categories`] = now;
+        hasRemoteModified = true;
+      }
+
+      // 4.1. 檢查 tags (標籤)
+      const localTags = await db.tags.where('ledgerId').equals(l.id).toArray();
+      const lastTagPushed = pushedTimes[`${l.id}_tags`] || '';
+      const maxTagUpdated = localTags.reduce((max, t) => (t.updatedAt > max ? t.updatedAt : max), '');
+
+      if (!lastTagPushed || maxTagUpdated > lastTagPushed) {
+        const tagPath = `${prefix}/tags.json`;
+        cachedRevs[tagPath] = await uploadJsonFile(tagPath, localTags, cachedRevs[tagPath]);
+        pushedTimes[`${l.id}_tags`] = now;
         hasRemoteModified = true;
       }
 

@@ -608,6 +608,11 @@
       "categoryOverview": "Category Overview",
       "activeAndArchived": "{{active}} Active · {{archived}} Archived",
       "manageCategories": "Manage Categories",
+      "tags": "Tags",
+      "tagsDesc": "Customize transaction tags and labels",
+      "tagsUnit": "tags",
+      "tagOverview": "Tags Overview",
+      "manageTags": "Manage Tags",
       "hidePwaInstallPrompt": "Hide PWA Install Button",
       "hidePwaInstallPromptDesc": "Hide the PWA install guide button on the home screen",
       "archived": "Archived",
@@ -1076,6 +1081,23 @@
       "desktopStep3": "Launch and run in a standalone native desktop window",
       "note": "Note: Zenance uses pure local storage and fully supports offline use.",
       "browserPreferenceHint": "Prefer using Zenance in your browser? You can enable \"Hide PWA Install Button\" in Settings to keep the home screen minimal."
+    },
+    "tags": {
+      "title": "Tags",
+      "subtitle": "Manage and archive your transaction tags",
+      "activeTags": "Active",
+      "archivedTags": "Archived",
+      "addTag": "New Tag",
+      "selectTags": "Select Tags",
+      "newTagPlaceholder": "Enter tag name...",
+      "editTagPlaceholder": "Enter tag name...",
+      "noTags": "No tags yet",
+      "noArchivedTags": "No archived tags",
+      "noTagsAvailable": "No tags available",
+      "deleteConfirmTitle": "Delete Tag",
+      "deleteConfirmDesc": "Are you sure you want to delete tag \"{{name}}\"? The tag will be removed from associated transactions.",
+      "tagNotFound": "Tag not found",
+      "unarchive": "Unarchive"
     }
   }
 }

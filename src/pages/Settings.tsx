@@ -37,6 +37,7 @@ import { toast } from '@/components/ui/toast';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAppStore } from '@/store/useAppStore';
 import { useCategories } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { useDropboxSync } from '@/hooks/useDropboxSync';
 import { useAppLockStore } from '@/store/useAppLockStore';
 import { useStorageStatus } from '@/hooks/useStorageStatus';
@@ -85,6 +86,7 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const confirm = useConfirm();
   const { categories, archivedCategories } = useCategories();
+  const { tags, archivedTags } = useTags();
   const { activeLedgerId, setActiveLedgerId, hidePwaInstallPrompt, setHidePwaInstallPrompt } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -889,6 +891,18 @@ export default function Settings() {
             <span className="text-sm font-normal text-foreground">{t('settings.manageCategories')}</span>
             <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
               <span>{t('settings.activeCount', { count: activeCount })}{archivedCount > 0 ? ` · ${t('settings.archivedCount', { count: archivedCount })}` : ''}</span>
+              <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </Link>
+
+          {/* 標籤管理 */}
+          <Link
+            to="/settings/tags"
+            className="h-12 px-4 flex items-center justify-between hover:bg-muted/40 transition-colors group cursor-pointer"
+          >
+            <span className="text-sm font-normal text-foreground">{t('settings.manageTags', '標籤管理')}</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground group-hover:text-foreground">
+              <span>{t('settings.activeCount', { count: (tags || []).length })}{(archivedTags || []).length > 0 ? ` · ${t('settings.archivedCount', { count: (archivedTags || []).length })}` : ''}</span>
               <ChevronRight className="size-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
             </div>
           </Link>

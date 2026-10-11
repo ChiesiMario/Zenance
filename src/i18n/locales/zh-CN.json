@@ -608,6 +608,11 @@
       "categoryOverview": "分类总览",
       "activeAndArchived": "{{active}} 个活跃 · {{archived}} 个已归档",
       "manageCategories": "管理收支分类",
+      "tags": "标签管理",
+      "tagsDesc": "自定义交易标签与标记",
+      "tagsUnit": "个标签",
+      "tagOverview": "标签总览",
+      "manageTags": "管理标签",
       "hidePwaInstallPrompt": "隐藏 PWA 安装按钮",
       "hidePwaInstallPromptDesc": "在首页顶部隐藏 PWA 安装引导按钮",
       "archived": "已归档",
@@ -1076,6 +1081,23 @@
       "desktopStep3": "确认后即可在独立窗口中像原生桌面软件一样运行",
       "note": "提示：Zenance 采用纯本地存储架构，安装后完全支持离线使用。",
       "browserPreferenceHint": "若习惯始终在浏览器中使用，可前往“设置”开启“隐藏 PWA 安装按钮”，保持首页纯净简洁。"
+    },
+    "tags": {
+      "title": "标签",
+      "subtitle": "管理与归档您的交易标签",
+      "activeTags": "使用中",
+      "archivedTags": "已归档",
+      "addTag": "新增标签",
+      "selectTags": "选择标签",
+      "newTagPlaceholder": "输入标签名称...",
+      "editTagPlaceholder": "输入标签名称...",
+      "noTags": "暂无标签",
+      "noArchivedTags": "暂无已归档标签",
+      "noTagsAvailable": "暂无标签",
+      "deleteConfirmTitle": "删除标签",
+      "deleteConfirmDesc": "确定要删除标签“{{name}}”吗？相关交易中的此标签关联将被移除。",
+      "tagNotFound": "找不到此标签",
+      "unarchive": "解除归档"
     }
   }
 }

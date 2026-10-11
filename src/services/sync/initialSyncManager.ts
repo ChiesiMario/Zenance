@@ -4,6 +4,7 @@ import {
   type Wallet,
   type Contact,
   type Category,
+  type Tag,
   type Budget,
   type BudgetRule,
   type Transaction,
@@ -80,6 +81,7 @@ interface StagedData {
   accounts: Wallet[];
   contacts: Contact[];
   categories: Category[];
+  tags: Tag[];
   budgets: Budget[];
   budgetRules: BudgetRule[];
   transactions: Transaction[];
@@ -108,6 +110,7 @@ let staging: InitialSyncStaging = {
     accounts: [],
     contacts: [],
     categories: [],
+    tags: [],
     budgets: [],
     budgetRules: [],
     transactions: [],
@@ -165,6 +168,7 @@ export async function startInitialSync(code: string): Promise<void> {
       accounts: [],
       contacts: [],
       categories: [],
+      tags: [],
       budgets: [],
       budgetRules: [],
       transactions: [],
@@ -419,6 +423,8 @@ async function executeDownloadQueue(): Promise<void> {
           staged.contacts.push(...(json as Contact[]));
         } else if (path.endsWith('/categories.json')) {
           staged.categories.push(...(json as Category[]));
+        } else if (path.endsWith('/tags.json')) {
+          staged.tags.push(...(json as Tag[]));
         } else if (path.endsWith('/budgets.json')) {
           staged.budgets.push(...(json as Budget[]));
         } else if (path.endsWith('/budget_rules.json')) {
@@ -486,6 +492,7 @@ async function executeAtomicCommit(): Promise<void> {
           db.ledgers,
           db.accounts,
           db.categories,
+          db.tags,
           db.transactions,
           db.contacts,
           db.budgets,
@@ -496,6 +503,7 @@ async function executeAtomicCommit(): Promise<void> {
             await db.ledgers.clear();
             await db.accounts.clear();
             await db.categories.clear();
+            await db.tags.clear();
             await db.transactions.clear();
             await db.contacts.clear();
             await db.budgets.clear();
@@ -504,6 +512,7 @@ async function executeAtomicCommit(): Promise<void> {
             if (staged.ledgers.length) await db.ledgers.bulkPut(staged.ledgers);
             if (staged.accounts.length) await db.accounts.bulkPut(staged.accounts);
             if (staged.categories.length) await db.categories.bulkPut(staged.categories);
+            if (staged.tags.length) await db.tags.bulkPut(staged.tags);
             if (staged.transactions.length) {
               const uniqueTxs = Array.from(new Map(staged.transactions.map((t) => [t.id, t])).values());
               await db.transactions.bulkPut(uniqueTxs);
@@ -516,6 +525,7 @@ async function executeAtomicCommit(): Promise<void> {
               localLedgers,
               localAccounts,
               localCategories,
+              localTags,
               localTxs,
               localContacts,
               localBudgets,
@@ -524,6 +534,7 @@ async function executeAtomicCommit(): Promise<void> {
               db.ledgers.toArray(),
               db.accounts.toArray(),
               db.categories.toArray(),
+              db.tags.toArray(),
               db.transactions.toArray(),
               db.contacts.toArray(),
               db.budgets.toArray(),
@@ -533,6 +544,7 @@ async function executeAtomicCommit(): Promise<void> {
             const mL = mergeEntities(localLedgers, staged.ledgers);
             const mA = mergeEntities(localAccounts, staged.accounts);
             const mC = mergeEntities(localCategories, staged.categories);
+            const mTag = mergeEntities(localTags, staged.tags);
             const mT = mergeEntities(localTxs, staged.transactions);
             const mCt = mergeEntities(localContacts, staged.contacts);
             const mB = mergeEntities(localBudgets, staged.budgets);
@@ -542,6 +554,7 @@ async function executeAtomicCommit(): Promise<void> {
               db.ledgers.bulkPut(mL.merged),
               db.accounts.bulkPut(mA.merged),
               db.categories.bulkPut(mC.merged),
+              db.tags.bulkPut(mTag.merged),
               db.transactions.bulkPut(mT.merged),
               db.contacts.bulkPut(mCt.merged),
               db.budgets.bulkPut(mB.merged),
@@ -629,6 +642,7 @@ export function cancelInitialSync(): void {
       budgets: [],
       budgetRules: [],
       transactions: [],
+      tags: [],
       revs: {},
     },
   };

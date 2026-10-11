@@ -10,6 +10,8 @@ import Reports from './pages/Reports';
 import Categories from './pages/Categories';
 import ArchivedCategories from './pages/ArchivedCategories';
 import CategoryDetails from './pages/CategoryDetails';
+import Tags from './pages/Tags';
+import TagDetails from './pages/TagDetails';
 import BudgetHistory from './pages/BudgetHistory';
 import BudgetDetails from './pages/BudgetDetails';
 import AccountDetails from './pages/AccountDetails';
@@ -81,6 +83,14 @@ const router = createBrowserRouter([
       {
         path: 'settings/categories/:id',
         element: <CategoryDetails />,
+      },
+      {
+        path: 'settings/tags',
+        element: <Tags />,
+      },
+      {
+        path: 'settings/tags/:id',
+        element: <TagDetails />,
       },
     ],
   },

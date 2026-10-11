@@ -4,10 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
+import { useTags } from '@/hooks/useTags';
 import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber, isBalanceAdjustmentTx, getLocalDateString } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +61,7 @@ export function AddTransactionModal({
   const { t } = useTranslation();
   const { transactions, addTransaction, updateTransaction, deleteTransaction } = useTransactions();
   const { categories, allCategories, addCategory } = useCategories();
+  const { tags, addTag } = useTags();
   const [splits, setSplits] = useState<SplitItem[]>([]);
   const { wallets: accounts, contacts } = useAccounts();
   const { activeLedgerId } = useAppStore();
@@ -78,6 +80,10 @@ export function AddTransactionModal({
   const [newCatName, setNewCatName] = useState('');
   const [isCatDialogOpen, setIsCatDialogOpen] = useState(false);
   const [isCatPickerOpen, setIsCatPickerOpen] = useState(false);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
+  const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
   const [isSplitDialogOpen, setIsSplitDialogOpen] = useState(false);
   const [displayAmount, setDisplayAmount] = useState('');
   const [displayAmountIn, setDisplayAmountIn] = useState('');
@@ -142,6 +148,13 @@ export function AddTransactionModal({
       if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     };
   }, []);
+
+  const selectedTagNames = useMemo(() => {
+    if (!selectedTagIds.length || !tags) return [];
+    return selectedTagIds
+      .map(id => tags.find(t => t.id === id)?.name)
+      .filter(Boolean) as string[];
+  }, [selectedTagIds, tags]);
 
   const TYPE_KEYS = ['expense', 'income', 'transfer', 'lend', 'borrow'] as const;
   const activeTypeKey = type === 'loan' ? (loanType === 'lend' ? 'lend' : 'borrow') : type;
@@ -274,10 +287,12 @@ export function AddTransactionModal({
           date: transactionToEdit.date,
           note: transactionToEdit.note || '',
         });
+        setSelectedTagIds(transactionToEdit.tagIds || []);
       } else {
         // Add mode
         const today = getLocalDateString();
         setType(initialType);
+        setSelectedTagIds([]);
         reset({
           amount: '' as unknown as number,
           categoryId: initialCategoryId || '',
@@ -714,6 +729,7 @@ export function AddTransactionModal({
               splitGroupId,
               note: data.note,
               date: data.date,
+              tagIds: selectedTagIds,
             });
 
             if (feeAmount > 0 && feeCategoryId) {
@@ -728,6 +744,7 @@ export function AddTransactionModal({
                 splitGroupId,
                 note: data.note?.trim() || undefined,
                 date: data.date,
+                tagIds: selectedTagIds,
               });
             }
           } else {
@@ -744,6 +761,7 @@ export function AddTransactionModal({
               splitGroupId,
               note: data.note,
               date: data.date,
+              tagIds: selectedTagIds,
             });
 
             if (feeAmount > 0 && feeCategoryId) {
@@ -758,6 +776,7 @@ export function AddTransactionModal({
                 splitGroupId,
                 note: data.note?.trim() || undefined,
                 date: data.date,
+                tagIds: selectedTagIds,
               });
             }
           }
@@ -795,6 +814,7 @@ export function AddTransactionModal({
           note: data.note,
           date: data.date,
           isGift: isGift,
+          tagIds: selectedTagIds,
         };
 
         if (transactionToEdit) {
@@ -850,6 +870,7 @@ export function AddTransactionModal({
                 splitGroupId,
                 note: data.note,
                 date: data.date,
+                tagIds: selectedTagIds,
               });
             }
 
@@ -868,6 +889,7 @@ export function AddTransactionModal({
                 splitGroupId,
                 note: data.note,
                 date: data.date,
+                tagIds: selectedTagIds,
               });
             }
           });
@@ -898,6 +920,7 @@ export function AddTransactionModal({
         budgetId: isAdvance ? undefined : data.budgetId,
         note: data.note,
         date: data.date,
+        tagIds: selectedTagIds,
       };
 
       if (transactionToEdit) {
@@ -1725,44 +1748,70 @@ export function AddTransactionModal({
             </div>
           )}
 
-          {/* Inline Note Input with Autocomplete Suggestions */}
-          <div className="relative w-full">
-            <NoteSuggestionsMenu
-              isOpen={isSuggestionsOpen}
-              suggestions={noteSuggestions}
-              currentCategoryId={selectedCategoryId}
-              activeIndex={activeSuggestionIndex}
-              onHoverIndex={setActiveSuggestionIndex}
-              onSelect={handleSelectSuggestion}
-              onClose={() => {
-                setIsSuggestionsOpen(false);
-                setHasDismissedSuggestions(true);
-                setActiveSuggestionIndex(-1);
+          {/* Inline Note & Tag Container */}
+          <div className="flex items-center gap-2 w-full">
+            {/* Tag Trigger Button */}
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                setIsTagPickerOpen(true);
               }}
-            />
+              className={cn(
+                "h-10 sm:h-8 px-2.5 sm:px-2 rounded-xl border flex items-center justify-center gap-1 shrink-0 text-sm sm:text-xs font-mono transition-colors cursor-pointer",
+                selectedTagIds.length > 0
+                  ? "bg-primary text-primary-foreground border-primary font-semibold"
+                  : "bg-muted/60 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+              )}
+              title={t('tags.selectTags', '選擇標籤')}
+            >
+              <span className="font-bold">#</span>
+              {selectedTagIds.length > 0 && (
+                <span className="text-[11px] font-sans font-medium max-w-[80px] truncate">
+                  {selectedTagNames.length === 1 ? selectedTagNames[0] : selectedTagIds.length}
+                </span>
+              )}
+            </button>
 
-            <input 
-              id="note" 
-              type="text" 
-              placeholder={t('add.note', '填寫備註...')} 
-              value={currentNote} 
-              onFocus={() => {
-                setIsNoteFocused(true);
-                setHasDismissedSuggestions(false);
-              }}
-              onBlur={() => {
-                setTimeout(() => {
-                  setIsNoteFocused(false);
-                }, 200);
-              }}
-              onKeyDown={handleNoteKeyDown}
-              onChange={(e) => {
-                setValue('note', e.target.value, { shouldDirty: true });
-                setIsNoteFocused(true);
-                setHasDismissedSuggestions(false);
-              }} 
-              className="w-full h-10 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-muted/60 border border-border text-sm sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
-            />
+            {/* Inline Note Input with Autocomplete Suggestions */}
+            <div className="relative flex-1 min-w-0">
+              <NoteSuggestionsMenu
+                isOpen={isSuggestionsOpen}
+                suggestions={noteSuggestions}
+                currentCategoryId={selectedCategoryId}
+                activeIndex={activeSuggestionIndex}
+                onHoverIndex={setActiveSuggestionIndex}
+                onSelect={handleSelectSuggestion}
+                onClose={() => {
+                  setIsSuggestionsOpen(false);
+                  setHasDismissedSuggestions(true);
+                  setActiveSuggestionIndex(-1);
+                }}
+              />
+
+              <input 
+                id="note" 
+                type="text" 
+                placeholder={t('add.note', '填寫備註...')} 
+                value={currentNote} 
+                onFocus={() => {
+                  setIsNoteFocused(true);
+                  setHasDismissedSuggestions(false);
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setIsNoteFocused(false);
+                  }, 200);
+                }}
+                onKeyDown={handleNoteKeyDown}
+                onChange={(e) => {
+                  setValue('note', e.target.value, { shouldDirty: true });
+                  setIsNoteFocused(true);
+                  setHasDismissedSuggestions(false);
+                }} 
+                className="w-full h-10 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-muted/60 border border-border text-sm sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
+              />
+            </div>
           </div>
 
           {/* Integrated Keypad */}
@@ -1947,6 +1996,105 @@ export function AddTransactionModal({
           }}
           contacts={contacts}
         />
+
+        {/* 標籤選擇彈窗 (平級 Sibling Portal 宣告) */}
+        <Dialog open={isTagPickerOpen} onOpenChange={setIsTagPickerOpen}>
+          <DialogContent
+            overlayClassName="z-[70]"
+            className="z-[70] w-[300px] max-w-[calc(100vw-32px)] sm:w-[300px] sm:max-w-[300px] bg-card border border-border text-card-foreground p-4"
+          >
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground text-base font-semibold">
+                {t('tags.selectTags', '選擇標籤')}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-wrap gap-2 max-h-[260px] overflow-y-auto no-scrollbar py-2">
+              {tags?.length === 0 && (
+                <div className="w-full py-4 text-center text-xs text-muted-foreground">
+                  {t('tags.noTagsAvailable', '暫無標籤')}
+                </div>
+              )}
+              {tags?.map(tag => {
+                const isSelected = selectedTagIds.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      setSelectedTagIds(prev =>
+                        prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
+                      );
+                    }}
+                    className={cn(
+                      "px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium shrink-0 transition-colors cursor-pointer border flex items-center gap-1",
+                      isSelected
+                        ? "bg-primary text-primary-foreground border-primary font-semibold"
+                        : "bg-muted/80 border-border text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    )}
+                  >
+                    <span>#{tag.name}</span>
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreateTagOpen(true);
+                }}
+                className="px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="text-xs sm:text-[11px]">{t('tags.addTag', '新增標籤')}</span>
+              </button>
+            </div>
+            <DialogFooter className="flex flex-row items-center justify-end pt-2 [&>*:only-child]:ml-auto">
+              <DialogClose render={<Button type="button" size="sm" className="h-8" />}>
+                {t('common.done', '完成')}
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 新增標籤次級彈窗 (平級 Sibling Portal 宣告) */}
+        <Dialog open={isCreateTagOpen} onOpenChange={setIsCreateTagOpen}>
+          <DialogContent
+            overlayClassName="z-[80]"
+            className="z-[80] sm:max-w-[320px] bg-card border border-border text-card-foreground p-4"
+          >
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground text-base">
+                {t('tags.addTag', '新增標籤')}
+              </DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newTagName.trim()) return;
+                const created = await addTag(newTagName.trim());
+                setSelectedTagIds(prev => prev.includes(created.id) ? prev : [...prev, created.id]);
+                setNewTagName('');
+                setIsCreateTagOpen(false);
+              }}
+              className="space-y-4 pt-2"
+            >
+              <Input
+                placeholder={t('tags.newTagPlaceholder', '輸入標籤名稱...')}
+                value={newTagName}
+                onChange={e => setNewTagName(e.target.value)}
+                className="h-9"
+              />
+              <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-2">
+                <DialogClose render={<Button type="button" variant="outline" className="h-8 border-border" />}>
+                  {t('common.cancel')}
+                </DialogClose>
+                <Button type="submit" disabled={!newTagName.trim()} className="h-8">
+                  {t('common.add')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </>
     );
   }

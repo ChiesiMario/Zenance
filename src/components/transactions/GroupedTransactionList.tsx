@@ -9,6 +9,7 @@ import { ChevronRight, User, Building2 } from 'lucide-react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useTags } from '@/hooks/useTags';
 import type { Transaction } from '@/services/db/db';
 
 interface ContactCapsuleProps {
@@ -55,6 +56,7 @@ export interface SplitGroupItem {
   feeAmount?: number;
   note?: string;
   latestCreatedAt: string;
+  tagIds?: string[];
 }
 
 export type DisplayListItem = 
@@ -125,6 +127,55 @@ export function GroupedTransactionList({
     });
     return map;
   }, [allTransactions, transactions]);
+
+  // 標籤數據與快速索引
+  const { tags } = useTags();
+  const tagMap = useMemo(() => {
+    const map = new Map<string, string>();
+    tags?.forEach((t) => {
+      map.set(t.id, t.name);
+    });
+    return map;
+  }, [tags]);
+
+  // 渲染標籤膠囊與備註（風格統一使用全圓角 rounded-full 膠囊，避免截斷）
+  const renderTagsAndNote = useCallback((tagIds?: string[], noteText?: string) => {
+    const resolvedTags = (tagIds || [])
+      .map((id) => ({ id, name: tagMap.get(id) }))
+      .filter((t): t is { id: string; name: string } => !!t.name);
+
+    const hasTags = resolvedTags.length > 0;
+    const hasNote = !!noteText && noteText.trim().length > 0;
+
+    if (!hasTags && !hasNote) return null;
+
+    const visibleTags = resolvedTags.slice(0, 2);
+    const extraCount = resolvedTags.length - visibleTags.length;
+
+    return (
+      <div className="h-5 flex items-center gap-1.5 text-xs text-muted-foreground min-w-0 mt-0.5 select-text overflow-hidden">
+        {visibleTags.map((tag) => (
+          <span
+            key={tag.id}
+            title={tag.name}
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted border border-border text-foreground leading-none shrink-0"
+          >
+            #{tag.name}
+          </span>
+        ))}
+        {extraCount > 0 && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-sans font-medium bg-muted border border-border text-muted-foreground leading-none shrink-0">
+            +{extraCount}
+          </span>
+        )}
+        {hasNote && (
+          <span className="truncate min-w-0 flex-1">
+            {noteText}
+          </span>
+        )}
+      </div>
+    );
+  }, [tagMap]);
 
   // 取得主交易的退款狀態標籤（部分退款 / 已退款）
   const getRefundStatus = useCallback((tx: Transaction) => {
@@ -535,6 +586,10 @@ export function GroupedTransactionList({
           const note = !isFeePlaceholder && cleanNote ? cleanNote : undefined;
           const latestCreatedAt = sortedBatch[0]?.createdAt || sortedBatch[0]?.date;
 
+          const groupTagIds = Array.from(
+            new Set(batchTxs.flatMap((t) => t.tagIds || []))
+          );
+
           displayItems.push({
             isSplitGroup: true,
             id: groupId,
@@ -551,6 +606,7 @@ export function GroupedTransactionList({
             feeAmount,
             note,
             latestCreatedAt,
+            tagIds: groupTagIds,
           });
         });
 
@@ -705,7 +761,7 @@ export function GroupedTransactionList({
                               </div>
                             )}
 
-                            {/* Note display */}
+                            {/* Note & Tags display */}
                             {(() => {
                               const isAdj = isBalanceAdjustment(tx);
                               const isDefaultNote =
@@ -713,13 +769,8 @@ export function GroupedTransactionList({
                                 tx.note === '手動餘額調整' ||
                                 tx.note === '手动余额调整' ||
                                 tx.note === 'Manual Balance Adjustment';
-                              if (isAdj && isDefaultNote) return null;
-                              if (!tx.note) return null;
-                              return (
-                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
-                                  {tx.note}
-                                </div>
-                              );
+                              const cleanNote = isAdj && isDefaultNote ? undefined : tx.note;
+                              return renderTagsAndNote(tx.tagIds, cleanNote);
                             })()}
                           </div>
                         )}
@@ -886,11 +937,8 @@ export function GroupedTransactionList({
                                 )}
                               </div>
 
-                              {item.note && (
-                                <div className="h-4 flex items-center text-xs text-muted-foreground truncate mt-1 select-text">
-                                  {item.note}
-                                </div>
-                              )}
+                              {/* Note & Tags display */}
+                              {renderTagsAndNote(item.tagIds, item.note)}
                             </div>
                           </div>
 

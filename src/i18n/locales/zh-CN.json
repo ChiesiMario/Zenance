@@ -1098,6 +1098,11 @@
       "deleteConfirmDesc": "确定要删除标签“{{name}}”吗？相关交易中的此标签关联将被移除。",
       "tagNotFound": "找不到此标签",
       "unarchive": "解除归档"
+    },
+    "stats": {
+      "pastMonth": "近一月",
+      "pastYear": "近一年",
+      "allTime": "全部"
     }
   }
 }

@@ -1098,6 +1098,11 @@
       "deleteConfirmDesc": "Are you sure you want to delete tag \"{{name}}\"? The tag will be removed from associated transactions.",
       "tagNotFound": "Tag not found",
       "unarchive": "Unarchive"
+    },
+    "stats": {
+      "pastMonth": "Past 30 Days",
+      "pastYear": "Past 1 Year",
+      "allTime": "All Time"
     }
   }
 }

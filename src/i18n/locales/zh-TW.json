@@ -1098,6 +1098,11 @@
       "deleteConfirmDesc": "確定要刪除標籤「{{name}}」嗎？相關交易中的此標籤關聯將被移除。",
       "tagNotFound": "找不到此標籤",
       "unarchive": "解除歸檔"
+    },
+    "stats": {
+      "pastMonth": "近一月",
+      "pastYear": "近一年",
+      "allTime": "全部"
     }
   }
 }

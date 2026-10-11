@@ -189,9 +189,15 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
 
   // 1. 核心點擊交易與當前聚焦交易
   const [activeTxId, setActiveTxId] = useState<string | null>(transactionId);
+  const [activeSplitGroupId, setActiveSplitGroupId] = useState<string | null>(null);
 
   useEffect(() => {
-    setActiveTxId(transactionId);
+    if (!transactionId) {
+      setActiveTxId(null);
+      setActiveSplitGroupId(null);
+    } else {
+      setActiveTxId(transactionId);
+    }
   }, [transactionId]);
 
   // 背景主容器滾動鎖定 (Main Scroll Lock)：防止彈窗開啟期間背後頁面滾動
@@ -208,35 +214,74 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
     };
   }, [transactionId]);
 
-  const currentTransaction = useMemo(() => {
-    if (!activeTxId || !transactions) return null;
-    return transactions.find((tx) => tx.id === activeTxId) || null;
-  }, [activeTxId, transactions]);
-
-  // 2. 獲取初始點擊交易的根節點
+  // 2. 獲取初始點擊交易的根節點（嘗試從 transactionId 或 activeTxId 獲取）
   const initialRootTx = useMemo(() => {
-    if (!transactionId || !transactions) return null;
-    const clicked = transactions.find((t) => t.id === transactionId);
+    if (!transactions) return null;
+    const targetId = transactionId || activeTxId;
+    if (!targetId) return null;
+    const clicked = transactions.find((t) => t.id === targetId);
     if (!clicked) return null;
     if (clicked.parentId) {
       return transactions.find((t) => t.id === clicked.parentId) || clicked;
     }
     return clicked;
-  }, [transactionId, transactions]);
+  }, [transactionId, activeTxId, transactions]);
+
+  // 同步並緩存群組 ID：只要能解析出 splitGroupId，就進行鎖定，避免刪除初始交易時群組關係丟失
+  useEffect(() => {
+    if (initialRootTx?.splitGroupId && initialRootTx.splitGroupId !== activeSplitGroupId) {
+      setActiveSplitGroupId(initialRootTx.splitGroupId);
+    }
+  }, [initialRootTx?.splitGroupId, activeSplitGroupId]);
 
   // 3. 獲取所有相關的主交易（若有 splitGroupId 則獲取整個群組的所有主交易；否則只有單筆主交易）
   const relatedRootTransactions = useMemo(() => {
-    if (!initialRootTx || !transactions) return [];
+    if (!transactions) return [];
 
-    if (initialRootTx.splitGroupId) {
+    const effectiveGroupId = activeSplitGroupId || initialRootTx?.splitGroupId;
+    if (effectiveGroupId) {
       const list = transactions.filter(
-        (t) => !t.deleted && !t.parentId && t.splitGroupId === initialRootTx.splitGroupId
+        (t) => !t.deleted && !t.parentId && t.splitGroupId === effectiveGroupId
       );
       return sortTransactionsDesc(list);
     }
 
-    return [initialRootTx];
-  }, [initialRootTx, transactions]);
+    if (initialRootTx) {
+      return [initialRootTx];
+    }
+
+    return [];
+  }, [activeSplitGroupId, initialRootTx, transactions]);
+
+  // 當前聚焦交易（提供群組剩餘交易 fallback）
+  const currentTransaction = useMemo(() => {
+    if (!transactions) return null;
+    if (activeTxId) {
+      const found = transactions.find((tx) => tx.id === activeTxId);
+      if (found) return found;
+    }
+    if (relatedRootTransactions.length > 0) {
+      return relatedRootTransactions[0];
+    }
+    return null;
+  }, [activeTxId, transactions, relatedRootTransactions]);
+
+  // 若當前 activeTxId 已被刪除，自動跟隨至剩餘的主交易
+  useEffect(() => {
+    if (relatedRootTransactions.length > 0) {
+      const isCurrentValid = transactions?.some((t) => t.id === activeTxId && !t.deleted);
+      if (!isCurrentValid) {
+        setActiveTxId(relatedRootTransactions[0].id);
+      }
+    }
+  }, [relatedRootTransactions, transactions, activeTxId]);
+
+  // 安全防護：若所有關聯交易已被全部清空（或單筆交易已被刪除），自動安全關閉彈窗
+  useEffect(() => {
+    if (transactionId && transactions && transactions.length > 0 && relatedRootTransactions.length === 0) {
+      onClose();
+    }
+  }, [transactionId, transactions, relatedRootTransactions.length, onClose]);
 
   // 4. 二維列結構化構建：每一列包含一個主交易及其名下的所有子退款
   const CARD_WIDTH = 280;
@@ -1317,7 +1362,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
         className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !w-screen !h-[100dvh] !max-w-none !sm:max-w-none !p-0 !bg-transparent !border-none !shadow-none !outline-none !flex !flex-col !items-center !justify-center !overflow-hidden !pointer-events-none select-none"
       >
         <DialogTitle className="sr-only">
-          {t('receipt.voucherTitle', '交易憑證')} - #{currentTransaction.displayId || currentTransaction.id}
+          {t('receipt.voucherTitle', '交易憑證')} - #{currentTransaction?.displayId || currentTransaction?.id || ''}
         </DialogTitle>
 
         {/* Global Backdrop Click Area (outside cards) */}
@@ -1491,7 +1536,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 type="button"
                 disabled={isEditDisabled}
                 onClick={() => {
-                  if (isEditDisabled) return;
+                  if (isEditDisabled || !currentTransaction) return;
                   setEditingTransactionId(currentTransaction.id);
                   onClose();
                 }}

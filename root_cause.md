@@ -1,45 +1,63 @@
-# Root Cause 分析報告：代付 Dialog 四周留白過多且不符合設計標準
+# Root Cause 分析報告：群組交易詳情刪除交易後介面陷入空白
 
 ## 1. 現象描述
-在代付彈窗（`SplitAdvanceDialog`）中：
-1. 視窗四周留白（Padding）異常巨大，標題、卡片與操作按鈕深深向內縮排。
-2. 內容區域高度被異常拉伸，在「+ 添加對象」與底部「取消/確認」按鈕之間產生了大片空洞無效的白色空白。
-3. 右上角「✕」關閉按鈕與內部標題排版錯位。
-4. 整體表現嚴重背離 Zenance 標準 Dialog「由內容自然緊湊撐開、無多餘巢狀留白」的設計規範。
+- 在群組交易詳情（`TransactionDetailsDialog`）中，用戶點擊底部 Dock Bar 的「刪除」按鈕刪除了當前聚焦的交易（例如點擊進入詳情時的初始交易）。
+- 刪除確認後，彈窗並未正常顯示剩餘的群組交易卡片，舞台中央的卡片瞬間全部消失，背後的毛玻璃 Backdrop 遮罩依然覆蓋整個螢幕，底部殘留 4 欄 Dock Bar（刪除、退款、編輯、關閉），介面徹底陷入空白與不可操作狀態。
 
 ---
 
-## 2. 根本原因定位 (Root Causes)
+## 2. 根本原因定位 (Root Cause)
 
-### 原因一：CSS 響應式斷點優先級導致的「雙重內邊距疊加 (Double Padding Collision)」
-- 在 [src/components/ui/dialog.tsx](file:///d:/GitHub/Zenance/src/components/ui/dialog.tsx#L110) 中，底層 `DialogContent`（即 `DialogPrimitive.Popup`）預設帶有響應式內邊距：
+### 根本原因一：數據錨點僵化綁定於外部 Props（Rigid Anchor to External `transactionId`）
+- 在 [src/components/transactions/TransactionDetailsDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/TransactionDetailsDialog.tsx#L217-L225) 中，組件將外部傳入的 `transactionId`（點擊打開彈窗時的初始交易 ID）作為錨定整個群組的唯一依據：
   ```tsx
-  className="... p-5 sm:p-6 ..."
+  const initialRootTx = useMemo(() => {
+    if (!transactionId || !transactions) return null;
+    const clicked = transactions.find((t) => t.id === transactionId);
+    if (!clicked) return null;
+    if (clicked.parentId) {
+      return transactions.find((t) => t.id === clicked.parentId) || clicked;
+    }
+    return clicked;
+  }, [transactionId, transactions]);
   ```
-- 在 [src/components/transactions/SplitAdvanceDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/SplitAdvanceDialog.tsx#L394) 中，傳入的覆蓋樣式為：
+- 當同群組內的多筆主交易需要被載入時，完全仰賴 `initialRootTx.splitGroupId` 來查詢整組交易：
   ```tsx
-  className="... p-0 gap-0 ..."
+  const relatedRootTransactions = useMemo(() => {
+    if (!initialRootTx || !transactions) return [];
+    if (initialRootTx.splitGroupId) {
+      const list = transactions.filter(
+        (t) => !t.deleted && !t.parentId && t.splitGroupId === initialRootTx.splitGroupId
+      );
+      return sortTransactionsDesc(list);
+    }
+    return [initialRootTx];
+  }, [initialRootTx, transactions]);
   ```
-- **衝突點**：Tailwind CSS 的 `p-0` 僅能覆蓋移動端基礎樣式 `p-5`，**完全無法覆蓋高優先級的 `sm:p-6`（24px）**。
-- 因此在桌面端或大於 640px 的環境下，彈窗外層先被注入了 `24px` 的邊距，而彈窗內部的 Header、Body、Footer 又各自聲明了 `px-4`（16px）與 `p-3.5`（14px）。
-- 兩者累加產生高達 **38px ~ 40px** 的巨大外圍邊距，導致彈窗四周產生極為空曠的視覺缺陷。
+- 父組件（如 `GroupedTransactionList` 或 `AppLayout`）在打開彈窗時將 `transactionId` 傳入。當彈窗內部執行刪除時，父組件並不會同步將 `transactionId` 改為群組中的其他交易 ID。
 
 ---
 
-### 原因二：底層 Selector 強制注入 `flex-1` 與高度未自然包裹
-- 在 [src/components/ui/dialog.tsx](file:///d:/GitHub/Zenance/src/components/ui/dialog.tsx#L111) 中，底層帶有通用子元素選擇器：
-  ```css
-  [&>*:not([data-slot=dialog-header]):not([data-slot=dialog-footer]):not(form)]:flex-1
-  ```
-- 在 [src/components/transactions/SplitAdvanceDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/SplitAdvanceDialog.tsx#L404) 中，中間內容容器自身也聲明了 `flex-1`：
-  ```tsx
-  <div className="flex-1 overflow-y-auto ...">
-  ```
-- 此外，彈窗外層設定了 `max-h-[90vh]` 與彈窗預設的 flex-col 縱向拉伸，違反了 UI Guidelines 中「**彈窗本體高度嚴格由內容自然撐開 (Height driven by content)**」的規範。
-- 當列表僅有 1 位使用者（「我 自費支出」）時，內容根本不足以填滿預期高度，但 flex-1 與拉伸容器強行將底部 Footer 推擠到最下方，致使中間留出大片無意義的空白斷層。
+### 根本原因二：響應式更新引發的級聯歸零連鎖崩潰（Reactive Cascade Collapse）
+1. 用戶在彈窗中點擊「刪除」該筆交易時，調用 `deleteTransaction(activeTxId)`，該交易在本地資料庫（Dexie）中被更新為 `deleted: true`。
+2. `useLiveQuery` 監聽到資料庫變更，向組件推送最新過濾後的 `transactions` 陣列（已排除剛刪除的交易）。
+3. 組件重新渲染時重新計算 `initialRootTx`：由於外部傳入的 Props `transactionId` 依舊是剛剛被刪除的交易 ID，在新的 `transactions` 陣列中執行 `find(t => t.id === transactionId)` 必然返回 `undefined`，導致 **`initialRootTx` 瞬間變為 `null`**。
+4. 由於 `initialRootTx` 變為 `null`，`relatedRootTransactions` 無法取得 `splitGroupId`，直接退化返回 **空陣列 `[]`**。
+5. 負責繪製畫布所有卡片的 `columnsData`（依賴 `relatedRootTransactions`）因此跟著連鎖變為 **空陣列 `[]`**。
 
 ---
 
-### 原因三：彈窗標準結構與原生 Close Button 的職責錯位
-- `dialog.tsx` 預設會在彈窗本體絕對定位渲染右上角關閉按鈕（`absolute top-4 right-4`），並受外層 `showCloseButton` 控制。
-- 由於外層 `sm:p-6` 與未關閉原生按鈕的影響，使得內部自定義佈局與外層結構產生衝突，造成右上角關閉按鈕孤立懸浮、內容深陷其中的視覺割裂。
+### 根本原因三：內部切換無法挽救數據源且視圖與遮罩狀態脫節
+- 雖然在 [src/components/transactions/TransactionDetailsDialog.tsx](file:///d:/GitHub/Zenance/src/components/transactions/TransactionDetailsDialog.tsx#L890-L895) 的刪除回調中，程式碼嘗試透過 `remainingCols` 找出群組中的下一筆交易並調用 `setActiveTxId(remainingCols[0].rootTx.id)`：
+  ```tsx
+  await deleteTransaction(activeTxId);
+  const remainingCols = columnsData.filter((c) => c.rootTx.id !== activeTxId);
+  if (remainingCols.length > 0) {
+    setActiveTxId(remainingCols[0].rootTx.id);
+  } else {
+    onClose();
+  }
+  ```
+- 但因為底層數據構建鏈（`initialRootTx -> relatedRootTransactions -> columnsData`）死鎖在已被刪除的外部 `props.transactionId` 上，即使更新了 `activeTxId`，`columnsData` 依然為 `[]`。
+- 中央卡片舞台依賴 `columnsData.map(...)` 渲染，陣列為空導致舞台中央所有主卡片與退款卡片全數卸載蒸發。
+- 與此同時，懸浮於底部的 4 欄 Dock Bar（刪除、退款、編輯、關閉）不依賴 `columnsData`，因此依然渲染在底部；外層 `<Dialog open={!!transactionId}>` 亦未被觸發關閉，導致整個頁面被凍結在毛玻璃 Backdrop 遮罩下，中央空無一物。

@@ -29,12 +29,12 @@ export function PwaInstallButton({ className }: PwaInstallButtonProps) {
         title={t('pwa.install', '安裝')}
         className={cn(
           'flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full',
-          'border border-border bg-background/80 hover:bg-muted text-foreground',
-          'transition-colors cursor-pointer select-none',
+          'border border-foreground bg-foreground text-background',
+          'hover:opacity-90 active:opacity-80 transition-opacity cursor-pointer select-none',
           className
         )}
       >
-        <Download className="size-3.5 text-muted-foreground" />
+        <Download className="size-3.5 text-background" />
         <span>{t('pwa.install', '安裝')}</span>
       </button>
 

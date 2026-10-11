@@ -1115,6 +1115,36 @@
       "pastMonth": "近一月",
       "pastYear": "近一年",
       "allTime": "全部"
+    },
+    "search": {
+      "title": "搜尋",
+      "placeholder": "搜尋交易、帳戶、預算、對象...",
+      "recentSearches": "近期搜尋",
+      "clearHistory": "清空",
+      "quickAccess": "快速入口",
+      "noResults": "找不到與「{{query}}」相關的內容",
+      "noResultsHint": "請嘗試縮短關鍵字，或切換至不同分類標籤",
+      "viewAll": "查看全部 {{count}} 筆",
+      "resultsCount": "{{count}} 筆結果",
+      "tabs": {
+        "all": "全部",
+        "transactions": "交易",
+        "accounts": "帳戶",
+        "budgets": "預算",
+        "contacts": "對象"
+      },
+      "types": {
+        "all": "全部",
+        "expense": "支出",
+        "income": "收入",
+        "transfer": "轉帳"
+      },
+      "sections": {
+        "transactions": "交易紀錄",
+        "accounts": "資產帳戶",
+        "budgets": "預算計劃",
+        "contacts": "往來對象"
+      }
     }
   }
 }

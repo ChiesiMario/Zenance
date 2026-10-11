@@ -1115,6 +1115,36 @@
       "pastMonth": "Past 30 Days",
       "pastYear": "Past 1 Year",
       "allTime": "All Time"
+    },
+    "search": {
+      "title": "Search",
+      "placeholder": "Search transactions, accounts, budgets, contacts...",
+      "recentSearches": "Recent Searches",
+      "clearHistory": "Clear",
+      "quickAccess": "Quick Access",
+      "noResults": "No results found for \"{{query}}\"",
+      "noResultsHint": "Try using fewer keywords or switching categories",
+      "viewAll": "View all {{count}}",
+      "resultsCount": "{{count}} results",
+      "tabs": {
+        "all": "All",
+        "transactions": "Transactions",
+        "accounts": "Accounts",
+        "budgets": "Budgets",
+        "contacts": "Contacts"
+      },
+      "types": {
+        "all": "All",
+        "expense": "Expense",
+        "income": "Income",
+        "transfer": "Transfer"
+      },
+      "sections": {
+        "transactions": "Transactions",
+        "accounts": "Accounts",
+        "budgets": "Budgets",
+        "contacts": "Contacts"
+      }
     }
   }
 }

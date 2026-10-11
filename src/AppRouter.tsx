@@ -16,6 +16,7 @@ import BudgetHistory from './pages/BudgetHistory';
 import BudgetDetails from './pages/BudgetDetails';
 import AccountDetails from './pages/AccountDetails';
 import ContactDetails from './pages/ContactDetails';
+import Search from './pages/Search';
 
 const router = createBrowserRouter([
   {
@@ -63,6 +64,10 @@ const router = createBrowserRouter([
       {
         path: 'budgets/:id',
         element: <BudgetDetails />,
+      },
+      {
+        path: 'search',
+        element: <Search />,
       },
       {
         path: 'reports',

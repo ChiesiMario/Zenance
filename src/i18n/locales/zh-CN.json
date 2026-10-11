@@ -1115,6 +1115,36 @@
       "pastMonth": "近一月",
       "pastYear": "近一年",
       "allTime": "全部"
+    },
+    "search": {
+      "title": "搜索",
+      "placeholder": "搜索交易、账户、预算、对象...",
+      "recentSearches": "近期搜索",
+      "clearHistory": "清空",
+      "quickAccess": "快速入口",
+      "noResults": "找不到与“{{query}}”相关的内容",
+      "noResultsHint": "请尝试缩短关键字，或切换至不同分类标签",
+      "viewAll": "查看全部 {{count}} 项",
+      "resultsCount": "{{count}} 项结果",
+      "tabs": {
+        "all": "全部",
+        "transactions": "交易",
+        "accounts": "账户",
+        "budgets": "预算",
+        "contacts": "对象"
+      },
+      "types": {
+        "all": "全部",
+        "expense": "支出",
+        "income": "收入",
+        "transfer": "转账"
+      },
+      "sections": {
+        "transactions": "交易记录",
+        "accounts": "资产账户",
+        "budgets": "预算计划",
+        "contacts": "往来对象"
+      }
     }
   }
 }

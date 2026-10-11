@@ -3,7 +3,7 @@ import { useBudgets } from '@/hooks/useBudgets';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
-import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, BarChart3, Check } from 'lucide-react';
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Plus, BarChart3, Check, Search } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -122,51 +122,50 @@ export default function Dashboard() {
   return (
     <div className="w-full">
       <div className="relative flex items-center justify-between gap-4 mb-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[130px] sm:max-w-[200px]">
-            <span className="truncate">
-              {activeLedger?.name || t('dashboard.overview')}
-            </span>
-            <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px]">
-            <DropdownMenuGroup>
-              {ledgers?.map(ledger => {
-                const isActive = ledger.id === activeLedgerId;
-                return (
-                  <DropdownMenuItem 
-                    key={ledger.id}
-                    onClick={() => setActiveLedgerId(ledger.id)}
-                    className="justify-between cursor-pointer"
-                  >
-                    <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0 mr-1.5">
-                      <span className={cn("truncate block", isActive && "font-medium text-foreground")}>
-                        {ledger.name}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">
-                        {ledger.baseCurrency || 'CNY'}
-                      </span>
-                    </div>
-                    {isActive && <Check className="h-4 w-4 text-foreground shrink-0" />}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator className="-mx-1 my-1" />
-            <DropdownMenuItem onClick={() => setIsCreateLedgerOpen(true)} className="cursor-pointer">
-              <Plus className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>{t('dashboard.createLedger')}</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setIsManageLedgersOpen(true)} className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span>{t('dashboard.manageLedgers')}</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2 min-w-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center text-xl font-semibold tracking-tight hover:bg-muted/50 data-[state=open]:bg-muted/50 rounded-md px-2 -ml-2 py-1 outline-none min-w-0 max-w-[130px] sm:max-w-[200px]">
+              <span className="truncate">
+                {activeLedger?.name || t('dashboard.overview')}
+              </span>
+              <ChevronDown className="ml-1 h-4 w-4 opacity-50 shrink-0" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px]">
+              <DropdownMenuGroup>
+                {ledgers?.map(ledger => {
+                  const isActive = ledger.id === activeLedgerId;
+                  return (
+                    <DropdownMenuItem 
+                      key={ledger.id}
+                      onClick={() => setActiveLedgerId(ledger.id)}
+                      className="justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0 mr-1.5">
+                        <span className={cn("truncate block", isActive && "font-medium text-foreground")}>
+                          {ledger.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                          {ledger.baseCurrency || 'CNY'}
+                        </span>
+                      </div>
+                      {isActive && <Check className="h-4 w-4 text-foreground shrink-0" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="-mx-1 my-1" />
+              <DropdownMenuItem onClick={() => setIsCreateLedgerOpen(true)} className="cursor-pointer">
+                <Plus className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>{t('dashboard.createLedger')}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsManageLedgersOpen(true)} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>{t('dashboard.manageLedgers')}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* 頂部居中安裝按鈕 (若已安裝為 PWA 自動不顯示) */}
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto">
-          <PwaInstallButton />
+          <PwaInstallButton className="shrink-0" />
         </div>
 
         <ManageLedgersDialog
@@ -181,6 +180,13 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-1.5 -mr-2 shrink-0">
           <SyncStatusPill />
+          <Link 
+            to="/search" 
+            title={t('search.title', '搜尋')}
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            <Search className="size-5" strokeWidth={1.5} />
+          </Link>
           <Link 
             to="/reports" 
             title={t('reports.title')}

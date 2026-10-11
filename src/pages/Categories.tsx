@@ -178,24 +178,26 @@ export default function Categories() {
             </div>
           ) : (
             currentCategories.map(cat => (
-              <div key={cat.id} className="flex items-center justify-between p-3 pl-4 transition-colors hover:bg-muted/40 group">
+              <div key={cat.id} className="h-12 flex items-stretch justify-between transition-colors hover:bg-muted/40 group">
                 {filterStatus === 'archived' ? (
                   <>
                     <button 
-                      className="flex-1 text-left font-medium text-sm text-muted-foreground cursor-pointer"
+                      className="flex-1 flex items-center h-full pl-4 pr-2 text-left font-medium text-sm text-muted-foreground cursor-pointer min-w-0 select-none"
                       onClick={() => navigate(`/settings/categories/${cat.id}`)}
                     >
                       {cat.name}
                     </button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 text-primary opacity-90 hover:opacity-100 cursor-pointer"
-                      onClick={() => unarchiveCategory(cat.id)}
-                    >
-                      <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
-                      {t('settings.unarchive', '取消歸檔')}
-                    </Button>
+                    <div className="flex items-center h-full pr-3 shrink-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-primary opacity-90 hover:opacity-100 cursor-pointer"
+                        onClick={() => unarchiveCategory(cat.id)}
+                      >
+                        <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
+                        {t('settings.unarchive', '取消歸檔')}
+                      </Button>
+                    </div>
                   </>
                 ) : (
                   (() => {
@@ -203,54 +205,56 @@ export default function Categories() {
                     return (
                       <>
                         <button 
-                          className="flex-1 text-left font-medium text-sm cursor-pointer"
+                          className="flex-1 flex items-center h-full pl-4 pr-2 text-left font-medium text-sm cursor-pointer min-w-0 select-none"
                           onClick={() => navigate(`/settings/categories/${cat.id}`)}
                         >
                           {cat.name}
                         </button>
                         
-                        <DropdownMenu>
-                          <DropdownMenuTrigger render={
-                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity">
-                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          } />
-                          <DropdownMenuContent align="end" className="w-[160px]">
-                            <DropdownMenuItem 
-                              className="cursor-pointer"
-                              onClick={() => {
-                                setRenamingCategory(cat);
-                                setRenameName(cat.name);
-                                setIsRenameDialogOpen(true);
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4 mr-2" />
-                              {t('common.rename', '重命名')}
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem 
-                              className={cn(
-                                "text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer",
-                                hasTx && "opacity-50"
-                              )}
-                              onClick={() => {
-                                if (hasTx) {
-                                  toast.show(t('settings.categoryHasTransactionsCannotDelete', '此分類存在交易記錄，無法刪除。'));
-                                  return;
-                                }
-                                handleDelete(cat);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              {t('common.delete', '刪除')}
-                            </DropdownMenuItem>
+                        <div className="flex items-center h-full pr-3 shrink-0">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger render={
+                              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity">
+                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            } />
+                            <DropdownMenuContent align="end" className="w-[160px]">
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  setRenamingCategory(cat);
+                                  setRenameName(cat.name);
+                                  setIsRenameDialogOpen(true);
+                                }}
+                              >
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                {t('common.rename', '重命名')}
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem 
+                                className={cn(
+                                  "text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer",
+                                  hasTx && "opacity-50"
+                                )}
+                                onClick={() => {
+                                  if (hasTx) {
+                                    toast.show(t('settings.categoryHasTransactionsCannotDelete', '此分類存在交易記錄，無法刪除。'));
+                                    return;
+                                  }
+                                  handleDelete(cat);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                {t('common.delete', '刪除')}
+                              </DropdownMenuItem>
 
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => archiveCategory(cat.id)}>
-                              <Archive className="h-4 w-4 mr-2" />
-                              {t('settings.archive', '歸檔')}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              <DropdownMenuItem className="cursor-pointer" onClick={() => archiveCategory(cat.id)}>
+                                <Archive className="h-4 w-4 mr-2" />
+                                {t('settings.archive', '歸檔')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </>
                     );
                   })()

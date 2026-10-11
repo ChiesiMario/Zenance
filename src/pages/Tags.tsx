@@ -122,24 +122,26 @@ export default function Tags() {
             </div>
           ) : (
             currentTags.map(tag => (
-              <div key={tag.id} className="flex items-center justify-between p-3 pl-4 transition-colors hover:bg-muted/40 group">
+              <div key={tag.id} className="h-12 flex items-stretch justify-between transition-colors hover:bg-muted/40 group">
                 {filterStatus === 'archived' ? (
                   <>
                     <button 
-                      className="flex-1 text-left font-medium text-sm text-muted-foreground cursor-pointer"
+                      className="flex-1 flex items-center h-full pl-4 pr-2 text-left font-medium text-sm text-muted-foreground cursor-pointer min-w-0 select-none"
                       onClick={() => navigate(`/settings/tags/${tag.id}`)}
                     >
                       #{tag.name}
                     </button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 text-primary opacity-90 hover:opacity-100 cursor-pointer"
-                      onClick={() => unarchiveTag(tag.id)}
-                    >
-                      <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
-                      {t('settings.unarchive', '取消歸檔')}
-                    </Button>
+                    <div className="flex items-center h-full pr-3 shrink-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 text-primary opacity-90 hover:opacity-100 cursor-pointer"
+                        onClick={() => unarchiveTag(tag.id)}
+                      >
+                        <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
+                        {t('settings.unarchive', '取消歸檔')}
+                      </Button>
+                    </div>
                   </>
                 ) : (
                   (() => {
@@ -147,56 +149,58 @@ export default function Tags() {
                     return (
                       <>
                         <button 
-                          className="flex-1 text-left font-medium text-sm cursor-pointer"
+                          className="flex-1 flex items-center h-full pl-4 pr-2 text-left font-medium text-sm cursor-pointer min-w-0 select-none"
                           onClick={() => navigate(`/settings/tags/${tag.id}`)}
                         >
                           #{tag.name}
                         </button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            render={
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            }
-                          />
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
-                              className="cursor-pointer"
-                              onClick={() => {
-                                setRenamingTag(tag);
-                                setRenameName(tag.name);
-                                setIsRenameDialogOpen(true);
-                              }}
-                            >
-                              <Edit2 className="h-4 w-4 mr-2" />
-                              {t('common.rename', '重命名')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="cursor-pointer"
-                              onClick={() => archiveTag(tag.id)}
-                            >
-                              <Archive className="h-4 w-4 mr-2" />
-                              {t('settings.archive', '歸檔')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className={cn(
-                                "cursor-pointer text-destructive focus:text-destructive",
-                                hasTx && "opacity-50"
-                              )}
-                              onClick={() => {
-                                if (hasTx) {
-                                  toast.show(t('settings.tagHasTransactionsCannotDelete', '此標籤存在交易記錄，無法刪除。'));
-                                  return;
-                                }
-                                handleDelete(tag);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              {t('common.delete')}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center h-full pr-3 shrink-0">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              }
+                            />
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={() => {
+                                  setRenamingTag(tag);
+                                  setRenameName(tag.name);
+                                  setIsRenameDialogOpen(true);
+                                }}
+                              >
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                {t('common.rename', '重命名')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={() => archiveTag(tag.id)}
+                              >
+                                <Archive className="h-4 w-4 mr-2" />
+                                {t('settings.archive', '歸檔')}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className={cn(
+                                  "cursor-pointer text-destructive focus:text-destructive",
+                                  hasTx && "opacity-50"
+                                )}
+                                onClick={() => {
+                                  if (hasTx) {
+                                    toast.show(t('settings.tagHasTransactionsCannotDelete', '此標籤存在交易記錄，無法刪除。'));
+                                    return;
+                                  }
+                                  handleDelete(tag);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                {t('common.delete')}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </>
                     );
                   })()

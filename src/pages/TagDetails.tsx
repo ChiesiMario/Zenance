@@ -60,10 +60,11 @@ export default function TagDetails() {
       const converted = tx.originalCurrency
         ? convertAmount(tx.originalAmount, tx.originalCurrency, baseCurrency, getRate)
         : tx.amount;
-      let delta = converted;
-      if (tx.parentId) {
-        delta = -converted;
-      } else if (tx.type === 'income') {
+      
+      let delta = 0;
+      if (tx.type === 'income') {
+        delta = converted;
+      } else if (tx.type === 'expense') {
         delta = -converted;
       }
 
@@ -77,24 +78,27 @@ export default function TagDetails() {
     });
 
     return {
-      allTimeAmount: Math.round(Math.abs(allSum) * 100) / 100,
-      pastMonthAmount: Math.round(Math.abs(monthSum) * 100) / 100,
-      pastYearAmount: Math.round(Math.abs(yearSum) * 100) / 100,
+      allTimeAmount: Math.round(allSum * 100) / 100,
+      pastMonthAmount: Math.round(monthSum * 100) / 100,
+      pastYearAmount: Math.round(yearSum * 100) / 100,
     };
   }, [tagTransactions, tag, baseCurrency, getRate]);
 
   return (
-    <div className="w-full space-y-4 pb-20">
-      <div className="flex items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)}
-          className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <h2 className="text-xl font-semibold tracking-tight truncate px-2">#{tag.name}</h2>
+    <div className="w-full max-w-md mx-auto space-y-4 pb-20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="h-8 w-8 -ml-2 cursor-pointer text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-xl font-semibold tracking-tight truncate">#{tag.name}</h2>
+        </div>
+        <div className="w-8 h-8" />
       </div>
 
       {/* 1:1 復刻賬戶頁面統計卡片 */}
@@ -113,8 +117,7 @@ export default function TagDetails() {
             <AmountDisplay 
               amount={allTimeAmount} 
               baseCurrency={baseCurrency} 
-              type="neutral" 
-              showSign={false}
+              type="balance" 
               memoryKey={`tag-all-${id}`}
               className="leading-none"
             />
@@ -135,8 +138,7 @@ export default function TagDetails() {
                 <AmountDisplay 
                   amount={pastMonthAmount} 
                   baseCurrency={baseCurrency} 
-                  type="neutral" 
-                  showSign={false}
+                  type="balance" 
                   memoryKey={`tag-month-${id}`}
                 />
               </AutoMarquee>
@@ -154,8 +156,7 @@ export default function TagDetails() {
                 <AmountDisplay 
                   amount={pastYearAmount} 
                   baseCurrency={baseCurrency} 
-                  type="neutral" 
-                  showSign={false}
+                  type="balance" 
                   memoryKey={`tag-year-${id}`}
                 />
               </AutoMarquee>

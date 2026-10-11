@@ -79,45 +79,67 @@ export default function CategoryDetails() {
   }, [categoryTransactions, category, baseCurrency, getRate]);
 
   return (
-    <div className="w-full space-y-4 pb-20">
-      <div className="flex items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)}
-          className="h-8 w-8 -ml-2 text-muted-foreground hover:text-foreground cursor-pointer"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <h2 className="text-xl font-semibold tracking-tight truncate px-2">{category.name}</h2>
+    <div className="w-full max-w-md mx-auto space-y-4 pb-20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="h-8 w-8 -ml-2 cursor-pointer text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h2 className="text-xl font-semibold tracking-tight truncate">{category.name}</h2>
+        </div>
+        <div className="w-8 h-8" />
       </div>
 
       {/* 1:1 復刻賬戶頁面統計卡片 */}
       <div className="border border-border rounded-lg overflow-hidden bg-card text-card-foreground shadow-none">
-        {/* 上半部：近一月 */}
+        {/* 上半部：全部 */}
         <div className="p-8 border-b border-border flex flex-col items-center justify-center text-center">
           <div className="relative flex items-center justify-center h-5 mb-2 w-full">
             <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
-              {t('stats.pastMonth', '近一月')}
+              {t('stats.allTime', '全部')}
             </p>
             <div className="absolute right-0 flex items-center">
-              <MagnitudeBadge amount={pastMonthAmount} memoryKey={`cat-month-${id}`} />
+              <MagnitudeBadge amount={allTimeAmount} memoryKey={`cat-all-${id}`} />
             </div>
           </div>
           <AutoMarquee align="center" className="text-4xl sm:text-5xl font-mono tracking-tighter font-medium px-4 leading-none">
             <AmountDisplay 
-              amount={pastMonthAmount} 
+              amount={allTimeAmount} 
               baseCurrency={baseCurrency} 
               type={category.type === 'income' ? 'income' : 'expense'} 
               showSign={false}
-              memoryKey={`cat-month-${id}`}
+              memoryKey={`cat-all-${id}`}
               className="leading-none"
             />
           </AutoMarquee>
         </div>
 
-        {/* 下半部：近一年 & 全部 */}
+        {/* 下半部：近一月 & 近一年 */}
         <div className="grid grid-cols-2 gap-px bg-border">
+          <div className="bg-card p-4">
+            <div className="flex items-center justify-between h-5 mb-1">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
+                {t('stats.pastMonth', '近一月')}
+              </p>
+              <MagnitudeBadge amount={pastMonthAmount} memoryKey={`cat-month-${id}`} />
+            </div>
+            <div className="text-2xl font-mono tracking-tight font-medium leading-none">
+              <AutoMarquee align="left">
+                <AmountDisplay 
+                  amount={pastMonthAmount} 
+                  baseCurrency={baseCurrency} 
+                  type={category.type === 'income' ? 'income' : 'expense'} 
+                  showSign={false}
+                  memoryKey={`cat-month-${id}`}
+                />
+              </AutoMarquee>
+            </div>
+          </div>
           <div className="bg-card p-4">
             <div className="flex items-center justify-between h-5 mb-1">
               <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
@@ -133,25 +155,6 @@ export default function CategoryDetails() {
                   type={category.type === 'income' ? 'income' : 'expense'} 
                   showSign={false}
                   memoryKey={`cat-year-${id}`}
-                />
-              </AutoMarquee>
-            </div>
-          </div>
-          <div className="bg-card p-4">
-            <div className="flex items-center justify-between h-5 mb-1">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground leading-none">
-                {t('stats.allTime', '全部')}
-              </p>
-              <MagnitudeBadge amount={allTimeAmount} memoryKey={`cat-all-${id}`} />
-            </div>
-            <div className="text-2xl font-mono tracking-tight font-medium leading-none">
-              <AutoMarquee align="left">
-                <AmountDisplay 
-                  amount={allTimeAmount} 
-                  baseCurrency={baseCurrency} 
-                  type={category.type === 'income' ? 'income' : 'expense'} 
-                  showSign={false}
-                  memoryKey={`cat-all-${id}`}
                 />
               </AutoMarquee>
             </div>

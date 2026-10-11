@@ -9,7 +9,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles } from 'lucide-react';
+import { Plus, X, ArrowRight, ArrowRightLeft, Zap, Gift, Sparkles, Search } from 'lucide-react';
 import { cn, getCurrencySymbol, formatDisplayAmount, formatAmountNumber, isBalanceAdjustmentTx, getLocalDateString } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { toast } from '@/components/ui/toast';
@@ -84,6 +84,14 @@ export function AddTransactionModal({
   const [isTagPickerOpen, setIsTagPickerOpen] = useState(false);
   const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
   const [newTagName, setNewTagName] = useState('');
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+
+  const filteredTags = useMemo(() => {
+    if (!tags) return [];
+    const query = tagSearchQuery.trim().toLowerCase();
+    if (!query) return tags;
+    return tags.filter(t => t.name.toLowerCase().includes(query));
+  }, [tags, tagSearchQuery]);
   const [isSplitDialogOpen, setIsSplitDialogOpen] = useState(false);
   const [displayAmount, setDisplayAmount] = useState('');
   const [displayAmountIn, setDisplayAmountIn] = useState('');
@@ -1809,7 +1817,7 @@ export function AddTransactionModal({
                   setIsNoteFocused(true);
                   setHasDismissedSuggestions(false);
                 }} 
-                className="w-full h-10 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-muted/60 border border-border text-sm sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors" 
+                className="w-full h-10 sm:h-8 px-3.5 sm:px-3 rounded-xl bg-muted/60 border border-border text-sm sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground transition-colors" 
               />
             </div>
           </div>
@@ -1998,23 +2006,54 @@ export function AddTransactionModal({
         />
 
         {/* 標籤選擇彈窗 (平級 Sibling Portal 宣告) */}
-        <Dialog open={isTagPickerOpen} onOpenChange={setIsTagPickerOpen}>
+        <Dialog
+          open={isTagPickerOpen}
+          onOpenChange={(open) => {
+            setIsTagPickerOpen(open);
+            if (!open) {
+              setTagSearchQuery('');
+            }
+          }}
+        >
           <DialogContent
             overlayClassName="z-[70]"
-            className="z-[70] w-[300px] max-w-[calc(100vw-32px)] sm:w-[300px] sm:max-w-[300px] bg-card border border-border text-card-foreground p-4"
+            className="z-[70] w-[320px] max-w-[calc(100vw-32px)] sm:w-[320px] sm:max-w-[320px] bg-card border border-border text-card-foreground p-4"
           >
             <DialogHeader>
               <DialogTitle className="text-card-foreground text-base font-semibold">
                 {t('tags.selectTags', '選擇標籤')}
               </DialogTitle>
             </DialogHeader>
-            <div className="flex flex-wrap gap-2 max-h-[260px] overflow-y-auto no-scrollbar py-2">
-              {tags?.length === 0 && (
+
+            <div className="relative flex items-center w-full my-2">
+              <Search className="size-4 text-muted-foreground absolute left-3 pointer-events-none" />
+              <Input
+                type="text"
+                value={tagSearchQuery}
+                onChange={(e) => setTagSearchQuery(e.target.value)}
+                placeholder={t('tags.searchPlaceholder', '搜尋標籤...')}
+                className="w-full h-9 pl-9 pr-8 text-xs font-sans rounded-lg bg-muted/10 border-border placeholder:text-muted-foreground/60"
+              />
+              {tagSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setTagSearchQuery('')}
+                  className="absolute right-2.5 p-0.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 max-h-[220px] overflow-y-auto no-scrollbar py-2">
+              {filteredTags.length === 0 && (
                 <div className="w-full py-4 text-center text-xs text-muted-foreground">
-                  {t('tags.noTagsAvailable', '暫無標籤')}
+                  {tags?.length === 0
+                    ? t('tags.noTagsAvailable', '暫無標籤')
+                    : t('tags.noMatchingTags', '無匹配標籤')}
                 </div>
               )}
-              {tags?.map(tag => {
+              {filteredTags.map(tag => {
                 const isSelected = selectedTagIds.includes(tag.id);
                 return (
                   <button

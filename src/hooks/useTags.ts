@@ -146,14 +146,25 @@ export function useTags() {
     });
   };
 
-  const deleteTag = async (id: string): Promise<void> => {
+  const deleteTag = async (id: string): Promise<{ success: boolean; reason?: string }> => {
+    const txCount = await db.transactions
+      .filter(t => !t.deleted && Boolean(t.tagIds?.includes(id)))
+      .count();
+
+    if (txCount > 0) {
+      return { success: false, reason: 'has_transactions' };
+    }
+
     const existing = await db.tags.get(id);
-    if (!existing) return;
+    if (!existing) return { success: false, reason: 'not_found' };
+
     await db.tags.update(id, {
       deleted: true,
       updatedAt: new Date().toISOString(),
       rev: (existing.rev || 1) + 1,
     });
+
+    return { success: true };
   };
 
   return {

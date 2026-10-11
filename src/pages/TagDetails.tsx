@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Tag as TagIcon } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTags } from '@/hooks/useTags';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -94,10 +94,7 @@ export default function TagDetails() {
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <div className="flex items-center gap-2 px-2 min-w-0">
-          <TagIcon className="h-4 w-4 opacity-60 shrink-0" />
-          <h2 className="text-xl font-semibold tracking-tight truncate">#{tag.name}</h2>
-        </div>
+        <h2 className="text-xl font-semibold tracking-tight truncate px-2">#{tag.name}</h2>
       </div>
 
       {/* 1:1 復刻賬戶頁面統計卡片 */}

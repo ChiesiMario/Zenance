@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, MoreVertical, Trash2, Edit2, Check, X, Archive, ChevronDown, RefreshCcw } from 'lucide-react';
+import { ChevronLeft, Plus, MoreVertical, Trash2, Edit2, Archive, ChevronDown, RefreshCcw, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCategories } from '@/hooks/useCategories';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Input } from '@/components/ui/input';
 import { type Category } from '@/services/db/db';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { toast } from '@/components/ui/toast';
+import { cn } from '@/lib/utils';
 
 export default function Categories() {
   const { t } = useTranslation();
@@ -20,8 +22,9 @@ export default function Categories() {
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
   const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>('active');
   
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [editName, setEditName] = useState('');
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [renamingCategory, setRenamingCategory] = useState<Category | null>(null);
+  const [renameName, setRenameName] = useState('');
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -39,15 +42,21 @@ export default function Categories() {
     return categories?.filter(c => c.type === activeTab) || [];
   }, [categories, archivedCategories, activeTab, filterStatus]);
 
-  const handleEditSubmit = async () => {
-    if (editingCategory && editName.trim()) {
-      await updateCategory(editingCategory.id, editName.trim());
-      setEditingCategory(null);
+  const handleRenameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (renamingCategory && renameName.trim()) {
+      await updateCategory(renamingCategory.id, renameName.trim());
+      setIsRenameDialogOpen(false);
+      setRenamingCategory(null);
+      setRenameName('');
     }
   };
 
   const handleDelete = async (cat: Category) => {
-    await deleteCategory(cat.id);
+    const res = await deleteCategory(cat.id);
+    if (!res.success && res.reason === 'has_transactions') {
+      toast.show(t('settings.categoryHasTransactionsCannotDelete', '此分類存在交易記錄，無法刪除。'));
+    }
   };
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -169,11 +178,11 @@ export default function Categories() {
             </div>
           ) : (
             currentCategories.map(cat => (
-              <div key={cat.id} className="flex items-center justify-between p-3 pl-4 group">
+              <div key={cat.id} className="flex items-center justify-between p-3 pl-4 transition-colors hover:bg-muted/40 group">
                 {filterStatus === 'archived' ? (
                   <>
                     <button 
-                      className="flex-1 text-left font-medium text-sm text-muted-foreground hover:underline cursor-pointer"
+                      className="flex-1 text-left font-medium text-sm text-muted-foreground cursor-pointer"
                       onClick={() => navigate(`/settings/categories/${cat.id}`)}
                     >
                       {cat.name}
@@ -188,71 +197,63 @@ export default function Categories() {
                       {t('settings.unarchive', '取消歸檔')}
                     </Button>
                   </>
-                ) : editingCategory?.id === cat.id ? (
-                  <div className="flex items-center gap-2 flex-1 mr-2">
-                    <Input 
-                      value={editName} 
-                      onChange={e => setEditName(e.target.value)} 
-                      className="h-8 flex-1"
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleEditSubmit();
-                        if (e.key === 'Escape') setEditingCategory(null);
-                      }}
-                    />
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={handleEditSubmit}>
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => setEditingCategory(null)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
                 ) : (
-                  <>
-                    {(() => {
-                      const hasTx = transactions?.some(t => !t.deleted && t.category === cat.id);
-                      return (
-                        <>
-                          <button 
-                            className="flex-1 text-left font-medium text-sm hover:underline cursor-pointer"
-                            onClick={() => navigate(`/settings/categories/${cat.id}`)}
-                          >
-                            {cat.name}
-                          </button>
-                          
-                          <DropdownMenu>
-                            <DropdownMenuTrigger render={
-                              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity">
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            } />
-                            <DropdownMenuContent align="end" className="w-[160px]">
-                              <DropdownMenuItem onClick={() => {
-                                setEditingCategory(cat);
-                                setEditName(cat.name);
-                              }}>
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                {t('dashboard.edit', '編輯')}
-                              </DropdownMenuItem>
-                              
-                              <DropdownMenuItem 
-                                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                onClick={() => handleDelete(cat)}
-                                disabled={hasTx}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                {t('dashboard.delete', '刪除')}
-                              </DropdownMenuItem>
+                  (() => {
+                    const hasTx = transactions?.some(t => !t.deleted && t.category === cat.id);
+                    return (
+                      <>
+                        <button 
+                          className="flex-1 text-left font-medium text-sm cursor-pointer"
+                          onClick={() => navigate(`/settings/categories/${cat.id}`)}
+                        >
+                          {cat.name}
+                        </button>
+                        
+                        <DropdownMenu>
+                          <DropdownMenuTrigger render={
+                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity">
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          } />
+                          <DropdownMenuContent align="end" className="w-[160px]">
+                            <DropdownMenuItem 
+                              className="cursor-pointer"
+                              onClick={() => {
+                                setRenamingCategory(cat);
+                                setRenameName(cat.name);
+                                setIsRenameDialogOpen(true);
+                              }}
+                            >
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              {t('common.rename', '重命名')}
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem 
+                              className={cn(
+                                "text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer",
+                                hasTx && "opacity-50"
+                              )}
+                              onClick={() => {
+                                if (hasTx) {
+                                  toast.show(t('settings.categoryHasTransactionsCannotDelete', '此分類存在交易記錄，無法刪除。'));
+                                  return;
+                                }
+                                handleDelete(cat);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {t('common.delete', '刪除')}
+                            </DropdownMenuItem>
 
-                              <DropdownMenuItem onClick={() => archiveCategory(cat.id)}>
-                                <Archive className="h-4 w-4 mr-2" />
-                                {t('settings.archive', '歸檔')}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </>
-                      );
-                    })()}
-                  </>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => archiveCategory(cat.id)}>
+                              <Archive className="h-4 w-4 mr-2" />
+                              {t('settings.archive', '歸檔')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    );
+                  })()
                 )}
               </div>
             ))
@@ -260,22 +261,71 @@ export default function Categories() {
         </div>
       </div>
 
+      {/* 新增分類 Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[300px]">
+        <DialogContent
+          overlayClassName="z-[70]"
+          className="z-[70] w-[300px] max-w-[calc(100vw-32px)] sm:w-[300px] sm:max-w-[300px] bg-card border border-border text-card-foreground p-5"
+        >
           <DialogHeader>
-            <DialogTitle>{t('add.addCategory')}</DialogTitle>
+            <DialogTitle className="text-card-foreground text-base font-semibold">
+              {t('add.addCategory')}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddSubmit} className="space-y-4 py-1">
+          <form onSubmit={handleAddSubmit} className="space-y-4 py-2">
             <Input 
               placeholder={t('add.newCategoryPlaceholder')} 
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
+              value={newName} 
+              onChange={e => setNewName(e.target.value)} 
             />
-            <DialogFooter>
-              <DialogClose render={<Button type="button" variant="outline" />}>
-                {t('dashboard.close')}
+            <DialogFooter className="flex flex-row items-center justify-between gap-3 pt-2">
+              <DialogClose render={<Button type="button" variant="outline" className="border-border" />}>
+                {t('common.cancel')}
               </DialogClose>
-              <Button type="submit" disabled={!newName.trim()}>{t('dashboard.save')}</Button>
+              <Button type="submit" disabled={!newName.trim()}>
+                {t('common.add')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 重命名分類 Dialog */}
+      <Dialog 
+        open={isRenameDialogOpen} 
+        onOpenChange={(open) => {
+          setIsRenameDialogOpen(open);
+          if (!open) {
+            setRenamingCategory(null);
+            setRenameName('');
+          }
+        }}
+      >
+        <DialogContent
+          overlayClassName="z-[70]"
+          className="z-[70] w-[300px] max-w-[calc(100vw-32px)] sm:w-[300px] sm:max-w-[300px] bg-card border border-border text-card-foreground p-5"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-card-foreground text-base font-semibold">
+              {t('settings.renameCategory', '重命名分類')}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleRenameSubmit} className="space-y-4 py-2">
+            <Input 
+              placeholder={t('settings.renameCategoryPlaceholder', '輸入分類名稱...')} 
+              value={renameName} 
+              onChange={e => setRenameName(e.target.value)} 
+            />
+            <DialogFooter className="flex flex-row items-center justify-between gap-3 pt-2">
+              <DialogClose render={<Button type="button" variant="outline" className="border-border" />}>
+                {t('common.cancel')}
+              </DialogClose>
+              <Button 
+                type="submit" 
+                disabled={!renameName.trim() || renameName.trim() === renamingCategory?.name}
+              >
+                {t('common.save')}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

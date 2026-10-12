@@ -48,7 +48,7 @@ import type { Transaction } from '@/services/db/db';
 export type PeriodType = 'week' | 'month' | 'quarter' | 'year';
 
 export default function Reports() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const { allCategories } = useCategories();
@@ -82,8 +82,9 @@ export default function Reports() {
     } else if (periodType === 'month') {
       start = startOfMonth(currentDate);
       end = endOfMonth(currentDate);
-      const isZh = i18n.language.startsWith('zh');
-      label = isZh ? `${year} 年 ${format(currentDate, 'M')} 月` : format(currentDate, 'MMMM yyyy');
+      const m = currentDate.getMonth() + 1;
+      const monthName = t(`reports.months.m${m}`);
+      label = t('reports.dateFormats.month', { year, month: m, monthName });
     } else if (periodType === 'quarter') {
       start = startOfQuarter(currentDate);
       end = endOfQuarter(currentDate);
@@ -92,11 +93,11 @@ export default function Reports() {
     } else {
       start = startOfYear(currentDate);
       end = endOfYear(currentDate);
-      label = i18n.language.startsWith('zh') ? `${year} 年` : `${year}`;
+      label = t('reports.dateFormats.year', { year });
     }
 
     return { startDate: start, endDate: end, periodLabel: label };
-  }, [periodType, currentDate, t, i18n.language]);
+  }, [periodType, currentDate, t]);
 
   // 前後週期導航
   const handlePrev = () => {
@@ -358,18 +359,21 @@ export default function Reports() {
       return { expense: Math.max(0, exp), income: Math.max(0, inc) };
     };
 
+    const WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+
     if (periodType === 'week') {
-      const days = ['一', '二', '三', '四', '五', '六', '日'];
       for (let i = 0; i < 7; i++) {
         const currentDay = addWeeks(startDate, 0);
         currentDay.setDate(startDate.getDate() + i);
         const dayStr = format(currentDay, 'yyyy-MM-dd');
         const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
         const { expense, income } = calculateTotals(dayTxs);
-        const isZh = i18n.language.startsWith('zh');
+        
+        const weekdayKey = WEEKDAY_KEYS[i];
+        const weekdayLabel = t(`reports.weekdays.${weekdayKey}`);
         points.push({
-          label: isZh ? `週${days[i]}` : format(currentDay, 'EEE'),
-          fullLabel: `${format(currentDay, 'MM/dd')} (${isZh ? `週${days[i]}` : format(currentDay, 'EEE')})`,
+          label: weekdayLabel,
+          fullLabel: `${format(currentDay, 'MM/dd')} (${weekdayLabel})`,
           expense,
           income,
           dateKey: dayStr,
@@ -377,7 +381,6 @@ export default function Reports() {
       }
     } else if (periodType === 'month') {
       const daysInMonth = endDate.getDate();
-      const isZh = i18n.language.startsWith('zh');
       for (let day = 1; day <= daysInMonth; day++) {
         const currentDay = new Date(startDate);
         currentDay.setDate(day);
@@ -385,8 +388,12 @@ export default function Reports() {
         const dayTxs = periodTransactions.filter(tx => tx.date.startsWith(dayStr));
         const { expense, income } = calculateTotals(dayTxs);
         points.push({
-          label: isZh ? `${day}日` : `${day}`,
-          fullLabel: format(currentDay, 'yyyy/MM/dd'),
+          label: t('reports.dateFormats.day', { day }),
+          fullLabel: t('reports.dateFormats.fullDate', {
+            year: getYear(startDate),
+            month: String(startDate.getMonth() + 1).padStart(2, '0'),
+            day: String(day).padStart(2, '0'),
+          }),
           expense,
           income,
           dateKey: dayStr,
@@ -394,7 +401,6 @@ export default function Reports() {
       }
     } else if (periodType === 'quarter') {
       const startM = startDate.getMonth();
-      const isZh = i18n.language.startsWith('zh');
       for (let i = 0; i < 3; i++) {
         const m = (startM + i) % 12;
         const monthTxs = periodTransactions.filter(tx => {
@@ -402,34 +408,47 @@ export default function Reports() {
           return dateObj.getMonth() === m;
         });
         const { expense, income } = calculateTotals(monthTxs);
+        const mNum = m + 1;
+        const monthLabel = t(`reports.monthsShort.m${mNum}`);
+        const fullLabel = t('reports.dateFormats.month', {
+          year: getYear(currentDate),
+          month: mNum,
+          monthName: t(`reports.months.m${mNum}`),
+        });
         points.push({
-          label: isZh ? `${m + 1}月` : format(new Date(2000, m, 1), 'MMM'),
-          fullLabel: isZh ? `${getYear(currentDate)} 年 ${m + 1} 月` : format(new Date(getYear(currentDate), m, 1), 'MMMM yyyy'),
+          label: monthLabel,
+          fullLabel,
           expense,
           income,
-          dateKey: `${getYear(currentDate)}-${String(m + 1).padStart(2, '0')}`,
+          dateKey: `${getYear(currentDate)}-${String(mNum).padStart(2, '0')}`,
         });
       }
     } else {
-      const isZh = i18n.language.startsWith('zh');
       for (let m = 0; m < 12; m++) {
         const monthTxs = periodTransactions.filter(tx => {
           const dateObj = parseISO(tx.date);
           return dateObj.getMonth() === m;
         });
         const { expense, income } = calculateTotals(monthTxs);
+        const mNum = m + 1;
+        const monthLabel = t(`reports.monthsShort.m${mNum}`);
+        const fullLabel = t('reports.dateFormats.month', {
+          year: getYear(currentDate),
+          month: mNum,
+          monthName: t(`reports.months.m${mNum}`),
+        });
         points.push({
-          label: isZh ? `${m + 1}月` : format(new Date(2000, m, 1), 'MMM'),
-          fullLabel: isZh ? `${getYear(currentDate)} 年 ${m + 1} 月` : format(new Date(getYear(currentDate), m, 1), 'MMMM yyyy'),
+          label: monthLabel,
+          fullLabel,
           expense,
           income,
-          dateKey: `${getYear(currentDate)}-${String(m + 1).padStart(2, '0')}`,
+          dateKey: `${getYear(currentDate)}-${String(mNum).padStart(2, '0')}`,
         });
       }
     }
 
     return points;
-  }, [periodTransactions, periodType, startDate, endDate, i18n.language, currentDate]);
+  }, [periodTransactions, periodType, startDate, endDate, t, currentDate]);
 
   return (
     <div className="w-full space-y-4 pb-12">

@@ -43,8 +43,16 @@ export function PreferencesSection({
   };
 
   const getLanguageLabel = (lang: string) => {
-    if (lang === 'zh-TW' || lang.startsWith('zh-TW') || lang.startsWith('zh-Hant')) return '繁體中文';
+    if (lang === 'zh-HK' || lang.startsWith('zh-HK')) return '繁體中文 (香港)';
+    if (lang === 'zh-TW' || lang.startsWith('zh-TW') || lang.startsWith('zh-Hant')) return '繁體中文 (台灣)';
     if (lang === 'zh-CN' || lang.startsWith('zh-CN') || lang.startsWith('zh-Hans')) return '简体中文';
+    if (lang === 'ja' || lang.startsWith('ja')) return '日本語';
+    if (lang === 'ko' || lang.startsWith('ko')) return '한국어';
+    if (lang === 'es' || lang.startsWith('es')) return 'Español';
+    if (lang === 'de' || lang.startsWith('de')) return 'Deutsch';
+    if (lang === 'fr' || lang.startsWith('fr')) return 'Français';
+    if (lang === 'vi' || lang.startsWith('vi')) return 'Tiếng Việt';
+    if (lang === 'pt' || lang.startsWith('pt')) return 'Português';
     return 'English';
   };
 
@@ -90,9 +98,17 @@ export function PreferencesSection({
               </SelectValue>
             </SelectTrigger>
             <SelectContent align="end">
-              <SelectItem value="zh-TW">繁體中文</SelectItem>
+              <SelectItem value="zh-TW">繁體中文 (台灣)</SelectItem>
+              <SelectItem value="zh-HK">繁體中文 (香港)</SelectItem>
               <SelectItem value="zh-CN">简体中文</SelectItem>
               <SelectItem value="en">English</SelectItem>
+              <SelectItem value="ja">日本語</SelectItem>
+              <SelectItem value="ko">한국어</SelectItem>
+              <SelectItem value="es">Español</SelectItem>
+              <SelectItem value="de">Deutsch</SelectItem>
+              <SelectItem value="fr">Français</SelectItem>
+              <SelectItem value="vi">Tiếng Việt</SelectItem>
+              <SelectItem value="pt">Português</SelectItem>
             </SelectContent>
           </Select>
         </div>

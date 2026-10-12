@@ -46,8 +46,14 @@ export default function Setup() {
   
   const getDefaultCurrency = () => {
     const lang = i18n.resolvedLanguage || i18n.language || 'zh-TW';
+    if (lang === 'zh-HK' || lang.startsWith('zh-HK')) return 'HKD';
     if (lang === 'zh-TW' || lang.startsWith('zh-TW')) return 'TWD';
     if (lang === 'zh-CN' || lang.startsWith('zh-CN')) return 'CNY';
+    if (lang === 'ja' || lang.startsWith('ja')) return 'JPY';
+    if (lang === 'ko' || lang.startsWith('ko')) return 'KRW';
+    if (lang === 'vi' || lang.startsWith('vi')) return 'VND';
+    if (lang === 'pt' || lang.startsWith('pt')) return 'BRL';
+    if (lang === 'es' || lang.startsWith('es') || lang === 'de' || lang.startsWith('de') || lang === 'fr' || lang.startsWith('fr')) return 'EUR';
     return 'USD';
   };
   const [currency, setCurrency] = useState(getDefaultCurrency);

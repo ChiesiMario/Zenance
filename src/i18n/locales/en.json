@@ -27,7 +27,11 @@
         "yi": "100M"
       },
       "more": "More",
-      "offline": "Offline"
+      "offline": "Offline",
+      "create": "Create",
+      "done": "Done",
+      "saved": "Saved",
+      "required": "Required"
     },
     "calendar": {
       "monthYearFormat": "MMMM yyyy",
@@ -466,7 +470,9 @@
       "none": "None",
       "monthlyRuleDesc": "Automatically generated on the 1st of every month",
       "yearlyRuleDesc": "Automatically generated on the 1st of every year",
-      "daily": " · Daily "
+      "daily": " · Daily ",
+      "addSuccess": "Budget added successfully",
+      "noBudgets": "No budgets"
     },
     "ledgers": {
       "personal": "Personal",
@@ -531,7 +537,9 @@
       "netReceivable": "Net Receivable",
       "netBalance": "Net Contacts",
       "receivable": "Receivable",
-      "payable": "Payable"
+      "payable": "Payable",
+      "organization": "Organization",
+      "individual": "Individual"
     },
     "setup": {
       "s1Title": "Local-First Architecture,\nPure and Instant.",
@@ -799,7 +807,51 @@
       "utilizationRate": "Utilization",
       "overspent": "Overspent",
       "remaining": "Remaining",
-      "budgetTotal": "Budget {{amount}}"
+      "budgetTotal": "Budget {{amount}}",
+      "dateFormats": {
+        "month": "{{monthName}} {{year}}",
+        "year": "{{year}}",
+        "day": "{{day}}",
+        "chartMonth": "{{month}}",
+        "fullDate": "{{year}}/{{month}}/{{day}}"
+      },
+      "weekdays": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
+      },
+      "months": {
+        "m1": "January",
+        "m2": "February",
+        "m3": "March",
+        "m4": "April",
+        "m5": "May",
+        "m6": "June",
+        "m7": "July",
+        "m8": "August",
+        "m9": "September",
+        "m10": "October",
+        "m11": "November",
+        "m12": "December"
+      },
+      "monthsShort": {
+        "m1": "Jan",
+        "m2": "Feb",
+        "m3": "Mar",
+        "m4": "Apr",
+        "m5": "May",
+        "m6": "Jun",
+        "m7": "Jul",
+        "m8": "Aug",
+        "m9": "Sep",
+        "m10": "Oct",
+        "m11": "Nov",
+        "m12": "Dec"
+      }
     },
     "keypad": {
       "current": "Current",
@@ -998,7 +1050,9 @@
       "offlineToast": "Currently offline. Sync will resume once reconnected.",
       "reconnectingToast": "Checking network connection...",
       "retryToast": "Retrying sync...",
-      "lastSyncPrefix": "Last synced"
+      "lastSyncPrefix": "Last synced",
+      "retryAction": "Click to Retry",
+      "syncNowAction": "Sync Now"
     },
     "currencies": {
       "USD": "US Dollar",
@@ -1109,7 +1163,8 @@
       "deleteConfirmDesc": "Are you sure you want to delete tag \"{{name}}\"? The tag will be removed from associated transactions.",
       "tagNotFound": "Tag not found",
       "tagHasTransactionsCannotDelete": "This tag has transactions and cannot be deleted.",
-      "unarchive": "Unarchive"
+      "unarchive": "Unarchive",
+      "items": "{{count}} transactions"
     },
     "stats": {
       "pastMonth": "Past 30 Days",

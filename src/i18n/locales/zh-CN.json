@@ -27,7 +27,11 @@
         "b": "B"
       },
       "more": "更多",
-      "offline": "离线"
+      "offline": "离线",
+      "create": "创建",
+      "done": "完成",
+      "saved": "已保存",
+      "required": "必填"
     },
     "calendar": {
       "monthYearFormat": "yyyy 年 M 月",
@@ -466,7 +470,9 @@
       "none": "无",
       "monthlyRuleDesc": "每月 1 号自动生成",
       "yearlyRuleDesc": "每年 1 号自动生成",
-      "daily": " · 每日 "
+      "daily": " · 每日 ",
+      "addSuccess": "预算添加成功",
+      "noBudgets": "暂无预算"
     },
     "ledgers": {
       "personal": "个人账本",
@@ -531,7 +537,9 @@
       "netReceivable": "净应收",
       "netBalance": "往来净额",
       "receivable": "应收",
-      "payable": "应还"
+      "payable": "应还",
+      "organization": "组织机构",
+      "individual": "个人联系人"
     },
     "setup": {
       "s1Title": "全本地优先，\n极速流畅的记账体验。",
@@ -799,7 +807,51 @@
       "utilizationRate": "执行率",
       "overspent": "已超支",
       "remaining": "剩余",
-      "budgetTotal": "预算总额 {{amount}}"
+      "budgetTotal": "预算总额 {{amount}}",
+      "dateFormats": {
+        "month": "{{year}} 年 {{month}} 月",
+        "year": "{{year}} 年",
+        "day": "{{day}} 日",
+        "chartMonth": "{{month}} 月",
+        "fullDate": "{{year}}/{{month}}/{{day}}"
+      },
+      "weekdays": {
+        "mon": "周一",
+        "tue": "周二",
+        "wed": "周三",
+        "thu": "周四",
+        "fri": "周五",
+        "sat": "周六",
+        "sun": "周日"
+      },
+      "months": {
+        "m1": "1 月",
+        "m2": "2 月",
+        "m3": "3 月",
+        "m4": "4 月",
+        "m5": "5 月",
+        "m6": "6 月",
+        "m7": "7 月",
+        "m8": "8 月",
+        "m9": "9 月",
+        "m10": "10 月",
+        "m11": "11 月",
+        "m12": "12 月"
+      },
+      "monthsShort": {
+        "m1": "1 月",
+        "m2": "2 月",
+        "m3": "3 月",
+        "m4": "4 月",
+        "m5": "5 月",
+        "m6": "6 月",
+        "m7": "7 月",
+        "m8": "8 月",
+        "m9": "9 月",
+        "m10": "10 月",
+        "m11": "11 月",
+        "m12": "12 月"
+      }
     },
     "keypad": {
       "current": "当前",
@@ -936,21 +988,21 @@
       "scanning": "正在深度扫描全库实体关联...",
       "notScanned": "尚未执行全库健康诊断",
       "startScan": "立即开始体检",
-      "healthy": "数据库状态极佳 (100分)",
+      "healthy": "数据库状态极佳 (100 分)",
       "noIssues": "未发现任何悬挂外键、精度偏差或坏点",
       "scannedRecords": "已检测记录: {{count}} 笔",
       "duration": "耗时: {{ms}}ms",
       "recheck": "重新检查",
       "done": "完成",
       "issuesFound": "检测到 {{count}} 项微小异常",
-      "score": "评分: {{score}}分",
+      "score": "评分: {{score}} 分",
       "fixMethod": "↳ 修复方式: {{action}}",
       "rescan": "重新扫描",
       "repairing": "修复中...",
       "repaired": "修复完成",
       "oneClickRepair": "一键安全修复 ({{count}})",
-      "scoreGood": "100分 · 良好",
-      "scoreNeedRepair": "{{score}}分 · 需修复",
+      "scoreGood": "100 分 · 良好",
+      "scoreNeedRepair": "{{score}} 分 · 需修复",
       "checkNow": "立即体检"
     },
     "initialSync": {
@@ -998,7 +1050,9 @@
       "offlineToast": "目前处于离线状态，将于连线后自动同步",
       "reconnectingToast": "正在检查网络连线...",
       "retryToast": "正在重试同步...",
-      "lastSyncPrefix": "上次同步"
+      "lastSyncPrefix": "上次同步",
+      "retryAction": "点击重试",
+      "syncNowAction": "立即同步"
     },
     "currencies": {
       "USD": "美元",
@@ -1109,7 +1163,8 @@
       "deleteConfirmDesc": "确定要删除标签“{{name}}”吗？相关交易中的此标签关联将被移除。",
       "tagNotFound": "找不到此标签",
       "tagHasTransactionsCannotDelete": "此标签存在交易记录，无法删除。",
-      "unarchive": "解除归档"
+      "unarchive": "解除归档",
+      "items": "{{count}} 笔交易"
     },
     "stats": {
       "pastMonth": "近一月",

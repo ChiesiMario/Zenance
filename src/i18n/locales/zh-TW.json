@@ -27,7 +27,11 @@
         "b": "B"
       },
       "more": "更多",
-      "offline": "離線"
+      "offline": "離線",
+      "create": "建立",
+      "done": "完成",
+      "saved": "已儲存",
+      "required": "必填"
     },
     "calendar": {
       "monthYearFormat": "yyyy 年 M 月",
@@ -466,7 +470,9 @@
       "none": "無",
       "monthlyRuleDesc": "每月 1 號自動生成",
       "yearlyRuleDesc": "每年 1 號自動生成",
-      "daily": " · 每日 "
+      "daily": " · 每日 ",
+      "addSuccess": "預算新增成功",
+      "noBudgets": "尚無預算"
     },
     "ledgers": {
       "personal": "個人帳本",
@@ -531,7 +537,9 @@
       "netReceivable": "淨應收",
       "netBalance": "往來淨額",
       "receivable": "應收",
-      "payable": "應還"
+      "payable": "應還",
+      "organization": "組織機構",
+      "individual": "個人聯絡人"
     },
     "setup": {
       "s1Title": "全本地優先，\n極速流暢的記帳體驗。",
@@ -799,7 +807,51 @@
       "utilizationRate": "執行率",
       "overspent": "已超支",
       "remaining": "剩餘",
-      "budgetTotal": "預算總額 {{amount}}"
+      "budgetTotal": "預算總額 {{amount}}",
+      "dateFormats": {
+        "month": "{{year}} 年 {{month}} 月",
+        "year": "{{year}} 年",
+        "day": "{{day}} 日",
+        "chartMonth": "{{month}} 月",
+        "fullDate": "{{year}}/{{month}}/{{day}}"
+      },
+      "weekdays": {
+        "mon": "週一",
+        "tue": "週二",
+        "wed": "週三",
+        "thu": "週四",
+        "fri": "週五",
+        "sat": "週六",
+        "sun": "週日"
+      },
+      "months": {
+        "m1": "1 月",
+        "m2": "2 月",
+        "m3": "3 月",
+        "m4": "4 月",
+        "m5": "5 月",
+        "m6": "6 月",
+        "m7": "7 月",
+        "m8": "8 月",
+        "m9": "9 月",
+        "m10": "10 月",
+        "m11": "11 月",
+        "m12": "12 月"
+      },
+      "monthsShort": {
+        "m1": "1 月",
+        "m2": "2 月",
+        "m3": "3 月",
+        "m4": "4 月",
+        "m5": "5 月",
+        "m6": "6 月",
+        "m7": "7 月",
+        "m8": "8 月",
+        "m9": "9 月",
+        "m10": "10 月",
+        "m11": "11 月",
+        "m12": "12 月"
+      }
     },
     "keypad": {
       "current": "當前",
@@ -936,21 +988,21 @@
       "scanning": "正在深度掃描全庫實體關聯...",
       "notScanned": "尚未執行全庫健康診斷",
       "startScan": "立即開始體檢",
-      "healthy": "資料庫狀態極佳 (100分)",
+      "healthy": "資料庫狀態極佳 (100 分)",
       "noIssues": "未發現任何懸掛外鍵、精度偏差或壞點",
       "scannedRecords": "已檢測記錄: {{count}} 筆",
       "duration": "耗時: {{ms}}ms",
       "recheck": "重新檢查",
       "done": "完成",
       "issuesFound": "檢測到 {{count}} 項微小異常",
-      "score": "評分: {{score}}分",
+      "score": "評分: {{score}} 分",
       "fixMethod": "↳ 修復方式: {{action}}",
       "rescan": "重新掃描",
       "repairing": "修復中...",
       "repaired": "修復完成",
       "oneClickRepair": "一鍵安全修復 ({{count}})",
-      "scoreGood": "100分 · 良好",
-      "scoreNeedRepair": "{{score}}分 · 需修復",
+      "scoreGood": "100 分 · 良好",
+      "scoreNeedRepair": "{{score}} 分 · 需修復",
       "checkNow": "立即體檢"
     },
     "initialSync": {
@@ -998,7 +1050,9 @@
       "offlineToast": "目前處於離線狀態，將於連線後自動同步",
       "reconnectingToast": "正在檢查網路連線...",
       "retryToast": "正在重試同步...",
-      "lastSyncPrefix": "上次同步"
+      "lastSyncPrefix": "上次同步",
+      "retryAction": "點擊重試",
+      "syncNowAction": "立即同步"
     },
     "currencies": {
       "USD": "美元",
@@ -1109,7 +1163,8 @@
       "deleteConfirmDesc": "確定要刪除標籤「{{name}}」嗎？相關交易中的此標籤關聯將被移除。",
       "tagNotFound": "找不到此標籤",
       "tagHasTransactionsCannotDelete": "此標籤存在交易記錄，無法刪除。",
-      "unarchive": "解除歸檔"
+      "unarchive": "解除歸檔",
+      "items": "{{count}} 筆交易"
     },
     "stats": {
       "pastMonth": "近一月",

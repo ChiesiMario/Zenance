@@ -7,6 +7,15 @@ const OPFS_META_KEY = 'zenance_opfs_rolling_meta';
 
 export type RollingBackupTier = 'daily' | 'weekly' | 'monthly';
 
+export interface RollingSnapshotItem {
+  id: RollingBackupTier;
+  title: string;
+  filename: string;
+  date: string;
+  sizeFormatted: string;
+  updatedAt: string;
+}
+
 export interface RollingSnapshotMeta {
   tier: RollingBackupTier;
   filename: string;

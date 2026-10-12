@@ -97,7 +97,7 @@ export function PreferencesSection({
                 {getLanguageLabel(currentLang)}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent align="end">
+            <SelectContent align="end" className="min-w-52">
               <SelectItem value="zh-TW">繁體中文 (台灣)</SelectItem>
               <SelectItem value="zh-HK">繁體中文 (香港)</SelectItem>
               <SelectItem value="zh-CN">简体中文</SelectItem>

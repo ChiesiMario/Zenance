@@ -207,7 +207,7 @@
       "personalExpense": "개인 지출",
       "newContactPlaceholder": "연락처 이름 입력 (예: 회사, 친구)",
       "contactTypePersonal": "개인",
-      "contactTypeOrganization": "단체/기관",
+      "contactTypeOrganization": "기관",
       "errors": {
         "amountRequired": "금액을 입력해 주세요",
         "amountPositive": "금액은 0보다 커야 합니다",
@@ -515,7 +515,7 @@
       "toPay": "정산 대기",
       "settled": "정산 완료",
       "groupPersonal": "개인",
-      "groupOrganization": "단체/기관",
+      "groupOrganization": "기관",
       "noContacts": "등록된 연락처가 없습니다",
       "all": "전체",
       "totalLent": "빌려준 돈 합계",
@@ -538,7 +538,7 @@
       "netBalance": "대여 잔액",
       "receivable": "받을 금액",
       "payable": "줄 금액",
-      "organization": "단체/기관",
+      "organization": "기관",
       "individual": "개인 연락처"
     },
     "setup": {

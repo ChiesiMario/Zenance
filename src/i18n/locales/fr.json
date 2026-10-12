@@ -515,7 +515,7 @@
       "toPay": "To pay",
       "settled": "Settled",
       "groupPersonal": "Personnel",
-      "groupOrganization": "Organization",
+      "groupOrganization": "Organisation",
       "noContacts": "Aucun contact",
       "all": "All Contacts",
       "totalLent": "Total Paid",
@@ -538,7 +538,7 @@
       "netBalance": "Net Contacts",
       "receivable": "Receivable",
       "payable": "Payable",
-      "organization": "Organization",
+      "organization": "Organisation",
       "individual": "Contact personnel"
     },
     "setup": {

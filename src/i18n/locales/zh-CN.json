@@ -207,7 +207,7 @@
       "personalExpense": "自费支出",
       "newContactPlaceholder": "输入对象名称（如：XX 公司、朋友名字）",
       "contactTypePersonal": "个人",
-      "contactTypeOrganization": "组织",
+      "contactTypeOrganization": "机构",
       "errors": {
         "amountRequired": "必填",
         "amountPositive": "金额必须大于 0",
@@ -538,7 +538,7 @@
       "netBalance": "往来净额",
       "receivable": "应收",
       "payable": "应还",
-      "organization": "组织机构",
+      "organization": "机构",
       "individual": "个人联系人"
     },
     "setup": {

@@ -515,7 +515,7 @@
       "toPay": "To pay",
       "settled": "Settled",
       "groupPersonal": "Cá nhân",
-      "groupOrganization": "Organization",
+      "groupOrganization": "Tổ chức",
       "noContacts": "Chưa có đối tượng nào",
       "all": "All Contacts",
       "totalLent": "Total Paid",
@@ -538,7 +538,7 @@
       "netBalance": "Net Contacts",
       "receivable": "Receivable",
       "payable": "Payable",
-      "organization": "Organization",
+      "organization": "Tổ chức",
       "individual": "Liên hệ cá nhân"
     },
     "setup": {

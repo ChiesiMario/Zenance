@@ -207,7 +207,7 @@
       "personalExpense": "自己負担",
       "newContactPlaceholder": "連絡先名を入力（例: 会社、友人）",
       "contactTypePersonal": "個人",
-      "contactTypeOrganization": "組織・店舗",
+      "contactTypeOrganization": "組織",
       "errors": {
         "amountRequired": "金額を入力してください",
         "amountPositive": "金額は0より大きい必要があります",
@@ -515,7 +515,7 @@
       "toPay": "支払い待ち",
       "settled": "精算済み",
       "groupPersonal": "個人",
-      "groupOrganization": "組織・店舗",
+      "groupOrganization": "組織",
       "noContacts": "連絡先がまだありません",
       "all": "すべて",
       "totalLent": "貸付合計",
@@ -538,7 +538,7 @@
       "netBalance": "貸借残高",
       "receivable": "受取予定",
       "payable": "支払予定",
-      "organization": "組織・グループ",
+      "organization": "組織",
       "individual": "個人連絡先"
     },
     "setup": {

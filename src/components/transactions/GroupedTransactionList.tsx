@@ -5,7 +5,7 @@ import { useAccounts } from '@/hooks/useAccounts';
 import { useCategories } from '@/hooks/useCategories';
 import { useLedgers } from '@/hooks/useLedgers';
 import { useAppStore } from '@/store/useAppStore';
-import { ChevronRight, User, Building2 } from 'lucide-react';
+import { ChevronRight, User, Building2, Gift } from 'lucide-react';
 import { AmountDisplay } from '@/components/ui/AmountDisplay';
 import { TransactionDetailsDialog } from '@/components/transactions/TransactionDetailsDialog';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -31,6 +31,19 @@ function ContactCapsule({ name, group, maxWidthClass = 'max-w-[120px]' }: Contac
     >
       <Icon className="w-3 h-3 text-muted-foreground/70 shrink-0" />
       <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
+function GiftCapsule() {
+  const { t } = useTranslation();
+  return (
+    <span
+      title={t('add.gift', '贈與')}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 leading-none shrink-0"
+    >
+      <Gift className="w-3 h-3 text-purple-500 shrink-0" />
+      <span>{t('add.gift', '贈與')}</span>
     </span>
   );
 }
@@ -409,9 +422,6 @@ export function GroupedTransactionList({
   }, [allCategories]);
 
   const getCategoryName = useCallback((tx: Transaction) => {
-    if (tx.isGift) {
-      return t('add.gift', '贈與');
-    }
     if (tx.type === 'transfer') return t('add.transfer');
     if (tx.type === 'loan') {
       if (tx.category === 'advance') {
@@ -711,6 +721,7 @@ export function GroupedTransactionList({
                                     >
                                       {toName}
                                     </span>
+                                    {tx.isGift && <GiftCapsule />}
                                   </div>
                                 );
                               })()
@@ -729,6 +740,7 @@ export function GroupedTransactionList({
                                       {isLent ? t('add.lent') : t('add.borrowed')}
                                     </span>
                                     <ContactCapsule name={contactName} group={contactObj?.group} />
+                                    {tx.isGift && <GiftCapsule />}
                                   </div>
                                 );
                               })()
@@ -748,6 +760,7 @@ export function GroupedTransactionList({
                                     {contactObj?.name && (
                                       <ContactCapsule name={contactObj.name} group={contactObj?.group} />
                                     )}
+                                    {tx.isGift && <GiftCapsule />}
                                   </div>
                                 );
                               })()
@@ -758,6 +771,7 @@ export function GroupedTransactionList({
                                     ? allCategories?.find(c => c.id === contextCategoryId)?.name || getCategoryName(tx)
                                     : getCategoryName(tx)}
                                 </span>
+                                {tx.isGift && <GiftCapsule />}
                               </div>
                             )}
 
@@ -933,6 +947,7 @@ export function GroupedTransactionList({
                                         maxWidthClass="max-w-[100px]"
                                       />
                                     ))}
+                                    {item.transactions.some(t => t.isGift) && <GiftCapsule />}
                                   </>
                                 )}
                               </div>
@@ -1036,6 +1051,7 @@ export function GroupedTransactionList({
                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-foreground text-background leading-none shrink-0">
                                           {t('add.me', '我')}
                                         </span>
+                                        {subTx.isGift && <GiftCapsule />}
                                       </>
                                     ) : (
                                       <>
@@ -1046,6 +1062,7 @@ export function GroupedTransactionList({
                                           name={targetContactName}
                                           group={targetContact?.group}
                                         />
+                                        {subTx.isGift && <GiftCapsule />}
                                       </>
                                     )}
                                   </div>

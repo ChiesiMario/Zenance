@@ -30,21 +30,17 @@ export default function TagDetails() {
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
 
-  if (!id) return <Navigate to="/settings/tags" />;
+  const tag = allTags?.find(t => t.id === id);
 
-  if (!allTags || !transactions) {
-    return <div className="p-8 text-center text-muted-foreground">{t('common.loading', '載入中...')}</div>;
-  }
-
-  const tag = allTags.find(t => t.id === id);
-  if (!tag) return <Navigate to="/settings/tags" />;
-
-  const tagTransactions = sortTransactionsDesc(
-    transactions?.filter(t => !t.deleted && t.tagIds?.includes(id)) || []
-  );
+  const tagTransactions = useMemo(() => {
+    if (!transactions || !id) return [];
+    return sortTransactionsDesc(
+      transactions.filter(t => !t.deleted && t.tagIds?.includes(id))
+    );
+  }, [transactions, id]);
 
   const { allTimeAmount, pastMonthAmount, pastYearAmount } = useMemo(() => {
-    if (!tagTransactions || !tag) {
+    if (!tagTransactions.length || !tag) {
       return { allTimeAmount: undefined, pastMonthAmount: undefined, pastYearAmount: undefined };
     }
 
@@ -83,6 +79,14 @@ export default function TagDetails() {
       pastYearAmount: Math.round(yearSum * 100) / 100,
     };
   }, [tagTransactions, tag, baseCurrency, getRate]);
+
+  if (!id) return <Navigate to="/settings/tags" />;
+
+  if (!allTags || !transactions) {
+    return <div className="p-8 text-center text-muted-foreground">{t('common.loading', '載入中...')}</div>;
+  }
+
+  if (!tag) return <Navigate to="/settings/tags" />;
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4 pb-20">

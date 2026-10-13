@@ -30,21 +30,17 @@ export default function CategoryDetails() {
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
   const baseCurrency = activeLedger?.baseCurrency || 'CNY';
 
-  if (!id) return <Navigate to="/settings/categories" />;
+  const category = allCategories?.find(c => c.id === id);
 
-  if (!allCategories || !transactions) {
-    return <div className="p-8 text-center text-muted-foreground">{t('common.loading', '載入中...')}</div>;
-  }
-
-  const category = allCategories.find(c => c.id === id);
-  if (!category) return <Navigate to="/settings/categories" />;
-
-  const categoryTransactions = sortTransactionsDesc(
-    transactions?.filter(t => !t.deleted && t.category === id) || []
-  );
+  const categoryTransactions = useMemo(() => {
+    if (!transactions || !id) return [];
+    return sortTransactionsDesc(
+      transactions.filter(t => !t.deleted && t.category === id)
+    );
+  }, [transactions, id]);
 
   const { pastMonthAmount, pastYearAmount, allTimeAmount } = useMemo(() => {
-    if (!categoryTransactions || !category) {
+    if (!categoryTransactions.length || !category) {
       return { pastMonthAmount: undefined, pastYearAmount: undefined, allTimeAmount: undefined };
     }
 
@@ -77,6 +73,14 @@ export default function CategoryDetails() {
       allTimeAmount: Math.round(allSum * 100) / 100,
     };
   }, [categoryTransactions, category, baseCurrency, getRate]);
+
+  if (!id) return <Navigate to="/settings/categories" />;
+
+  if (!allCategories || !transactions) {
+    return <div className="p-8 text-center text-muted-foreground">{t('common.loading', '載入中...')}</div>;
+  }
+
+  if (!category) return <Navigate to="/settings/categories" />;
 
   return (
     <div className="w-full max-w-md mx-auto space-y-4 pb-20">

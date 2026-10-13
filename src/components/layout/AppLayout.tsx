@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect, useCallback } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { Home, Plus, Wallet, PieChart, Users, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, HandCoins, Coins } from 'lucide-react';
 import Dashboard from '@/pages/Dashboard';
@@ -56,6 +56,11 @@ export function AppLayout() {
     openAddModal, 
     closeAddModal 
   } = useAppStore();
+
+  const handleCloseAddModal = useCallback(() => {
+    closeAddModal();
+    setEditingTransactionId(null);
+  }, [closeAddModal, setEditingTransactionId]);
   
   const walletCount = wallets?.length ?? 0;
   const activeLedger = ledgers?.find(l => l.id === activeLedgerId);
@@ -444,10 +449,7 @@ export function AppLayout() {
       
       <AddTransactionModal 
         isOpen={isAddModalOpen || !!editingTransactionId} 
-        onClose={() => {
-          closeAddModal();
-          if (editingTransactionId) setEditingTransactionId(null);
-        }} 
+        onClose={handleCloseAddModal} 
         initialType={addModalType}
         initialLoanType={addModalLoanType}
         transactionToEditId={editingTransactionId}

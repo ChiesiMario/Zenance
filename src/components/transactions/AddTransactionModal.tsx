@@ -226,76 +226,96 @@ export function AddTransactionModal({
     return transactions.find((t) => t.id === transactionToEditId) || null;
   }, [transactionToEditId, transactions]);
 
+  // 記錄彈窗開啟與編輯目標載入狀態，防止背景任務更新或父層重新渲染導致重複重設
+  const prevIsOpenRef = useRef(false);
+  const loadedEditIdRef = useRef<string | null>(null);
+  const hasInitializedAddRef = useRef(false);
+
   // 編輯模式載入或新增模式重設
   useEffect(() => {
-    if (isOpen) {
-      if (transactionToEdit) {
-        if (isBalanceAdjustmentTx(transactionToEdit, allCategories)) {
-          toast.show(t('accounts.balanceAdjustmentCannotEdit', '餘額調整交易不允許編輯'));
-          onClose();
-          return;
-        }
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      loadedEditIdRef.current = null;
+      hasInitializedAddRef.current = false;
+      return;
+    }
 
-        // 編輯模式：分攤群組解析
+    // 1. 編輯模式處理
+    if (transactionToEditId) {
+      // 若該目標交易已經成功載入至表單，鎖定避免重複載入覆寫用戶當前編輯
+      if (loadedEditIdRef.current === transactionToEditId) {
+        prevIsOpenRef.current = true;
+        return;
+      }
+
+      // 等待交易資料從 Dexie 非同步 Resolve
+      if (!transactionToEdit) {
+        prevIsOpenRef.current = true;
+        return;
+      }
+
+      if (isBalanceAdjustmentTx(transactionToEdit, allCategories)) {
+        toast.show(t('accounts.balanceAdjustmentCannotEdit', '餘額調整交易不允許編輯'));
+        onClose();
+        return;
+      }
+
+      // 標記該交易已載入
+      loadedEditIdRef.current = transactionToEditId;
+      hasInitializedAddRef.current = false;
+
+      // 編輯模式：分攤群組解析
+      if (transactionToEdit.splitGroupId) {
+        const groupTxs =
+          transactions?.filter((t) => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
+        const loadedSplits: SplitItem[] = groupTxs
+          .filter((t) => t.type === 'loan' && t.toAccountId && t.category === 'advance')
+          .map((t) => ({ contactId: t.toAccountId!, amount: t.originalAmount }));
+        setSplits(loadedSplits);
+        const totalGroupOriginalAmount = groupTxs.reduce((sum, t) => sum + t.originalAmount, 0);
+        setDisplayAmount(totalGroupOriginalAmount.toString());
+      } else if (
+        transactionToEdit.type === 'loan' &&
+        transactionToEdit.category === 'advance' &&
+        transactionToEdit.toAccountId
+      ) {
+        setSplits([{ contactId: transactionToEdit.toAccountId, amount: transactionToEdit.originalAmount }]);
+      } else {
+        setSplits([]);
+      }
+
+      const isAdvanceLoan = transactionToEdit.type === 'loan' && transactionToEdit.category === 'advance';
+      if (isAdvanceLoan) {
+        setType('expense');
+      } else {
+        setType(transactionToEdit.type);
+      }
+      const isLend =
+        transactionToEdit.type === 'loan' && contacts?.some((c) => c.id === transactionToEdit.toAccountId);
+      setLoanType(isLend ? 'lend' : 'borrow');
+      setIsGift(!!transactionToEdit.isGift);
+
+      if (!transactionToEdit.splitGroupId) {
+        setDisplayAmount(transactionToEdit.originalAmount.toString());
+      }
+      if (transactionToEdit.transferInAmount !== undefined && transactionToEdit.transferInAmount > 0) {
+        setDisplayAmountIn(transactionToEdit.transferInAmount.toString());
+      } else {
+        setDisplayAmountIn('');
+      }
+
+      // 轉帳手續費解析
+      if (transactionToEdit.type === 'transfer') {
         if (transactionToEdit.splitGroupId) {
-          const groupTxs =
-            transactions?.filter((t) => !t.deleted && t.splitGroupId === transactionToEdit.splitGroupId) || [];
-          const loadedSplits: SplitItem[] = groupTxs
-            .filter((t) => t.type === 'loan' && t.toAccountId && t.category === 'advance')
-            .map((t) => ({ contactId: t.toAccountId!, amount: t.originalAmount }));
-          setSplits(loadedSplits);
-          const totalGroupOriginalAmount = groupTxs.reduce((sum, t) => sum + t.originalAmount, 0);
-          setDisplayAmount(totalGroupOriginalAmount.toString());
-        } else if (
-          transactionToEdit.type === 'loan' &&
-          transactionToEdit.category === 'advance' &&
-          transactionToEdit.toAccountId
-        ) {
-          setSplits([{ contactId: transactionToEdit.toAccountId, amount: transactionToEdit.originalAmount }]);
-        } else {
-          setSplits([]);
-        }
-
-        const isAdvanceLoan = transactionToEdit.type === 'loan' && transactionToEdit.category === 'advance';
-        if (isAdvanceLoan) {
-          setType('expense');
-        } else {
-          setType(transactionToEdit.type);
-        }
-        const isLend =
-          transactionToEdit.type === 'loan' && contacts?.some((c) => c.id === transactionToEdit.toAccountId);
-        setLoanType(isLend ? 'lend' : 'borrow');
-        setIsGift(!!transactionToEdit.isGift);
-
-        if (!transactionToEdit.splitGroupId) {
-          setDisplayAmount(transactionToEdit.originalAmount.toString());
-        }
-        if (transactionToEdit.transferInAmount !== undefined && transactionToEdit.transferInAmount > 0) {
-          setDisplayAmountIn(transactionToEdit.transferInAmount.toString());
-        } else {
-          setDisplayAmountIn('');
-        }
-
-        // 轉帳手續費解析
-        if (transactionToEdit.type === 'transfer') {
-          if (transactionToEdit.splitGroupId) {
-            const feeTx = transactions?.find(
-              (t) =>
-                !t.deleted &&
-                t.splitGroupId === transactionToEdit.splitGroupId &&
-                t.type === 'expense' &&
-                t.id !== transactionToEdit.id
-            );
-            if (feeTx) {
-              setDisplayFeeAmount(feeTx.originalAmount.toString());
-            } else if (
-              transactionToEdit.transferInAmount !== undefined &&
-              transactionToEdit.originalAmount > transactionToEdit.transferInAmount
-            ) {
-              setDisplayFeeAmount((transactionToEdit.originalAmount - transactionToEdit.transferInAmount).toString());
-            } else {
-              setDisplayFeeAmount('');
-            }
+          const feeTx = transactions?.find(
+            (t) =>
+              !t.deleted &&
+              t.splitGroupId === transactionToEdit.splitGroupId &&
+              t.type === 'expense' &&
+              t.id !== transactionToEdit.id
+          );
+          if (feeTx) {
+            setDisplayFeeAmount(feeTx.originalAmount.toString());
           } else if (
             transactionToEdit.transferInAmount !== undefined &&
             transactionToEdit.originalAmount > transactionToEdit.transferInAmount
@@ -304,82 +324,102 @@ export function AddTransactionModal({
           } else {
             setDisplayFeeAmount('');
           }
-          setFocusedField('out');
+        } else if (
+          transactionToEdit.transferInAmount !== undefined &&
+          transactionToEdit.originalAmount > transactionToEdit.transferInAmount
+        ) {
+          setDisplayFeeAmount((transactionToEdit.originalAmount - transactionToEdit.transferInAmount).toString());
         } else {
           setDisplayFeeAmount('');
-          setFocusedField('out');
         }
-
-        reset({
-          amount: transactionToEdit.originalAmount,
-          categoryId: transactionToEdit.category,
-          accountId: transactionToEdit.accountId,
-          fromAccountId:
-            !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan')
-              ? transactionToEdit.accountId
-              : undefined,
-          toAccountId:
-            !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan')
-              ? transactionToEdit.toAccountId || undefined
-              : undefined,
-          transferInAmount: transactionToEdit.transferInAmount,
-          budgetId: transactionToEdit.budgetId || (transactionToEdit.type === 'income' ? 'none' : 'auto'),
-          date: transactionToEdit.date,
-          note: transactionToEdit.note || '',
-        });
-        setSelectedTagIds(transactionToEdit.tagIds || []);
+        setFocusedField('out');
       } else {
-        // 新增模式
-        const today = getLocalDateString();
-        setType(initialType);
-        setSelectedTagIds([]);
-        reset({
-          amount: '' as unknown as number,
-          categoryId: initialCategoryId || '',
-          accountId: initialAccountId || '',
-          fromAccountId: '',
-          toAccountId: initialToAccountId || '',
-          transferInAmount: undefined,
-          feeCategoryId: undefined,
-          budgetId: initialType === 'income' ? 'none' : 'auto',
-          date: today,
-          note: initialNote || '',
-        });
-        setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
-        setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
-
-        if (initialAmount && initialAmount > 0) {
-          const roundedInit = roundToTwo(initialAmount);
-          setDisplayAmount(roundedInit.toString());
-          setValue('amount', roundedInit);
-        } else {
-          setDisplayAmount('');
-        }
-        if (initialToAccountId) {
-          setValue('toAccountId', initialToAccountId);
-        }
-        if (initialAccountId) {
-          setValue('accountId', initialAccountId);
-        }
-        if (initialCategoryId) {
-          setValue('categoryId', initialCategoryId);
-          setIsUserSelectedCat(true);
-        }
-        if (initialNote) {
-          setValue('note', initialNote);
-        }
-        setDisplayAmountIn('');
         setDisplayFeeAmount('');
         setFocusedField('out');
-        setPreviousAmountField('out');
-        setValue('feeCategoryId', undefined);
-        setLoanType(initialLoanType);
-        setIsGift(false);
-        setIsUserSelectedCat(Boolean(transactionToEditId || initialCategoryId));
       }
+
+      reset({
+        amount: transactionToEdit.originalAmount,
+        categoryId: transactionToEdit.category,
+        accountId: transactionToEdit.accountId,
+        fromAccountId:
+          !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan')
+            ? transactionToEdit.accountId
+            : undefined,
+        toAccountId:
+          !isAdvanceLoan && (transactionToEdit.type === 'transfer' || transactionToEdit.type === 'loan')
+            ? transactionToEdit.toAccountId || undefined
+            : undefined,
+        transferInAmount: transactionToEdit.transferInAmount,
+        budgetId: transactionToEdit.budgetId || (transactionToEdit.type === 'income' ? 'none' : 'auto'),
+        date: transactionToEdit.date,
+        note: transactionToEdit.note || '',
+      });
+      setSelectedTagIds(transactionToEdit.tagIds || []);
+      prevIsOpenRef.current = true;
+      return;
     }
+
+    // 2. 新增模式處理：僅在開啟瞬間（或從編輯切換為新增時）執行單次初始化
+    if (hasInitializedAddRef.current) {
+      prevIsOpenRef.current = true;
+      return;
+    }
+
+    hasInitializedAddRef.current = true;
+    loadedEditIdRef.current = null;
+
+    const today = getLocalDateString();
+    setType(initialType);
+    setSelectedTagIds([]);
+    reset({
+      amount: '' as unknown as number,
+      categoryId: initialCategoryId || '',
+      accountId: initialAccountId || '',
+      fromAccountId: '',
+      toAccountId: initialToAccountId || '',
+      transferInAmount: undefined,
+      feeCategoryId: undefined,
+      budgetId: initialType === 'income' ? 'none' : 'auto',
+      date: today,
+      note: initialNote || '',
+    });
+    setSplits(initialContactId ? [{ contactId: initialContactId, amount: 0 }] : []);
+    setValue('budgetId', initialType === 'income' ? 'none' : 'auto');
+
+    if (initialAmount && initialAmount > 0) {
+      const roundedInit = roundToTwo(initialAmount);
+      setDisplayAmount(roundedInit.toString());
+      setValue('amount', roundedInit);
+    } else {
+      setDisplayAmount('');
+    }
+    if (initialToAccountId) {
+      setValue('toAccountId', initialToAccountId);
+    }
+    if (initialAccountId) {
+      setValue('accountId', initialAccountId);
+    }
+    if (initialCategoryId) {
+      setValue('categoryId', initialCategoryId);
+      setIsUserSelectedCat(true);
+    }
+    if (initialNote) {
+      setValue('note', initialNote);
+    }
+    setDisplayAmountIn('');
+    setDisplayFeeAmount('');
+    setFocusedField('out');
+    setPreviousAmountField('out');
+    setValue('feeCategoryId', undefined);
+    setLoanType(initialLoanType);
+    setIsGift(false);
+    setIsUserSelectedCat(Boolean(initialCategoryId));
+    prevIsOpenRef.current = true;
   }, [
     isOpen,
+    transactionToEditId,
+    transactionToEdit,
     initialType,
     initialLoanType,
     initialContactId,
@@ -388,14 +428,11 @@ export function AddTransactionModal({
     initialAccountId,
     initialCategoryId,
     initialNote,
-    transactionToEdit,
     transactions,
-    baseCurrency,
     contacts,
+    allCategories,
     reset,
     setValue,
-    transactionToEditId,
-    allCategories,
     t,
     onClose,
   ]);

@@ -4,13 +4,14 @@
 
 > A minimalist, privacy-first personal finance PWA engineered with uncompromising monochrome aesthetics and end-to-end encrypted synchronization.
 
+[![Website](https://img.shields.io/badge/website-zenance.pages.dev-black?style=flat-square&labelColor=white)](https://zenance.pages.dev/)
 ![Version](https://img.shields.io/badge/version-1.0.0-black?style=flat-square&labelColor=white)
 ![Platform](https://img.shields.io/badge/platform-PWA%20%7C%20Web-black?style=flat-square&labelColor=white)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-black?style=flat-square&labelColor=white)
 
 <br>
 <p align="center">
-  <img src="Screenshot/image.png" alt="Zenance Screenshot" width="800">
+  <img src="Screenshot/cover-en.png" alt="Zenance Showcase" width="100%">
 </p>
 <br>
 
@@ -36,6 +37,11 @@
 - **Internationalization**: react-i18next
 
 ## INSTALLATION
+
+### Live Web App (Instant Access)
+
+Experience Zenance directly in your browser or install it as a PWA:
+👉 **[https://zenance.pages.dev](https://zenance.pages.dev/)**
 
 ### Prerequisites
 

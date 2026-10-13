@@ -2,6 +2,8 @@
   "name": "zenance",
   "private": true,
   "version": "1.0.0",
+  "description": "Minimalist, privacy-first personal finance PWA engineered with craft monochrome aesthetics and end-to-end encrypted synchronization.",
+  "homepage": "https://zenance.pages.dev/",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {

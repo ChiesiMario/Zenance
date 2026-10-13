@@ -4,13 +4,14 @@
 
 > 一款極簡、隱私優先的個人記帳 PWA 應用程式，專注於純粹黑白工程師美學與端到端加密同步。
 
+[![Website](https://img.shields.io/badge/website-zenance.pages.dev-black?style=flat-square&labelColor=white)](https://zenance.pages.dev/)
 ![Version](https://img.shields.io/badge/version-1.0.0-black?style=flat-square&labelColor=white)
 ![Platform](https://img.shields.io/badge/platform-PWA%20%7C%20Web-black?style=flat-square&labelColor=white)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-black?style=flat-square&labelColor=white)
 
 <br>
 <p align="center">
-  <img src="Screenshot/image.png" alt="Zenance Screenshot" width="800">
+  <img src="Screenshot/cover-zh-TW.png" alt="Zenance 雙端展示" width="100%">
 </p>
 <br>
 
@@ -36,6 +37,11 @@
 - **多國語系**: react-i18next
 
 ## 安裝與執行
+
+### 線上即時體驗 (Web App)
+
+無需安裝，即可直接在瀏覽器中開始使用或一鍵安裝為 PWA：
+👉 **[https://zenance.pages.dev](https://zenance.pages.dev/)**
 
 ### 環境需求
 

@@ -6,7 +6,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-black?style=flat-square&labelColor=white)
 ![Platform](https://img.shields.io/badge/platform-PWA%20%7C%20Web-black?style=flat-square&labelColor=white)
-![License](https://img.shields.io/badge/license-MIT-black?style=flat-square&labelColor=white)
+![License](https://img.shields.io/badge/license-AGPL--3.0-black?style=flat-square&labelColor=white)
 
 <br>
 <p align="center">
@@ -73,4 +73,4 @@ Zenance 遵循高度模組化且職責分明的乾淨架構，徹底解耦 UI �
 
 ## 授權條款
 
-本專案採用 MIT 授權條款。
+本專案採用 GNU Affero General Public License v3 (AGPLv3) 授權條款，完整內容請參閱 [LICENSE](LICENSE) 檔案。

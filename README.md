@@ -6,7 +6,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-black?style=flat-square&labelColor=white)
 ![Platform](https://img.shields.io/badge/platform-PWA%20%7C%20Web-black?style=flat-square&labelColor=white)
-![License](https://img.shields.io/badge/license-MIT-black?style=flat-square&labelColor=white)
+![License](https://img.shields.io/badge/license-AGPL--3.0-black?style=flat-square&labelColor=white)
 
 <br>
 <p align="center">
@@ -73,4 +73,4 @@ Zenance follows a clean, modular architecture separating concerns across present
 
 ## LICENSE
 
-This project is licensed under the MIT License.
+This project is licensed under the GNU Affero General Public License v3 (AGPLv3). See the [LICENSE](LICENSE) file for details.

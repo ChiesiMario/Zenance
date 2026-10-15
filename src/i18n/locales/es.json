@@ -628,6 +628,7 @@
       "archived": "Archivado",
       "unarchive": "Unarchive",
       "noArchivedCategories": "No hay categorías archivadas",
+      "noCategories": "Aún no hay categorías personalizadas. Toca la esquina superior derecha para agregar una.",
       "renameCategory": "Renombrar categoría",
       "renameCategoryPlaceholder": "Nombre de categoría...",
       "categoryHasTransactionsCannotDelete": "Esta categoría tiene transacciones asociadas y no se puede eliminar.",

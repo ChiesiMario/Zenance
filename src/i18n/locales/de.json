@@ -628,6 +628,7 @@
       "archived": "Archiviert",
       "unarchive": "Unarchive",
       "noArchivedCategories": "Keine archivierten Kategorien",
+      "noCategories": "Noch keine benutzerdefinierten Kategorien. Tippen Sie oben rechts, um eine hinzuzufügen.",
       "renameCategory": "Kategorie umbenennen",
       "renameCategoryPlaceholder": "Kategoriename eingeben...",
       "categoryHasTransactionsCannotDelete": "Diese Kategorie enthält Buchungen und kann nicht gelöscht werden.",

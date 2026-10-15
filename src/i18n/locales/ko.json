@@ -628,6 +628,7 @@
       "archived": "아카이브됨",
       "unarchive": "취소보관",
       "noArchivedCategories": "아카이브된 카테고리가 없습니다",
+      "noCategories": "사용자 지정 카테고리가 없습니다. 오른쪽 상단을 탭하여 추가하세요.",
       "renameCategory": "카테고리 이름 변경",
       "renameCategoryPlaceholder": "카테고리 이름 입력...",
       "categoryHasTransactionsCannotDelete": "이 카테고리에 연결된 거래 기록이 있어 삭제할 수 없습니다.",

@@ -628,6 +628,7 @@
       "archived": "Archived",
       "unarchive": "Unarchive",
       "noArchivedCategories": "No archived categories",
+      "noCategories": "No custom categories yet. Tap the top right button to add one.",
       "renameCategory": "Rename Category",
       "renameCategoryPlaceholder": "Enter category name...",
       "categoryHasTransactionsCannotDelete": "This category has transactions and cannot be deleted.",

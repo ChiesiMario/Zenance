@@ -628,6 +628,7 @@
       "archived": "已歸檔",
       "unarchive": "取消歸檔",
       "noArchivedCategories": "暫無已歸檔分類",
+      "noCategories": "尚無自訂分類，請點擊右上角新增。",
       "renameCategory": "重命名分類",
       "renameCategoryPlaceholder": "輸入分類名稱...",
       "categoryHasTransactionsCannotDelete": "此分類存在交易記錄，無法刪除。",

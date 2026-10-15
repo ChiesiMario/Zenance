@@ -174,7 +174,9 @@ export default function Categories() {
         <div className="divide-y divide-border">
           {currentCategories.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              {filterStatus === 'archived' ? t('settings.noArchivedCategories', '暫無已歸檔分類') : t('dashboard.noActivity')}
+              {filterStatus === 'archived'
+                ? t('settings.noArchivedCategories', '暫無已歸檔分類')
+                : t('settings.noCategories', '尚無自訂分類，請點擊右上角新增。')}
             </div>
           ) : (
             currentCategories.map(cat => (

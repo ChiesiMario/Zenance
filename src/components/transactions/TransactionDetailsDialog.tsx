@@ -1597,7 +1597,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               <button
                 type="button"
                 onClick={handleDelete}
-                className="h-8.5 flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 active:bg-destructive/15 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+                className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:bg-foreground hover:text-background active:bg-foreground active:text-background transition-colors cursor-pointer outline-none text-[11px] tracking-wide"
               >
                 <span>{t('dashboard.delete')}</span>
               </button>
@@ -1608,10 +1608,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                 disabled={isCurrentActiveRefund || isNonRefundableType || maxRefundable <= 0}
                 onClick={handleRefund}
                 className={cn(
-                  "h-8.5 flex items-center justify-center transition-all outline-none text-[11px] tracking-wide",
+                  "h-8.5 flex items-center justify-center transition-colors outline-none text-[11px] tracking-wide",
                   isCurrentActiveRefund || isNonRefundableType || maxRefundable <= 0
                     ? "text-muted-foreground/30 cursor-not-allowed"
-                    : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 cursor-pointer"
+                    : "text-muted-foreground/60 hover:bg-foreground hover:text-background active:bg-foreground active:text-background cursor-pointer"
                 )}
               >
                 <span>{t('dashboard.refund', '退款')}</span>
@@ -1627,10 +1627,10 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
                   onClose();
                 }}
                 className={cn(
-                  "h-8.5 flex items-center justify-center transition-all outline-none text-[11px] tracking-wide",
+                  "h-8.5 flex items-center justify-center transition-colors outline-none text-[11px] tracking-wide",
                   isEditDisabled
                     ? "text-muted-foreground/30 cursor-not-allowed"
-                    : "text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 cursor-pointer"
+                    : "text-muted-foreground/60 hover:bg-foreground hover:text-background active:bg-foreground active:text-background cursor-pointer"
                 )}
               >
                 <span>{t('dashboard.edit', '編輯')}</span>
@@ -1640,7 +1640,7 @@ export function TransactionDetailsDialog({ transactionId, onClose }: Props) {
               <button
                 type="button"
                 onClick={onClose}
-                className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 active:bg-muted/60 transition-all cursor-pointer outline-none text-[11px] tracking-wide"
+                className="h-8.5 flex items-center justify-center text-muted-foreground/60 hover:bg-foreground hover:text-background active:bg-foreground active:text-background transition-colors cursor-pointer outline-none text-[11px] tracking-wide"
               >
                 <span>{t('dashboard.close')}</span>
               </button>

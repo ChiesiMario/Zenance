@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -47,11 +47,17 @@ export default function Search() {
   const { allCategories } = useCategories();
   const { allTags } = useTags();
 
+  const inputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('all');
   const [txTypeFilter, setTxTypeFilter] = useState<TxTypeFilter>('all');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+
+  // 自動聚焦於搜尋輸入框（全域搜尋頁之特許例外，確保點擊搜尋後立即能夠鍵入）
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   // 讀取本地近期搜尋紀錄（自動去重）
   useEffect(() => {
@@ -252,6 +258,8 @@ export default function Search() {
         <div className="relative flex-1 flex items-center">
           <SearchIcon className="size-4 text-muted-foreground absolute left-3 pointer-events-none" />
           <Input
+            ref={inputRef}
+            autoFocus
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

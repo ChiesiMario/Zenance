@@ -1086,6 +1086,7 @@
       "archived": "已封存",
       "unarchive": "取消封存",
       "noArchivedCategories": "未有已封存分類",
+      "noCategories": "仲未有自訂分類，請點擊右上角新增。",
       "renameCategory": "重新命名分類",
       "renameCategoryPlaceholder": "輸入分類名稱...",
       "categoryHasTransactionsCannotDelete": "呢個分類仲有交易記錄，無法直接刪除。",

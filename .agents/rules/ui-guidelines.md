@@ -40,6 +40,7 @@ trigger: always_on
   - **焦點管理與禁止自動聚焦 (Dialog Focus & No Auto-Focus)**：
     - 彈窗掛載時禁止第 0 幀同步強奪焦點（`initialFocus={false}`），避免觸發整頁同步強制重排（Forced Synchronous Reflow）。
     - **嚴禁自動聚焦輸入框**：所有 Dialog 彈窗掛載出現時，**絕對禁止**在任何輸入框（如 `Input`、`AmountInput` 等）上設置 `autoFocus` 屬性，亦禁止透過 JS 強行調用 `.focus()`。自動聚焦會導致輸入鍵盤（桌面端懸浮數字鍵盤或行動端原生軟鍵盤）直接出現從而遮擋彈窗內容，破壞用戶看清彈窗完整資訊（如標題、說明、帳戶、金額上限等）的體驗。鍵盤必須交由用戶主動點擊目標欄位時呼出。
+    - **特許例外（全域搜尋頁面 `/search`）**：獨立的全域搜尋頁面為唯一特許例外。當用戶從首頁等全域入口主動點擊搜尋進入時，其核心意圖即為即時檢索，因此搜尋輸入框允許且應在進入時自動獲得焦點（`autoFocus` 搭配 `inputRef.focus()`），以保證操作流暢性與即敲即搜體驗。
 - **動畫與彈窗彈出規範 (Instant Pop)**：
   - Dialog / Modal 彈窗本體全面採用**「原生級瞬時彈出 (Instant Pop)」**，嚴禁在卡片上附加慢速 `animate-in fade-in` 動畫，徹底避免在舊款設備（如 A9/A10 晶片、iOS 15）上因底層光柵化搶佔時間片導致動畫殘缺與嚴重掉幀卡頓。
   - 彈窗呈現應如同 Vercel、Raycast 及 macOS 原生 Alert 般即點即出、清脆乾脆。

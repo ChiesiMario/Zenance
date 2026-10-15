@@ -628,6 +628,7 @@
       "archived": "Đã lưu trữ",
       "unarchive": "Unarchive",
       "noArchivedCategories": "Chưa có danh mục nào được lưu trữ",
+      "noCategories": "Chưa có danh mục tùy chỉnh nào. Nhấn vào góc trên bên phải để thêm mới.",
       "renameCategory": "Đổi tên danh mục",
       "renameCategoryPlaceholder": "Nhập tên danh mục...",
       "categoryHasTransactionsCannotDelete": "Danh mục này có giao dịch liên kết, không thể xóa.",

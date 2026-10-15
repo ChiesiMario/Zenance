@@ -628,6 +628,7 @@
       "archived": "アーカイブ済",
       "unarchive": "キャンセルアーカイブ",
       "noArchivedCategories": "アーカイブされたカテゴリはありません",
+      "noCategories": "カスタムカテゴリはまだありません。右上のボタンをタップして追加してください。",
       "renameCategory": "カテゴリ名を変更",
       "renameCategoryPlaceholder": "カテゴリ名を入力...",
       "categoryHasTransactionsCannotDelete": "このカテゴリには取引記録があるため削除できません。",
